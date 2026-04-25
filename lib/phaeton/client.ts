@@ -1,4 +1,4 @@
-import { ProxyAgent, type Dispatcher } from "undici";
+import { fetch as undiciFetch, ProxyAgent } from "undici";
 import type {
   PhaetonBrandsResponse,
   PhaetonDictionaryResponse,
@@ -11,9 +11,13 @@ const DEFAULT_TIMEOUT = 15_000;
  * Phaeton requires a static IP whitelist. On Vercel egress IPs are random,
  * so we route Phaeton calls through a fixed-IP proxy (e.g. Fixie). Configure
  * via env: PHAETON_PROXY_URL=http://user:pass@proxy.host:port
+ *
+ * NOTE: We use `undici.fetch` (not the global fetch). On Vercel the global
+ * fetch implementation can ignore the `dispatcher` option, so we call the
+ * raw undici fetch which always honors it.
  */
 let _proxyAgent: ProxyAgent | null = null;
-function proxyAgent(): Dispatcher | undefined {
+function proxyAgent(): ProxyAgent | undefined {
   const url = process.env.PHAETON_PROXY_URL;
   if (!url) return undefined;
   if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
@@ -62,14 +66,18 @@ async function phaetonFetch<T>(
   const ctrl = new AbortController();
   const tm = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT);
   try {
-    const res = await fetch(url, {
-      headers: { accept: "application/json" },
-      signal: ctrl.signal,
-      // Cache handled per-call by the caller via `next: { revalidate }` if desired.
-      cache: "no-store",
-      // @ts-expect-error — undici dispatcher for proxy routing; valid in Node fetch.
-      dispatcher: proxyAgent(),
-    });
+    const dispatcher = proxyAgent();
+    const res = dispatcher
+      ? await undiciFetch(url, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+          dispatcher,
+        })
+      : await fetch(url, {
+          headers: { accept: "application/json" },
+          signal: ctrl.signal,
+          cache: "no-store",
+        });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(

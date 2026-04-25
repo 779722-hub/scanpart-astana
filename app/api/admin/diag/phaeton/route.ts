@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ProxyAgent } from "undici";
+import { fetch as undiciFetch, ProxyAgent } from "undici";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,12 +42,15 @@ export async function POST(req: NextRequest) {
   const url = `${base}${path}?${qs}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-      // @ts-expect-error — undici dispatcher option
-      dispatcher: proxy,
-    });
+    const res = proxy
+      ? await undiciFetch(url, {
+          headers: { accept: "application/json" },
+          dispatcher: proxy,
+        })
+      : await fetch(url, {
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
     const text = await res.text();
     let parsed: unknown;
     try {
