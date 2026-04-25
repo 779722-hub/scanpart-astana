@@ -15,6 +15,15 @@ const phoneSchema = z
   .max(30)
   .refine(phoneOk, { message: "invalidPhone" });
 
+export const cartItemSchema = z.object({
+  brand: z.string().min(1).max(120),
+  article: z.string().min(1).max(120),
+  partName: z.string().min(1).max(300),
+  price: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().int().positive().max(999),
+});
+export type CartItemInput = z.infer<typeof cartItemSchema>;
+
 export const orderSchema = z
   .object({
     kind: z.enum(["express", "pickup"]),
@@ -27,11 +36,7 @@ export const orderSchema = z
       .optional()
       .or(z.literal("")),
     address: z.string().max(200).optional().or(z.literal("")),
-    brand: z.string().min(1),
-    article: z.string().min(1),
-    partName: z.string().min(1),
-    price: z.coerce.number().int().positive(),
-    quantity: z.coerce.number().int().positive().max(99),
+    items: z.array(cartItemSchema).min(1).max(50),
   })
   .superRefine((data, ctx) => {
     if (data.kind === "express" && !data.address?.trim()) {

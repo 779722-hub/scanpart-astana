@@ -12,32 +12,54 @@ export function buildWhatsAppLink(args: {
   return `https://wa.me/${phone}?text=${text}`;
 }
 
+export interface WhatsAppOrderItem {
+  brand: string;
+  article: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export function buildOrderWhatsAppMessage(args: {
   orderType: "express" | "pickup";
   clientName: string;
   phone: string;
+  whatsapp?: string;
   address?: string;
-  partName: string;
-  partBrand: string;
-  partArticle: string;
-  price: number;
-  quantity: number;
+  items: WhatsAppOrderItem[];
+  totalAmount: number;
   vehicle?: string;
   vin?: string;
 }): string[] {
   const t = args.orderType === "express" ? "Экспресс-доставка" : "Самовывоз";
   const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
-  const total = args.price * args.quantity;
-  return [
+
+  const lines: string[] = [
     `Здравствуйте! Я оформил заказ на SCANPART.ASTANA.`,
     `Тип: ${t}`,
-    `Запчасть: ${args.partName} (${args.partBrand} ${args.partArticle})`,
-    `Цена за шт.: ${fmt(args.price)} ₸ · Кол-во: ${args.quantity}`,
-    `Итого: ${fmt(total)} ₸`,
-    args.vehicle
-      ? `Авто: ${args.vehicle}${args.vin ? ` (VIN ${args.vin})` : ""}`
-      : "",
-    `Имя: ${args.clientName}, тел: ${args.phone}`,
-    args.address ? `Адрес: ${args.address}` : "",
-  ].filter(Boolean);
+    ``,
+    `Клиент: ${args.clientName}`,
+    `Телефон: ${args.phone}`,
+  ];
+  if (args.whatsapp) lines.push(`WhatsApp: ${args.whatsapp}`);
+  if (args.orderType === "express") {
+    lines.push(`Адрес доставки (Астана): ${args.address || "—"}`);
+  } else {
+    lines.push(`Самовывоз: г. Астана, пр. Республики, 68`);
+  }
+  if (args.vehicle) {
+    lines.push(`Авто: ${args.vehicle}${args.vin ? ` (VIN ${args.vin})` : ""}`);
+  } else if (args.vin) {
+    lines.push(`VIN: ${args.vin}`);
+  }
+  lines.push("");
+  lines.push(`Позиции (${args.items.length}):`);
+  args.items.forEach((it, i) => {
+    lines.push(
+      `${i + 1}. ${it.name} — ${it.brand} ${it.article} · ${fmt(it.price)} ₸ × ${it.quantity} = ${fmt(it.price * it.quantity)} ₸`
+    );
+  });
+  lines.push("");
+  lines.push(`Итого: ${fmt(args.totalAmount)} ₸`);
+  return lines;
 }

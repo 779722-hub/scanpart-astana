@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Package, Truck, Store, Check, HelpCircle, Info, Clock } from "lucide-react";
+import { Loader2, Package, Check, HelpCircle, Info, Clock, ShoppingCart, Trash2 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
+import { useCart } from "@/lib/cart";
 
 type State =
   | { kind: "loading" }
@@ -135,15 +136,19 @@ function OfferCard({
   locale: string;
 }) {
   const t = useTranslations("results");
-  const base = `/${locale}/order`;
-  const q = new URLSearchParams({
-    brand: offer.brand,
-    article: offer.article,
-    name: offer.name,
-    price: String(offer.priceFinal),
-    qty: "1",
-    available: String(offer.quantity),
-  }).toString();
+  const cart = useCart();
+  const inCart = cart.isInCart(offer.id);
+  const onAdd = () => {
+    cart.add({
+      id: offer.id,
+      brand: offer.brand,
+      article: offer.article,
+      name: offer.name,
+      price: offer.priceFinal,
+      quantity: 1,
+      availableQty: offer.quantity,
+    });
+  };
 
   return (
     <article className="card">
@@ -223,14 +228,26 @@ function OfferCard({
       </div>
 
       <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-        <Link href={`${base}/express?${q}`} className="btn-primary flex-1">
-          <Truck className="h-4 w-4" />
-          {t("orderExpress")}
-        </Link>
-        <Link href={`${base}/pickup?${q}`} className="btn-secondary flex-1">
-          <Store className="h-4 w-4" />
-          {t("orderPickup")}
-        </Link>
+        {inCart ? (
+          <>
+            <Link href={`/${locale}/cart`} className="btn-primary flex-1">
+              <ShoppingCart className="h-4 w-4" />
+              Перейти в корзину
+            </Link>
+            <button
+              onClick={() => cart.remove(offer.id)}
+              className="btn-secondary"
+              aria-label="Удалить из корзины"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <button onClick={onAdd} className="btn-primary flex-1">
+            <ShoppingCart className="h-4 w-4" />
+            В корзину
+          </button>
+        )}
       </div>
     </article>
   );

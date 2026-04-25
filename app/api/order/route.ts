@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { orderSchema, normalizePhoneE164 } from "@/lib/schemas";
+import { orderSchema, normalizePhoneE164, formatPhonePretty } from "@/lib/schemas";
 import { appendOrder } from "@/lib/sheets/client";
 import { getAllSettings } from "@/lib/sheets/settings";
 import { sendOrderToTelegram } from "@/lib/telegram/bot";
@@ -27,32 +27,39 @@ export async function POST(req: NextRequest) {
 
   const orderType = d.kind === "express" ? "Экспресс" : "Самовывоз";
   const settings = await getAllSettings().catch(() => null);
+  const isoNow = new Date().toISOString();
 
-  // 1. Append to Google Sheets
-  let sheetRow: number | null = null;
-  try {
-    sheetRow = await appendOrder({
-      date: new Date().toISOString(),
-      telegramId: "", // reserved — if the flow later migrates into a TG WebApp
-      clientName: d.name,
-      vin,
-      vehicle,
-      partName: d.partName,
-      partArticle: d.article,
-      brand: d.brand,
-      price: d.price,
-      quantity: d.quantity,
-      orderType,
-      address: d.address ?? "",
-      phone: d.phone,
-      whatsapp: d.whatsapp ?? "",
-      status: "Новый",
-    });
-  } catch (err) {
-    console.error("[api/order] sheets append failed", (err as Error).message);
+  // 1. Append one row per cart item to Google Sheets.
+  const sheetRows: Array<number | null> = [];
+  for (const item of d.items) {
+    try {
+      const row = await appendOrder({
+        date: isoNow,
+        telegramId: "",
+        clientName: d.name,
+        vin,
+        vehicle,
+        partName: item.partName,
+        partArticle: item.article,
+        brand: item.brand,
+        price: item.price,
+        quantity: item.quantity,
+        orderType,
+        address: d.address ?? "",
+        phone: d.phone,
+        whatsapp: d.whatsapp ?? "",
+        status: "Новый",
+      });
+      sheetRows.push(row);
+    } catch (err) {
+      console.error("[api/order] sheets append failed", (err as Error).message);
+      sheetRows.push(null);
+    }
   }
 
-  // 2. Notify manager in Telegram
+  const totalAmount = d.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  // 2. Notify manager in Telegram (single message with full breakdown).
   if (settings?.telegramChatId) {
     await sendOrderToTelegram({
       chatId: settings.telegramChatId,
@@ -63,28 +70,35 @@ export async function POST(req: NextRequest) {
       address: d.address || undefined,
       vehicle: vehicle || undefined,
       vin: vin || undefined,
-      partName: d.partName,
-      partBrand: d.brand,
-      partArticle: d.article,
-      price: d.price,
-      quantity: d.quantity,
-      sheetRow,
+      items: d.items.map((i) => ({
+        brand: i.brand,
+        article: i.article,
+        name: i.partName,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      totalAmount,
+      sheetRows: sheetRows.filter((r): r is number => r !== null),
     });
   }
 
-  // 3. Build WhatsApp deep-link for the client to open
+  // 3. WhatsApp deep-link for the client.
   let whatsappUrl: string | null = null;
   if (settings?.managerWhatsappE164) {
     const lines = buildOrderWhatsAppMessage({
       orderType: d.kind,
       clientName: d.name,
-      phone: normalizePhoneE164(d.phone),
+      phone: formatPhonePretty(d.phone),
+      whatsapp: d.whatsapp ? formatPhonePretty(d.whatsapp) : undefined,
       address: d.address || undefined,
-      partName: d.partName,
-      partBrand: d.brand,
-      partArticle: d.article,
-      price: d.price,
-      quantity: d.quantity,
+      items: d.items.map((i) => ({
+        brand: i.brand,
+        article: i.article,
+        name: i.partName,
+        price: i.price,
+        quantity: i.quantity,
+      })),
+      totalAmount,
       vehicle: vehicle || undefined,
       vin: vin || undefined,
     });
@@ -96,8 +110,12 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    sheetRow,
+    sheetRows,
     whatsappUrl,
     orderType: d.kind,
+    total: totalAmount,
   });
 }
+
+// Suppress unused-import warning when bundler tree-shakes alternate paths.
+void normalizePhoneE164;
