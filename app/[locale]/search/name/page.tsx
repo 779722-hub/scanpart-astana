@@ -49,21 +49,24 @@ export default async function NamePage({
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <a
-              href={`https://www.autodoc.ru/avtopoisk/${encodeURIComponent(
-                session.vin || ""
-              )}`}
+              href="https://www.autodoc.ru/catalogs/car"
               target="_blank"
               rel="noreferrer"
               className="btn-secondary justify-between !py-3"
+              title={
+                session.vin
+                  ? `Скопируйте VIN ${session.vin} и вставьте в поиск на autodoc.ru`
+                  : undefined
+              }
             >
-              <span>autodoc.ru — подбор по VIN</span>
+              <span>autodoc.ru — каталог по авто</span>
               <ExternalLink className="h-4 w-4" />
             </a>
             <a
               href={`https://www.google.com/search?q=${encodeURIComponent(
                 `${vehicle.make} ${vehicle.model !== "—" ? vehicle.model : ""} ${
                   vehicle.year !== "—" ? vehicle.year : ""
-                } каталог запчастей`
+                } каталог запчастей VIN`
               )}`}
               target="_blank"
               rel="noreferrer"
@@ -73,6 +76,16 @@ export default async function NamePage({
               <ExternalLink className="h-4 w-4" />
             </a>
           </div>
+          {session.vin && (
+            <div className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
+              <div className="text-ink-mute dark:text-paper-mute">
+                Ваш VIN — скопируйте и вставьте в форму autodoc.ru:
+              </div>
+              <div className="mt-1 select-all font-mono text-sm font-bold">
+                {session.vin}
+              </div>
+            </div>
+          )}
           <p className="text-xs text-ink-mute dark:text-paper-mute">
             Вернитесь сюда с найденным парт-номером и введите его в{" "}
             <a className="underline" href={`/${locale}/search/article`}>
