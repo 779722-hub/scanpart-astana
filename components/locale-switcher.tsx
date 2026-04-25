@@ -26,7 +26,7 @@ export function LocaleSwitcher() {
   return (
     <div
       role="radiogroup"
-      className="inline-flex rounded-2xl border border-paper-mute bg-white p-1 dark:border-ink-mute dark:bg-ink-soft"
+      className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 sm:p-1 dark:border-ink-mute dark:bg-ink-soft"
     >
       {locales.map((l) => {
         const is = l === active;
@@ -37,13 +37,13 @@ export function LocaleSwitcher() {
             aria-checked={is}
             onClick={() => switchTo(l)}
             className={cn(
-              "flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition",
+              "flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-semibold transition sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm",
               is
                 ? "bg-brand text-white shadow-card"
                 : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
             )}
           >
-            <span aria-hidden>{LABELS[l].flag}</span>
+            <span aria-hidden className="hidden sm:inline">{LABELS[l].flag}</span>
             <span>{LABELS[l].short}</span>
           </button>
         );

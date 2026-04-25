@@ -22,7 +22,7 @@ export function ThemeSwitcher() {
     <div
       role="radiogroup"
       aria-label={t("themeAuto")}
-      className="inline-flex rounded-2xl border border-paper-mute bg-white p-1 dark:border-ink-mute dark:bg-ink-soft"
+      className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 sm:p-1 dark:border-ink-mute dark:bg-ink-soft"
     >
       {options.map(({ value, Icon, label }) => {
         const active = mounted && theme === value;
@@ -35,7 +35,7 @@ export function ThemeSwitcher() {
             title={label}
             onClick={() => setTheme(value)}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl transition",
+              "flex h-8 w-8 items-center justify-center rounded-xl transition sm:h-9 sm:w-9",
               active
                 ? "bg-brand text-white shadow-card"
                 : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"

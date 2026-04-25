@@ -5,16 +5,22 @@
 @layer base {
   :root {
     color-scheme: light;
+    /* Safe-area for iOS notch / Android gesture bar */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   .dark {
     color-scheme: dark;
   }
   html {
     scroll-behavior: smooth;
+    /* Prevent iOS auto-zoom on form focus when font-size < 16px */
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-paper text-ink antialiased dark:bg-ink dark:text-paper;
     font-feature-settings: "ss01", "cv11";
+    /* Prevent horizontal scroll on small screens */
+    overflow-x: hidden;
   }
   input,
   textarea,
@@ -22,11 +28,19 @@
   button {
     font: inherit;
   }
+  /* Touch-target — at least 44px on mobile per WCAG/Apple HIG. */
+  button,
+  [role="button"],
+  a.btn-primary,
+  a.btn-secondary {
+    min-height: 44px;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-4
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-brand
+           px-5 py-3 sm:px-6 sm:py-4
            text-base font-semibold text-white shadow-card transition
            hover:bg-brand-600 hover:shadow-cardHover
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400
@@ -34,23 +48,34 @@
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-paper-mute
-           bg-white px-6 py-4 text-base font-semibold text-ink shadow-card transition
+           bg-white px-5 py-3 sm:px-6 sm:py-4
+           text-base font-semibold text-ink shadow-card transition
            hover:border-ink-mute hover:shadow-cardHover
            dark:border-ink-mute dark:bg-ink-soft dark:text-paper dark:hover:border-paper-mute;
   }
   .card {
-    @apply rounded-3xl bg-white p-6 shadow-card ring-1 ring-paper-mute
+    @apply rounded-2xl bg-white p-4 shadow-card ring-1 ring-paper-mute
+           sm:rounded-3xl sm:p-6
            dark:bg-ink-soft dark:ring-ink-mute;
   }
   .input {
-    @apply block w-full rounded-2xl border border-paper-mute bg-white px-4 py-3 text-lg
+    @apply block w-full rounded-2xl border border-paper-mute bg-white
+           px-4 py-3 text-base sm:text-lg
            outline-none transition focus:border-brand focus:ring-2 focus:ring-brand-200
            dark:border-ink-mute dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute;
+    /* keep ≥16px to avoid iOS auto-zoom on focus */
+    font-size: 16px;
+  }
+  @screen sm {
+    .input {
+      font-size: 18px;
+    }
   }
   .label {
     @apply mb-1 block text-sm font-medium text-ink-mute dark:text-paper-mute;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
+           text-[11px] font-semibold sm:px-3 sm:py-1 sm:text-xs;
   }
 }

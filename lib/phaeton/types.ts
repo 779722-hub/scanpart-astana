@@ -77,4 +77,16 @@ export interface PartOffer {
   isOriginal: boolean;
   compat?: CompatHint;
   compatReason?: string;
+  // Filter flags — populated server-side and used by the relax-ladder.
+  atAstana: boolean;
+  inStockNow: boolean;
+  matchesAllWords: boolean;
+  shipmentDays: number;
 }
+
+export type RelaxLevel =
+  | "exact"            // all filters applied
+  | "no-make"          // dropped strict-compat (no make match required)
+  | "no-words"         // dropped query-words AND
+  | "with-delivery"    // allow non-zero delivery to Astana
+  | "any-warehouse";   // allow other cities

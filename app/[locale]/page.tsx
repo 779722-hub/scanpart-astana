@@ -68,31 +68,31 @@ export default async function HomePage({
         className="absolute inset-0 -z-10 [mask-image:radial-gradient(70%_50%_at_50%_0%,#000,transparent)] bg-[url('/images/hero-grid.svg')] opacity-50"
       />
 
-      <section className="mx-auto max-w-6xl px-4 pb-12 pt-12 sm:px-6 sm:pt-20">
-        <h1 className="text-balance text-4xl font-black tracking-tight sm:text-5xl md:text-6xl">
+      <section className="mx-auto max-w-6xl px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-20">
+        <h1 className="text-balance text-3xl font-black tracking-tight sm:text-5xl md:text-6xl">
           <span className="bg-gradient-to-r from-brand to-ink bg-clip-text text-transparent dark:to-paper">
             {t("title")}
           </span>
         </h1>
-        <p className="mt-5 max-w-2xl text-pretty text-lg text-ink-mute dark:text-paper-mute">
+        <p className="mt-3 max-w-2xl text-pretty text-base text-ink-mute sm:mt-5 sm:text-lg dark:text-paper-mute">
           {t("subtitle")}
         </p>
 
-        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-4 lg:grid-cols-4">
           {cards.map(({ href, label, desc, Icon, accent }) => (
             <Link
               key={href}
               href={href}
-              className="card group flex min-h-[10rem] flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-cardHover"
+              className="card group flex min-h-[7.5rem] flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-cardHover sm:min-h-[10rem]"
             >
               <span
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-card ${accent}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-2xl shadow-card sm:h-12 sm:w-12 ${accent}`}
               >
-                <Icon className="h-6 w-6" />
+                <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
               </span>
-              <div className="mt-6">
-                <div className="text-xl font-bold">{label}</div>
-                <div className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+              <div className="mt-4 sm:mt-6">
+                <div className="text-base font-bold leading-tight sm:text-xl">{label}</div>
+                <div className="mt-1 hidden text-sm text-ink-mute sm:block dark:text-paper-mute">
                   {desc}
                 </div>
               </div>

@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Package, Truck, Store, Check, HelpCircle } from "lucide-react";
-import type { PartOffer } from "@/lib/phaeton/types";
+import { Loader2, Package, Truck, Store, Check, HelpCircle, Info, Clock } from "lucide-react";
+import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 
 type State =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message?: string }
-  | { kind: "ok"; offers: PartOffer[] };
+  | { kind: "ok"; offers: PartOffer[]; level: RelaxLevel };
 
 function formatKzt(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
@@ -47,7 +47,11 @@ export function ResultsList({
           setState({ kind: "empty" });
           return;
         }
-        setState({ kind: "ok", offers: json.offers as PartOffer[] });
+        setState({
+          kind: "ok",
+          offers: json.offers as PartOffer[],
+          level: (json.level as RelaxLevel) ?? "exact",
+        });
       } catch {
         if (!cancelled) setState({ kind: "error" });
       }
@@ -91,6 +95,7 @@ export function ResultsList({
 
   return (
     <div className="space-y-4">
+      {state.level !== "exact" && <RelaxBanner level={state.level} />}
       {state.offers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
@@ -99,6 +104,23 @@ export function ResultsList({
           {t("newSearch")}
         </Link>
       </div>
+    </div>
+  );
+}
+
+function RelaxBanner({ level }: { level: RelaxLevel }) {
+  const messages: Record<Exclude<RelaxLevel, "exact">, string> = {
+    "no-make": "Точных совпадений с вашей маркой нет — показаны другие варианты в наличии в Астане.",
+    "no-words": "По вашему запросу совпадений в Астане нет — показаны похожие позиции, которые есть в наличии.",
+    "with-delivery": "В наличии Астана нет — показаны позиции с доставкой из других городов (срок указан в карточке).",
+    "any-warehouse": "В Астане нет — показаны позиции с других складов (доставка может занять несколько дней).",
+  };
+  return (
+    <div className="card flex items-start gap-3 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10">
+      <Info className="mt-0.5 h-5 w-5 flex-none text-amber-600" />
+      <p className="text-sm text-amber-900 dark:text-amber-200">
+        {messages[level as Exclude<RelaxLevel, "exact">]}
+      </p>
     </div>
   );
 }
@@ -156,10 +178,10 @@ function OfferCard({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-4">
         <div>
-          <h3 className="text-xl font-bold leading-tight">{offer.name}</h3>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <h3 className="text-base font-bold leading-tight sm:text-xl">{offer.name}</h3>
+          <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-ink-mute dark:text-paper-mute">{t("brand")}</dt>
             <dd className="font-semibold">{offer.brand}</dd>
             <dt className="text-ink-mute dark:text-paper-mute">
@@ -169,16 +191,30 @@ function OfferCard({
             <dt className="text-ink-mute dark:text-paper-mute">{t("stock")}</dt>
             <dd className="font-semibold">
               {offer.quantity} {t("stockSuffix")}
+              {offer.warehouse && offer.warehouse !== "Астана" && (
+                <span className="ml-1 text-xs text-ink-mute dark:text-paper-mute">
+                  · {offer.warehouse}
+                </span>
+              )}
             </dd>
+            {offer.shipmentDays > 0 && (
+              <>
+                <dt className="text-ink-mute dark:text-paper-mute">Доставка</dt>
+                <dd className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-300">
+                  <Clock className="h-3 w-3" />
+                  ~{offer.shipmentDays} дн.
+                </dd>
+              </>
+            )}
           </dl>
         </div>
-        <div className="text-right">
+        <div className="flex items-baseline justify-between gap-2 sm:block sm:text-right">
           <div className="text-xs uppercase tracking-wider text-ink-mute dark:text-paper-mute">
             {t("price")}
           </div>
-          <div className="text-3xl font-black text-brand">
+          <div className="text-2xl font-black text-brand sm:text-3xl">
             {formatKzt(offer.priceFinal)}
-            <span className="ml-1 text-base font-semibold text-ink dark:text-paper">
+            <span className="ml-1 text-sm font-semibold text-ink sm:text-base dark:text-paper">
               {t("priceUnit")}
             </span>
           </div>
