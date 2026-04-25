@@ -41,7 +41,7 @@ Thumbs.db
 # Misc
 .vercel
 *.tsbuildinfo
-next-env.d.ts
+# next-env.d.ts intentionally tracked: CI typecheck (no `next build` first) needs it.
 .cache/
 .history/
 
