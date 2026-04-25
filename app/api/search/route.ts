@@ -17,8 +17,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Astana warehouse resolution: env override → Dictionary → fall back to no filter.
     const [warehouseIds, markupPct] = await Promise.all([
-      getAstanaWarehouseIds(),
+      getAstanaWarehouseIds().catch((err) => {
+        console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
+        return [] as string[];
+      }),
       getMarkupPercent(),
     ]);
 
@@ -54,15 +58,22 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Filter in-stock at Astana (extra safety: server-side Sources filter
-    // should already do this, but warehouses in responses are cross-checked).
-    const normArticle = raw.toUpperCase().replace(/[\s-]/g, "");
+    // Filter in-stock + Astana (when we couldn't pass Sources to Phaeton, do client-side filter).
+    const normArticle = raw.toUpperCase().replace(/[\s\-]/g, "");
+    const astanaOnly = warehouseIds.length > 0 || true; // always prefer Astana if we can detect it by name
     const offers: PartOffer[] = rawItems
-      .filter((i) => (i.Count ?? 0) > 0 && (i.Price ?? 0) > 0)
+      .filter((i) => (i.AvailableCount ?? 0) > 0 && (i.Price ?? 0) > 0)
+      .filter((i) => {
+        if (warehouseIds.length && i.WarehouseId && warehouseIds.includes(i.WarehouseId)) return true;
+        if (warehouseIds.length === 0 && astanaOnly) {
+          // No env/dictionary id, but the response carries a Warehouse name string — prefer Astana.
+          return /астана|astana/i.test(i.Warehouse ?? "");
+        }
+        return warehouseIds.length === 0; // no filter at all
+      })
       .map((i): PartOffer => {
-        const articleClean = i.Article.toUpperCase().replace(/[\s-]/g, "");
-        const isOriginal =
-          articleClean === normArticle || i.IsAnalog === false;
+        const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
+        const isOriginal = cleanArticle === normArticle;
         return {
           id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
           brand: i.Brand,
@@ -70,8 +81,8 @@ export async function GET(req: NextRequest) {
           name: i.Name ?? brandsResp.Items.find((b) => b.Brand === i.Brand)?.Name ?? "",
           priceRaw: i.Price,
           priceFinal: applyMarkup(i.Price, markupPct),
-          quantity: i.Count,
-          warehouse: i.WarehouseName,
+          quantity: i.AvailableCount ?? 0,
+          warehouse: i.Warehouse,
           isOriginal,
         };
       });

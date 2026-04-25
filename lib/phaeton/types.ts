@@ -21,14 +21,20 @@ export interface PhaetonBrandsResponse {
 export interface PhaetonPriceItem {
   Brand: string;
   Article: string;
+  CleanArticle?: string;
   Name?: string;
   Price: number;
-  Count: number;
+  CurrencyCode?: string;
+  AvailableCount?: number;
+  Presence?: string;
   WarehouseId?: string;
-  WarehouseName?: string;
-  IsAnalog?: boolean;
-  SupplierId?: number;
+  Warehouse?: string;
+  ItemId?: string;
+  SupplierId?: number | null;
   ExpectedDelivery?: number;
+  GuaranteedDelivery?: number;
+  DeliveryProbability?: number;
+  Using?: string;
   // Any additional unknown fields are accepted silently.
 }
 
