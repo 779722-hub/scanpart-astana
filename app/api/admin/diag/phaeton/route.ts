@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ProxyAgent } from "undici";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const proxy = process.env.PHAETON_PROXY_URL
+  ? new ProxyAgent(process.env.PHAETON_PROXY_URL)
+  : undefined;
 
 /**
  * Token-protected Phaeton diagnostic — proxies a raw call and returns the
@@ -40,6 +45,8 @@ export async function POST(req: NextRequest) {
     const res = await fetch(url, {
       headers: { accept: "application/json" },
       cache: "no-store",
+      // @ts-expect-error — undici dispatcher option
+      dispatcher: proxy,
     });
     const text = await res.text();
     let parsed: unknown;

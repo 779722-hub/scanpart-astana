@@ -1,3 +1,4 @@
+import { ProxyAgent, type Dispatcher } from "undici";
 import type {
   PhaetonBrandsResponse,
   PhaetonDictionaryResponse,
@@ -5,6 +6,19 @@ import type {
 } from "./types";
 
 const DEFAULT_TIMEOUT = 15_000;
+
+/**
+ * Phaeton requires a static IP whitelist. On Vercel egress IPs are random,
+ * so we route Phaeton calls through a fixed-IP proxy (e.g. Fixie). Configure
+ * via env: PHAETON_PROXY_URL=http://user:pass@proxy.host:port
+ */
+let _proxyAgent: ProxyAgent | null = null;
+function proxyAgent(): Dispatcher | undefined {
+  const url = process.env.PHAETON_PROXY_URL;
+  if (!url) return undefined;
+  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
+  return _proxyAgent;
+}
 
 function env(name: string): string {
   const v = process.env[name];
@@ -53,6 +67,8 @@ async function phaetonFetch<T>(
       signal: ctrl.signal,
       // Cache handled per-call by the caller via `next: { revalidate }` if desired.
       cache: "no-store",
+      // @ts-expect-error — undici dispatcher for proxy routing; valid in Node fetch.
+      dispatcher: proxyAgent(),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
