@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     } catch {
       parsed = text.slice(0, 1000);
     }
+    const proxyEnv = process.env.PHAETON_PROXY_URL;
     return NextResponse.json({
       ok: res.ok,
       status: res.status,
@@ -66,6 +67,12 @@ export async function POST(req: NextRequest) {
       params: Object.keys(body.extra || {}),
       contentType: res.headers.get("content-type"),
       body: parsed,
+      proxy: {
+        envSet: Boolean(proxyEnv),
+        envLen: proxyEnv?.length ?? 0,
+        envPrefix: proxyEnv ? proxyEnv.slice(0, 12) : null,
+        agentInUse: Boolean(proxy),
+      },
     });
   } catch (err) {
     return NextResponse.json(
