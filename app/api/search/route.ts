@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup } from "@/lib/markup";
-import { getMarkupPercent } from "@/lib/sheets/settings";
+import { getAnalogsMax, getMarkupPercent } from "@/lib/sheets/settings";
 import type { PartOffer, PhaetonPriceItem } from "@/lib/phaeton/types";
 import { getSession } from "@/lib/session";
 
@@ -18,12 +18,13 @@ export async function GET(req: NextRequest) {
 
   try {
     // Astana warehouse resolution: env override → Dictionary → fall back to no filter.
-    const [warehouseIds, markupPct] = await Promise.all([
+    const [warehouseIds, markupPct, analogsMax] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
         return [] as string[];
       }),
       getMarkupPercent(),
+      getAnalogsMax(),
     ]);
 
     // Step A: brands for this article (Phaeton accepts part number OR name
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
     const analogs = offers
       .filter((o) => !o.isOriginal)
       .sort((a, b) => a.priceFinal - b.priceFinal)
-      .slice(0, 3);
+      .slice(0, analogsMax);
 
     const picked = [...originals.slice(0, 1), ...analogs].sort(
       (a, b) => a.priceFinal - b.priceFinal

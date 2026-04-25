@@ -16,6 +16,7 @@ async function main() {
   console.log("Seeding default Settings…");
   const defaults: Record<string, string> = {
     markup_percent: "35",
+    analogs_max: "3",
     express_delivery_price: "3000",
     express_hours: "Пн–Сб 09:00–16:30",
     pickup_address: "г. Астана, пр. Республики, 68",

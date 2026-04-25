@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import { Loader2, Save, CheckCircle2, Settings } from "lucide-react";
 import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 
+const ANALOGS_MIN = 0;
+const ANALOGS_MAX = 10;
+
 const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "text" }[] = [
   { key: "markup_percent", label: "Наценка, %", hint: `${MARKUP_MIN}–${MARKUP_MAX}`, kind: "number" },
+  { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза" },
@@ -59,6 +63,15 @@ export function TabSettings() {
           Number(patch.markup_percent) > MARKUP_MAX)
       ) {
         alert(`Наценка должна быть в диапазоне ${MARKUP_MIN}–${MARKUP_MAX}%`);
+        setStatus("idle");
+        return;
+      }
+      if (
+        patch.analogs_max &&
+        (Number(patch.analogs_max) < ANALOGS_MIN ||
+          Number(patch.analogs_max) > ANALOGS_MAX)
+      ) {
+        alert(`Количество аналогов должно быть в диапазоне ${ANALOGS_MIN}–${ANALOGS_MAX}`);
         setStatus("idle");
         return;
       }

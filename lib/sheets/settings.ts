@@ -33,8 +33,27 @@ export async function setMarkupPercent(pct: number): Promise<number> {
   return clamped;
 }
 
+export const ANALOGS_MIN = 0;
+export const ANALOGS_MAX = 10;
+export const ANALOGS_DEFAULT = 3;
+
+function clampAnalogs(n: number): number {
+  if (!Number.isFinite(n)) return ANALOGS_DEFAULT;
+  return Math.max(ANALOGS_MIN, Math.min(ANALOGS_MAX, Math.floor(n)));
+}
+
+export async function getAnalogsMax(): Promise<number> {
+  try {
+    const v = await getSetting("analogs_max");
+    return clampAnalogs(Number(v));
+  } catch {
+    return ANALOGS_DEFAULT;
+  }
+}
+
 export interface PublicSettings {
   markupPercent: number;
+  analogsMax: number;
   expressDeliveryPrice: number;
   expressHours: string;
   pickupAddress: string;
@@ -48,6 +67,7 @@ export async function getAllSettings(): Promise<PublicSettings> {
   const map = await readAll().catch(() => ({} as Record<string, string>));
   return {
     markupPercent: clampMarkup(Number(map.markup_percent ?? MARKUP_DEFAULT)),
+    analogsMax: clampAnalogs(Number(map.analogs_max ?? ANALOGS_DEFAULT)),
     expressDeliveryPrice: Number(map.express_delivery_price ?? 3000),
     expressHours: map.express_hours ?? "Пн-Сб 09:00–16:30",
     pickupAddress: map.pickup_address ?? "г. Астана, пр. Республики, 68",
