@@ -12,7 +12,7 @@ const SESSION_COOKIE = "scanpart_sess";
 const ADMIN_PAGE_RE = /^\/(ru|kk|en)\/admin(\/|$)/;
 const ADMIN_LOGIN_RE = /^\/(ru|kk|en)\/admin\/login(\/|$)/;
 const PUBLIC_API_AUTH_RE =
-  /^\/api\/admin\/auth\/(login|bootstrap)(\/|$)/;
+  /^\/api\/admin\/(auth\/(login|bootstrap)|setup)(\/|$)/;
 
 function hasSessionCookie(req: NextRequest): boolean {
   return Boolean(req.cookies.get(SESSION_COOKIE)?.value);
