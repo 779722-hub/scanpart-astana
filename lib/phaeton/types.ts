@@ -33,6 +33,8 @@ export interface PhaetonPriceItem {
   SupplierId?: number | null;
   ExpectedDelivery?: number;
   GuaranteedDelivery?: number;
+  ExpectedShipmentDays?: number;
+  GuaranteedShipmentDays?: number;
   DeliveryProbability?: number;
   Using?: string;
   // Any additional unknown fields are accepted silently.

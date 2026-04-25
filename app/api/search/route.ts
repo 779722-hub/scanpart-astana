@@ -65,18 +65,28 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Filter in-stock + Astana (when we couldn't pass Sources to Phaeton, do client-side filter).
+    // Strict in-stock check: physically on the Astana shelf right now, no
+    // delivery/transfer days. Items with any positive shipment days are
+    // dropped — those would arrive from another city.
+    const inStockNow = (i: PhaetonPriceItem): boolean => {
+      const days = Math.max(
+        i.ExpectedShipmentDays ?? 0,
+        i.GuaranteedShipmentDays ?? 0,
+        i.ExpectedDelivery ?? 0,
+        i.GuaranteedDelivery ?? 0
+      );
+      return days === 0;
+    };
+
     const normArticle = raw.toUpperCase().replace(/[\s\-]/g, "");
-    const astanaOnly = warehouseIds.length > 0 || true; // always prefer Astana if we can detect it by name
     const offers: PartOffer[] = rawItems
       .filter((i) => (i.AvailableCount ?? 0) > 0 && (i.Price ?? 0) > 0)
+      .filter(inStockNow)
       .filter((i) => {
         if (warehouseIds.length && i.WarehouseId && warehouseIds.includes(i.WarehouseId)) return true;
-        if (warehouseIds.length === 0 && astanaOnly) {
-          // No env/dictionary id, but the response carries a Warehouse name string — prefer Astana.
-          return /астана|astana/i.test(i.Warehouse ?? "");
-        }
-        return warehouseIds.length === 0; // no filter at all
+        // Always prefer items whose warehouse name contains "Астана" — that's
+        // the local-shelf signal we trust most.
+        return /астана|astana/i.test(i.Warehouse ?? "");
       })
       .map((i): PartOffer => {
         const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
