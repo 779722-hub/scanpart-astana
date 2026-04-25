@@ -51,11 +51,21 @@ export async function decodeVin(input: string): Promise<VehicleInfo | null> {
     return info;
   }
 
-  // Fallback: try WMI lookup (first 3 chars). Returns at least the make.
-  const partial = await decodeWmi(vin.slice(0, 3));
-  if (partial) {
-    cache.set(vin, partial);
-    return partial;
+  // Partial fallback: NHTSA often knows the year and body class even when
+  // the full VIN isn't in its database. Combine with WMI-derived make.
+  const wmi = await decodeWmi(vin.slice(0, 3));
+  const partialMake = r?.Make || wmi?.make;
+  const partialYear = r?.ModelYear || wmi?.year;
+  if (partialMake) {
+    const info: VehicleInfo = {
+      make: partialMake,
+      model: r?.Model || "—",
+      year: partialYear || "—",
+      bodyClass: r?.BodyClass || wmi?.bodyClass || undefined,
+      fuelType: r?.FuelTypePrimary || undefined,
+    };
+    cache.set(vin, info);
+    return info;
   }
   return null;
 }
@@ -69,15 +79,23 @@ async function decodeWmi(wmi: string): Promise<VehicleInfo | null> {
     });
     if (!res.ok) return null;
     const json = (await res.json()) as {
-      Results?: Array<{ Name?: string; VehicleType?: string; Country?: string }>;
+      Results?: Array<{
+        CommonName?: string;
+        Make?: string;
+        ManufacturerName?: string;
+        VehicleType?: string;
+      }>;
     };
     const r = json.Results?.[0];
-    if (!r?.Name) return null;
+    // CommonName is the short brand ("Nissan"), Make can be a multi-marque
+    // string like "NISSAN, INFINITI"; prefer CommonName for cleaner UI.
+    const make = r?.CommonName || r?.Make || r?.ManufacturerName;
+    if (!make) return null;
     return {
-      make: r.Name,
+      make,
       model: "—",
       year: "—",
-      bodyClass: r.VehicleType || undefined,
+      bodyClass: r?.VehicleType || undefined,
     };
   } catch {
     return null;
