@@ -142,6 +142,7 @@ function OfferCard({
     name: offer.name,
     price: String(offer.priceFinal),
     qty: "1",
+    available: String(offer.quantity),
   }).toString();
 
   return (

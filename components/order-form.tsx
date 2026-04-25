@@ -3,9 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, ChevronLeft, CheckCircle2, ExternalLink } from "lucide-react";
+import {
+  Loader2,
+  ChevronLeft,
+  CheckCircle2,
+  ExternalLink,
+  Minus,
+  Plus,
+} from "lucide-react";
 import { orderSchema, type OrderInput } from "@/lib/schemas";
 
 export interface SelectedPart {
@@ -14,7 +21,11 @@ export interface SelectedPart {
   name: string;
   price: number;
   quantity: number;
+  /** How many are physically on the Astana shelf — upper bound for the qty input. */
+  availableQty: number;
 }
+
+const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
 export function OrderForm({
   locale,
@@ -34,6 +45,8 @@ export function OrderForm({
   const {
     register,
     handleSubmit,
+    setValue,
+    control,
     formState: { errors },
   } = useForm<OrderInput>({
     resolver: zodResolver(orderSchema),
@@ -43,9 +56,17 @@ export function OrderForm({
       article: part.article,
       partName: part.name,
       price: part.price,
-      quantity: part.quantity,
+      quantity: Math.max(1, Math.min(part.quantity || 1, part.availableQty || 99)),
     },
   });
+
+  const watchedQty = useWatch({ control, name: "quantity", defaultValue: 1 }) as number;
+  const qty = Math.max(1, Math.min(Number(watchedQty) || 1, part.availableQty));
+  const total = qty * part.price;
+  const setQty = (n: number) => {
+    const clamped = Math.max(1, Math.min(n, part.availableQty));
+    setValue("quantity", clamped, { shouldValidate: true });
+  };
 
   async function onSubmit(data: OrderInput) {
     setStatus("submitting");
@@ -111,14 +132,61 @@ export function OrderForm({
         </Link>
       </div>
 
-      <div className="rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
-        <div className="font-semibold">{part.name}</div>
-        <div className="text-ink-mute dark:text-paper-mute">
-          {part.brand} · {part.article} ·{" "}
-          <strong>
-            {new Intl.NumberFormat("ru-RU").format(part.price)} ₸
-          </strong>{" "}
-          × {part.quantity}
+      <div className="space-y-3 rounded-2xl bg-paper-soft p-4 text-sm dark:bg-ink-mute">
+        <div>
+          <div className="font-semibold leading-tight">{part.name}</div>
+          <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            {part.brand} · {part.article}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-paper-mute/60 pt-3 dark:border-ink/40">
+          <div>
+            <div className="text-xs text-ink-mute dark:text-paper-mute">
+              Цена за шт.
+            </div>
+            <div className="font-bold">{fmt(part.price)} ₸</div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs text-ink-mute dark:text-paper-mute">
+              Количество (в наличии: {part.availableQty} шт)
+            </div>
+            <div className="inline-flex items-center overflow-hidden rounded-2xl border border-paper-mute dark:border-ink">
+              <button
+                type="button"
+                onClick={() => setQty(qty - 1)}
+                disabled={qty <= 1}
+                className="flex h-10 w-10 items-center justify-center text-ink-mute disabled:opacity-40 hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
+                aria-label="−"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <input
+                type="number"
+                min={1}
+                max={part.availableQty}
+                {...register("quantity", { valueAsNumber: true })}
+                className="h-10 w-14 border-x border-paper-mute bg-transparent text-center text-base font-bold outline-none dark:border-ink"
+              />
+              <button
+                type="button"
+                onClick={() => setQty(qty + 1)}
+                disabled={qty >= part.availableQty}
+                className="flex h-10 w-10 items-center justify-center text-ink-mute disabled:opacity-40 hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
+                aria-label="+"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-xs text-ink-mute dark:text-paper-mute">Итого</div>
+            <div className="text-2xl font-black text-brand">
+              {fmt(total)} <span className="text-sm font-semibold">₸</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -137,7 +205,7 @@ export function OrderForm({
             className="input"
             inputMode="tel"
             autoComplete="tel"
-            placeholder="+7 (7__) ___-__-__"
+            placeholder="+77051112233"
             {...register("phone")}
           />
           {errors.phone && (
@@ -149,7 +217,7 @@ export function OrderForm({
           <input
             className="input"
             inputMode="tel"
-            placeholder="+7 (7__) ___-__-__"
+            placeholder="+77051112233"
             {...register("whatsapp")}
           />
           {errors.whatsapp && (

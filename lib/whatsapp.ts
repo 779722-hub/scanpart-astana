@@ -26,12 +26,14 @@ export function buildOrderWhatsAppMessage(args: {
   vin?: string;
 }): string[] {
   const t = args.orderType === "express" ? "Экспресс-доставка" : "Самовывоз";
-  const money = new Intl.NumberFormat("ru-RU").format(args.price);
+  const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
+  const total = args.price * args.quantity;
   return [
     `Здравствуйте! Я оформил заказ на SCANPART.ASTANA.`,
     `Тип: ${t}`,
     `Запчасть: ${args.partName} (${args.partBrand} ${args.partArticle})`,
-    `Цена: ${money} ₸, кол-во: ${args.quantity}`,
+    `Цена за шт.: ${fmt(args.price)} ₸ · Кол-во: ${args.quantity}`,
+    `Итого: ${fmt(total)} ₸`,
     args.vehicle
       ? `Авто: ${args.vehicle}${args.vin ? ` (VIN ${args.vin})` : ""}`
       : "",

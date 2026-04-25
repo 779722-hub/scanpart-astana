@@ -15,6 +15,7 @@ export default function PickupOrderPage({
     name: String(searchParams.name ?? ""),
     price: Number(searchParams.price ?? 0),
     quantity: Number(searchParams.qty ?? 1),
+    availableQty: Number(searchParams.available ?? 1) || 1,
   };
   return (
     <section className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-16">

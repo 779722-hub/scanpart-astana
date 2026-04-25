@@ -49,7 +49,8 @@ export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<bool
     ``,
     `🧩 <b>${escapeHtml(m.partName)}</b>`,
     `Бренд: <b>${escapeHtml(m.partBrand)}</b> · Парт-номер: <code>${escapeHtml(m.partArticle)}</code>`,
-    `Цена клиенту: <b>${new Intl.NumberFormat("ru-RU").format(m.price)} ₸</b> · Кол-во: ${m.quantity}`,
+    `Цена за шт.: ${new Intl.NumberFormat("ru-RU").format(m.price)} ₸ · Кол-во: ${m.quantity}`,
+    `<b>Итого: ${new Intl.NumberFormat("ru-RU").format(m.price * m.quantity)} ₸</b>`,
     m.sheetRow ? `\n📋 Строка #${m.sheetRow} в Google Sheets` : null,
   ].filter(Boolean);
 
