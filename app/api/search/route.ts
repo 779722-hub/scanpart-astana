@@ -116,9 +116,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, empty: false, query: raw, offers: picked });
   } catch (err) {
-    console.error("[api/search]", (err as Error).message);
+    const msg = (err as Error).message;
+    console.error("[api/search]", msg);
+    // Temporary debug — expose message when DIAG_TOKEN is set in env. Remove after stabilizing.
+    const showDetail = !!process.env.DIAG_TOKEN;
     return NextResponse.json(
-      { ok: false, error: "service_unavailable" },
+      { ok: false, error: "service_unavailable", ...(showDetail ? { detail: msg } : {}) },
       { status: 503 }
     );
   }
