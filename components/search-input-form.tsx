@@ -34,6 +34,7 @@ export function SearchInputForm({
     setLoading(true);
     const params = new URLSearchParams({ q: query, k: kind });
     if (strict && vehicle) params.set("strict", "1");
+    if (kind === "name") params.set("k", "name");
     router.push(`/${locale}/results?${params.toString()}`);
   }
 

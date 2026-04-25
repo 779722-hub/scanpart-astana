@@ -10,10 +10,27 @@ import { classifyCompat } from "@/lib/compat";
 export const runtime = "nodejs";
 // In-process per-request soft throttle; real prod ratelimit lives in a reverse proxy.
 const MAX_BRANDS_TO_QUERY = 6;
+const MAX_BRANDS_TO_QUERY_NAME = 12;
+
+const STOP_WORDS = new Set([
+  "и", "или", "для", "на", "в", "по", "с", "от", "до", "но",
+  "the", "a", "an", "and", "or", "for", "to", "of", "with",
+]);
+
+function tokenize(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[«»"']/g, " ")
+    .split(/[\s\-,./()]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+}
 
 export async function GET(req: NextRequest) {
   const raw = (req.nextUrl.searchParams.get("q") ?? "").trim();
   const strict = req.nextUrl.searchParams.get("strict") === "1";
+  const kind: "article" | "name" =
+    req.nextUrl.searchParams.get("k") === "name" ? "name" : "article";
   if (!raw) {
     return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   }
@@ -46,7 +63,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Step B: run price queries for the first N brands in parallel.
-    const toQuery = brandsResp.Items.slice(0, MAX_BRANDS_TO_QUERY);
+    const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
+    const toQuery = brandsResp.Items.slice(0, cap);
     const priceResponses = await Promise.allSettled(
       toQuery.map((b) =>
         searchPrices({
@@ -78,6 +96,16 @@ export async function GET(req: NextRequest) {
       return days === 0;
     };
 
+    // For name-search: each meaningful query word (≥3 chars) must appear in
+    // the part description. This kills the "брелок Nissan" type junk that
+    // a bare text search returns.
+    const queryTokens = kind === "name" ? tokenize(raw) : [];
+    const matchesAllWords = (name: string): boolean => {
+      if (!queryTokens.length) return true;
+      const hay = (name || "").toLowerCase();
+      return queryTokens.every((tok) => hay.includes(tok));
+    };
+
     const normArticle = raw.toUpperCase().replace(/[\s\-]/g, "");
     const offers: PartOffer[] = rawItems
       .filter((i) => (i.AvailableCount ?? 0) > 0 && (i.Price ?? 0) > 0)
@@ -88,6 +116,7 @@ export async function GET(req: NextRequest) {
         // the local-shelf signal we trust most.
         return /астана|astana/i.test(i.Warehouse ?? "");
       })
+      .filter((i) => kind !== "name" || matchesAllWords(i.Name ?? ""))
       .map((i): PartOffer => {
         const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
         const isOriginal = cleanArticle === normArticle;
@@ -114,18 +143,31 @@ export async function GET(req: NextRequest) {
       ? offers.filter((o) => o.compat === "match")
       : offers;
 
-    // Keep 1 cheapest original + up to N cheapest analogs.
-    const originals = compatFiltered
-      .filter((o) => o.isOriginal)
-      .sort((a, b) => a.priceFinal - b.priceFinal);
-    const analogs = compatFiltered
-      .filter((o) => !o.isOriginal)
-      .sort((a, b) => a.priceFinal - b.priceFinal)
-      .slice(0, analogsMax);
-
-    const picked = [...originals.slice(0, 1), ...analogs].sort(
-      (a, b) => a.priceFinal - b.priceFinal
-    );
+    let picked: PartOffer[];
+    if (kind === "name") {
+      // For name search there's no "original" — show the cheapest 1 + analogsMax
+      // matching items. Prefer compat:"match" first so vehicle-specific picks
+      // float to the top regardless of price.
+      picked = compatFiltered
+        .sort((a, b) => {
+          const cm = (a.compat === "match" ? 0 : 1) - (b.compat === "match" ? 0 : 1);
+          if (cm !== 0) return cm;
+          return a.priceFinal - b.priceFinal;
+        })
+        .slice(0, 1 + analogsMax);
+    } else {
+      // For part-number search: 1 cheapest original + up to N cheapest analogs.
+      const originals = compatFiltered
+        .filter((o) => o.isOriginal)
+        .sort((a, b) => a.priceFinal - b.priceFinal);
+      const analogs = compatFiltered
+        .filter((o) => !o.isOriginal)
+        .sort((a, b) => a.priceFinal - b.priceFinal)
+        .slice(0, analogsMax);
+      picked = [...originals.slice(0, 1), ...analogs].sort(
+        (a, b) => a.priceFinal - b.priceFinal
+      );
+    }
 
     if (!picked.length) {
       return NextResponse.json({
@@ -137,7 +179,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Persist last search to session (so Order form can reference it).
-    session.lastSearch = { kind: "article", query: raw };
+    session.lastSearch = { kind, query: raw };
     await session.save();
 
     return NextResponse.json({ ok: true, empty: false, query: raw, offers: picked });

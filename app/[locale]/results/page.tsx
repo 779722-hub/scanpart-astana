@@ -13,6 +13,7 @@ export default async function ResultsPage({
   const t = await getTranslations("results");
   const q = (searchParams.q ?? "").trim();
   const strict = searchParams.strict === "1";
+  const kind: "article" | "name" = searchParams.k === "name" ? "name" : "article";
 
   if (!q) {
     return (
@@ -37,7 +38,7 @@ export default async function ResultsPage({
           {t("newSearch")}
         </Link>
       </div>
-      <ResultsList locale={locale} q={q} strict={strict} />
+      <ResultsList locale={locale} q={q} strict={strict} kind={kind} />
     </section>
   );
 }

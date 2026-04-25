@@ -20,10 +20,12 @@ export function ResultsList({
   locale,
   q,
   strict = false,
+  kind = "article",
 }: {
   locale: string;
   q: string;
   strict?: boolean;
+  kind?: "article" | "name";
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -32,7 +34,7 @@ export function ResultsList({
     let cancelled = false;
     (async () => {
       try {
-        const params = new URLSearchParams({ q });
+        const params = new URLSearchParams({ q, k: kind });
         if (strict) params.set("strict", "1");
         const res = await fetch(`/api/search?${params.toString()}`);
         const json = await res.json();
@@ -53,7 +55,7 @@ export function ResultsList({
     return () => {
       cancelled = true;
     };
-  }, [q, strict]);
+  }, [q, strict, kind]);
 
   if (state.kind === "loading") {
     return (
