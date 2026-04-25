@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VERSION = process.env.GITHUB_SHA?.slice(0, 7) ?? "dev";
+const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.GITHUB_SHA?.slice(0, 7) ?? "dev";
 
 async function checkUrl(url: string, timeoutMs = 4000): Promise<boolean> {
   const ctrl = new AbortController();
