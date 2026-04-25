@@ -1,8 +1,10 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
+  # Auto-deploy disabled until the VPS is provisioned and DEPLOY_SSH_* secrets
+  # are set. Re-enable by adding back:
+  #   push:
+  #     branches: [main]
   workflow_dispatch:
 
 concurrency:
