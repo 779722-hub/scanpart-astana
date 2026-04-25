@@ -7,11 +7,12 @@ export default async function ResultsPage({
   searchParams,
 }: {
   params: { locale: string };
-  searchParams: { q?: string; k?: string };
+  searchParams: { q?: string; k?: string; strict?: string };
 }) {
   unstable_setRequestLocale(locale);
   const t = await getTranslations("results");
   const q = (searchParams.q ?? "").trim();
+  const strict = searchParams.strict === "1";
 
   if (!q) {
     return (
@@ -36,7 +37,7 @@ export default async function ResultsPage({
           {t("newSearch")}
         </Link>
       </div>
-      <ResultsList locale={locale} q={q} />
+      <ResultsList locale={locale} q={q} strict={strict} />
     </section>
   );
 }

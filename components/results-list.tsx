@@ -16,7 +16,15 @@ function formatKzt(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
 }
 
-export function ResultsList({ locale, q }: { locale: string; q: string }) {
+export function ResultsList({
+  locale,
+  q,
+  strict = false,
+}: {
+  locale: string;
+  q: string;
+  strict?: boolean;
+}) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -24,7 +32,9 @@ export function ResultsList({ locale, q }: { locale: string; q: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const params = new URLSearchParams({ q });
+        if (strict) params.set("strict", "1");
+        const res = await fetch(`/api/search?${params.toString()}`);
         const json = await res.json();
         if (cancelled) return;
         if (!res.ok || !json.ok) {
@@ -43,7 +53,7 @@ export function ResultsList({ locale, q }: { locale: string; q: string }) {
     return () => {
       cancelled = true;
     };
-  }, [q]);
+  }, [q, strict]);
 
   if (state.kind === "loading") {
     return (

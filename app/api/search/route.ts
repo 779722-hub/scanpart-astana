@@ -13,6 +13,7 @@ const MAX_BRANDS_TO_QUERY = 6;
 
 export async function GET(req: NextRequest) {
   const raw = (req.nextUrl.searchParams.get("q") ?? "").trim();
+  const strict = req.nextUrl.searchParams.get("strict") === "1";
   if (!raw) {
     return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   }
@@ -97,11 +98,17 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // Keep 1 cheapest original + up to 3 cheapest analogs.
-    const originals = offers
+    // Strict-compat filter: when set (and a vehicle is known), drop items
+    // that don't mention the customer's make in the description.
+    const compatFiltered = strict && vehicle?.make
+      ? offers.filter((o) => o.compat === "match")
+      : offers;
+
+    // Keep 1 cheapest original + up to N cheapest analogs.
+    const originals = compatFiltered
       .filter((o) => o.isOriginal)
       .sort((a, b) => a.priceFinal - b.priceFinal);
-    const analogs = offers
+    const analogs = compatFiltered
       .filter((o) => !o.isOriginal)
       .sort((a, b) => a.priceFinal - b.priceFinal)
       .slice(0, analogsMax);
