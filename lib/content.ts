@@ -55,6 +55,23 @@ export const getThemeMap = unstable_cache(
  * object compatible with next-intl messages. Keys use dot notation,
  * e.g. `home.title` → `{ home: { title } }`.
  */
+function parseValue(value: string): unknown {
+  // Sheets stores arrays/objects as JSON strings (see scripts/seed-content.ts).
+  // Detect and parse them so consumers like `t.raw("info.lines").map(...)` work.
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+    (trimmed.startsWith("{") && trimmed.endsWith("}"))
+  ) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 function inflate(flat: Record<string, string>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(flat)) {
@@ -68,7 +85,7 @@ function inflate(flat: Record<string, string>): Record<string, unknown> {
       }
       cursor = cursor[seg] as Record<string, unknown>;
     }
-    cursor[path[path.length - 1]] = value;
+    cursor[path[path.length - 1]] = parseValue(value);
   }
   return out;
 }
