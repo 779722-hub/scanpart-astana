@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   ensureSheetStructure,
-  writeSetting,
-  writeTheme,
-  writeContent,
+  bulkWriteSettings,
+  bulkWriteTheme,
+  bulkWriteContent,
+  type ContentRow,
 } from "@/lib/sheets/client";
 
 export const runtime = "nodejs";
@@ -45,15 +46,10 @@ function flatten(obj: AnyJson, prefix = ""): Record<string, string> {
 /**
  * One-shot bootstrap: creates all required sheet tabs with headers, seeds
  * default Settings + Theme, and migrates messages/{ru,kk,en}.json into the
- * Content sheet.
+ * Content sheet. Uses bulk writes (one API call per sheet section) to avoid
+ * Sheets API quota limits.
  *
- * Protected by BOOTSTRAP_TOKEN. After successful run, clear the env var to
- * disable this endpoint.
- *
- * Usage:
- *   curl -X POST https://<host>/api/admin/setup \
- *     -H 'content-type: application/json' \
- *     -d '{"token":"<BOOTSTRAP_TOKEN>"}'
+ * Protected by BOOTSTRAP_TOKEN. After successful run, clear the env var.
  */
 export async function POST(req: NextRequest) {
   const expected = process.env.BOOTSTRAP_TOKEN;
@@ -70,13 +66,8 @@ export async function POST(req: NextRequest) {
 
   try {
     await ensureSheetStructure();
-
-    for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) {
-      await writeSetting(k, v);
-    }
-    for (const [k, v] of Object.entries(DEFAULT_THEME)) {
-      await writeTheme(k, v);
-    }
+    await bulkWriteSettings(DEFAULT_SETTINGS);
+    await bulkWriteTheme(DEFAULT_THEME);
 
     const ru = (await import("@/messages/ru.json")).default as AnyJson;
     const kk = (await import("@/messages/kk.json")).default as AnyJson;
@@ -90,19 +81,22 @@ export async function POST(req: NextRequest) {
       ...Object.keys(flatEn),
     ]);
 
-    let count = 0;
-    for (const key of allKeys) {
-      if (flatRu[key]) await writeContent(key, "ru", flatRu[key], "setup");
-      if (flatKk[key]) await writeContent(key, "kk", flatKk[key], "setup");
-      if (flatEn[key]) await writeContent(key, "en", flatEn[key], "setup");
-      count++;
-    }
+    const rows: ContentRow[] = [...allKeys].sort().map((key) => ({
+      key,
+      ru: flatRu[key] ?? "",
+      kk: flatKk[key] ?? "",
+      en: flatEn[key] ?? "",
+    }));
+    await bulkWriteContent(rows);
 
     return NextResponse.json({
       ok: true,
       sheetsCreated: ["Settings", "Orders", "Users", "Content", "ContentImages", "Theme"],
-      defaultsSeeded: { settings: Object.keys(DEFAULT_SETTINGS).length, theme: Object.keys(DEFAULT_THEME).length },
-      contentRows: count,
+      defaultsSeeded: {
+        settings: Object.keys(DEFAULT_SETTINGS).length,
+        theme: Object.keys(DEFAULT_THEME).length,
+      },
+      contentRows: rows.length,
     });
   } catch (err) {
     console.error("[setup]", (err as Error).message);

@@ -321,6 +321,69 @@ export async function writeContent(
   });
 }
 
+/** Replace the entire Content sheet body in a single batch call. */
+export async function bulkWriteContent(rows: ContentRow[]): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const now = new Date().toISOString();
+  const values: (string | number)[][] = rows.map((r) => [
+    r.key,
+    r.ru,
+    r.kk,
+    r.en,
+    now,
+    "setup",
+  ]);
+  // Clear existing rows below the header, then write all at once.
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: id,
+    range: `${CONTENT_SHEET}!A2:F`,
+  });
+  if (values.length === 0) return;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${CONTENT_SHEET}!A2:F${1 + values.length}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
+}
+
+/** Replace the entire Settings sheet body in one call. */
+export async function bulkWriteSettings(map: Record<string, string>): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const values = Object.entries(map);
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: id,
+    range: `Settings!A2:B`,
+  });
+  if (values.length === 0) return;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `Settings!A2:B${1 + values.length}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
+}
+
+/** Replace the entire Theme sheet body in one call. */
+export async function bulkWriteTheme(map: Record<string, string>): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const values = Object.entries(map);
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: id,
+    range: `${THEME_SHEET}!A2:B`,
+  });
+  if (values.length === 0) return;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${THEME_SHEET}!A2:B${1 + values.length}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
+}
+
 // --- ContentImages -----------------------------------------------------------
 
 export async function readImages(): Promise<ImageRow[]> {
