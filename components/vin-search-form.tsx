@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Car, ChevronRight, RotateCcw } from "lucide-react";
+import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
 
 interface Vehicle {
@@ -11,17 +11,29 @@ interface Vehicle {
   year: string;
 }
 
+const KNOWN_MAKES = [
+  "Audi", "BMW", "Chevrolet", "Citroen", "Fiat", "Ford", "Honda", "Hyundai",
+  "Infiniti", "Jaguar", "Jeep", "Kia", "Land Rover", "Lexus", "Mazda",
+  "Mercedes-Benz", "Mitsubishi", "Nissan", "Opel", "Peugeot", "Porsche",
+  "Renault", "Skoda", "Subaru", "Suzuki", "Toyota", "Volkswagen", "Volvo",
+  "Lada", "UAZ", "Chery", "Geely", "Haval",
+];
+
 export function VinSearchForm({ locale }: { locale: string }) {
   const t = useTranslations("vin");
   const tArt = useTranslations("article");
   const tName = useTranslations("name");
   const [vin, setVin] = useState("");
   const [status, setStatus] = useState<
-    "idle" | "loading" | "error" | "ok"
+    "idle" | "loading" | "error" | "ok" | "manual"
   >("idle");
   const [errorKind, setErrorKind] =
     useState<"invalid" | "notFound" | "generic">("invalid");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [manualMake, setManualMake] = useState("");
+  const [manualModel, setManualModel] = useState("");
+  const [manualYear, setManualYear] = useState("");
+  const [savingManual, setSavingManual] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,7 +64,36 @@ export function VinSearchForm({ locale }: { locale: string }) {
     setVin("");
     setVehicle(null);
     setStatus("idle");
+    setManualMake("");
+    setManualModel("");
+    setManualYear("");
   }
+
+  async function submitManual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!manualMake) return;
+    setSavingManual(true);
+    try {
+      const v: Vehicle = {
+        make: manualMake,
+        model: manualModel || "—",
+        year: manualYear || "—",
+      };
+      // Use a synthetic VIN of 17 chars to satisfy the API; real VIN unknown.
+      const syntheticVin = "MANUAL00000000000".slice(0, 17);
+      await fetch("/api/session/vin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vin: syntheticVin, vehicle: v }),
+      });
+      setVehicle(v);
+      setStatus("ok");
+    } finally {
+      setSavingManual(false);
+    }
+  }
+
+  if (status === "manual") return <ManualForm />;
 
   if (status === "ok" && vehicle) {
     return (
@@ -124,8 +165,19 @@ export function VinSearchForm({ locale }: { locale: string }) {
         />
       </div>
       {status === "error" && (
-        <div className="rounded-2xl bg-brand/10 px-4 py-3 text-sm font-medium text-brand">
-          {errorKind === "invalid" ? t("invalid") : t("notFound")}
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-brand/10 px-4 py-3 text-sm font-medium text-brand">
+            {errorKind === "invalid" ? t("invalid") : t("notFound")}
+          </div>
+          {errorKind === "notFound" && (
+            <button
+              type="button"
+              onClick={() => setStatus("manual")}
+              className="btn-secondary w-full"
+            >
+              {t("manualOpen")}
+            </button>
+          )}
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -149,4 +201,68 @@ export function VinSearchForm({ locale }: { locale: string }) {
       </div>
     </form>
   );
+
+  function ManualForm() {
+    return (
+      <form onSubmit={submitManual} className="card space-y-4">
+        <h2 className="text-2xl font-bold tracking-tight">{t("manualTitle")}</h2>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          {t("manualHint")}
+        </p>
+        <div>
+          <label className="label">{t("manualMake")}</label>
+          <input
+            list="known-makes"
+            className="input"
+            value={manualMake}
+            onChange={(e) => setManualMake(e.target.value)}
+            placeholder="Toyota"
+            required
+          />
+          <datalist id="known-makes">
+            {KNOWN_MAKES.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">{t("manualModel")}</label>
+            <input
+              className="input"
+              value={manualModel}
+              onChange={(e) => setManualModel(e.target.value)}
+              placeholder="Camry"
+            />
+          </div>
+          <div>
+            <label className="label">{t("manualYear")}</label>
+            <input
+              className="input"
+              type="number"
+              min={1980}
+              max={new Date().getFullYear() + 1}
+              value={manualYear}
+              onChange={(e) => setManualYear(e.target.value)}
+              placeholder="2018"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button className="btn-primary flex-1" disabled={savingManual || !manualMake}>
+            {savingManual ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Save className="h-4 w-4" /> {t("manualSave")}
+              </>
+            )}
+          </button>
+          <button type="button" onClick={reset} className="btn-secondary">
+            {t("confirmEdit")}
+          </button>
+        </div>
+      </form>
+    );
+  }
 }

@@ -32,7 +32,14 @@
     "notFound": "Please check the VIN spelling",
     "confirmTitle": "Is this your vehicle?",
     "confirmContinue": "Yes, continue",
-    "confirmEdit": "Edit VIN"
+    "confirmEdit": "Edit VIN",
+    "manualOpen": "Enter make and model manually",
+    "manualTitle": "Tell us your vehicle",
+    "manualHint": "If your VIN isn't recognised, pick the make and model — we'll highlight compatible parts.",
+    "manualMake": "Make",
+    "manualModel": "Model",
+    "manualYear": "Year",
+    "manualSave": "Continue"
   },
   "article": {
     "title": "Search by part number",

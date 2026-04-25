@@ -10,14 +10,19 @@ export async function POST(req: NextRequest) {
     vehicle?: { make?: string; model?: string; year?: string };
   };
   const vin = normalizeVin(body.vin ?? "");
-  if (!isVinFormatValid(vin) || !body.vehicle?.make || !body.vehicle?.model) {
+  // Accept either a real VIN with valid format, OR a manual entry (make is enough).
+  const isManual = vin.startsWith("MANUAL");
+  if (!isManual && (!isVinFormatValid(vin) || !body.vehicle?.model)) {
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
+  if (!body.vehicle?.make) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   const session = await getSession();
-  session.vin = vin;
+  session.vin = isManual ? "" : vin;
   session.vehicle = {
     make: body.vehicle.make,
-    model: body.vehicle.model,
+    model: body.vehicle.model ?? "—",
     year: body.vehicle.year ?? "",
   };
   await session.save();
