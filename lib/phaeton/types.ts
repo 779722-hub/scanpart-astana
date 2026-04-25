@@ -59,6 +59,9 @@ export interface PhaetonDictionaryResponse {
   [key: string]: unknown;
 }
 
+/** Vehicle-compatibility hint computed by name-matching against the VIN-decoded vehicle. */
+export type CompatHint = "match" | "unknown";
+
 /** Normalized cross-layer part item used by our API + UI. */
 export interface PartOffer {
   id: string; // stable key for React lists
@@ -70,4 +73,6 @@ export interface PartOffer {
   quantity: number;
   warehouse?: string;
   isOriginal: boolean;
+  compat?: CompatHint;
+  compatReason?: string;
 }

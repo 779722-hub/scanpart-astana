@@ -62,7 +62,10 @@
     "orderExpress": "Экспресс-доставка",
     "orderPickup": "Самовывоз",
     "badgeOriginal": "Оригинал",
-    "badgeAnalog": "Аналог"
+    "badgeAnalog": "Аналог",
+    "badgeCompat": "подходит для вашего авто",
+    "badgeCompatUnknown": "совместимость не подтверждена",
+    "badgeCompatUnknownHint": "Марка вашего авто не упомянута в описании запчасти. Возможно, она универсальная."
   },
   "order": {
     "expressTitle": "Введите ваши данные для доставки",

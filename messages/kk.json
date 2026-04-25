@@ -62,7 +62,10 @@
     "orderExpress": "Экспресс-жеткізу",
     "orderPickup": "Өзі алып кету",
     "badgeOriginal": "Түпнұсқа",
-    "badgeAnalog": "Аналог"
+    "badgeAnalog": "Аналог",
+    "badgeCompat": "көлігіңізге сәйкес",
+    "badgeCompatUnknown": "сәйкестігі расталмаған",
+    "badgeCompatUnknownHint": "Көлігіңіздің маркасы бөлшек сипаттамасында көрсетілмеген. Бөлшек әмбебап болуы мүмкін."
   },
   "order": {
     "expressTitle": "Жеткізу үшін деректеріңізді енгізіңіз",

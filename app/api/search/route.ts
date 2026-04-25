@@ -5,6 +5,7 @@ import { applyMarkup } from "@/lib/markup";
 import { getAnalogsMax, getMarkupPercent } from "@/lib/sheets/settings";
 import type { PartOffer, PhaetonPriceItem } from "@/lib/phaeton/types";
 import { getSession } from "@/lib/session";
+import { classifyCompat } from "@/lib/compat";
 
 export const runtime = "nodejs";
 // In-process per-request soft throttle; real prod ratelimit lives in a reverse proxy.
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Read VIN-decoded vehicle from session for compat hints.
+    const session = await getSession();
+    const vehicle = session.vehicle;
+
     // Astana warehouse resolution: env override → Dictionary → fall back to no filter.
     const [warehouseIds, markupPct, analogsMax] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
@@ -75,16 +80,20 @@ export async function GET(req: NextRequest) {
       .map((i): PartOffer => {
         const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
         const isOriginal = cleanArticle === normArticle;
+        const name = i.Name ?? brandsResp.Items.find((b) => b.Brand === i.Brand)?.Name ?? "";
+        const compat = classifyCompat(name, vehicle);
         return {
           id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
           brand: i.Brand,
           article: i.Article,
-          name: i.Name ?? brandsResp.Items.find((b) => b.Brand === i.Brand)?.Name ?? "",
+          name,
           priceRaw: i.Price,
           priceFinal: applyMarkup(i.Price, markupPct),
           quantity: i.AvailableCount ?? 0,
           warehouse: i.Warehouse,
           isOriginal,
+          compat: compat.compat,
+          compatReason: compat.reason,
         };
       });
 
@@ -111,7 +120,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Persist last search to session (so Order form can reference it).
-    const session = await getSession();
     session.lastSearch = { kind: "article", query: raw };
     await session.save();
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Package, Truck, Store } from "lucide-react";
+import { Loader2, Package, Truck, Store, Check, HelpCircle } from "lucide-react";
 import type { PartOffer } from "@/lib/phaeton/types";
 
 type State =
@@ -125,6 +125,23 @@ function OfferCard({
         <span className="chip bg-paper-soft text-ink-mute dark:bg-ink-mute dark:text-paper-mute">
           #{index + 1}
         </span>
+        {offer.compat === "match" ? (
+          <span
+            className="chip bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+            title={offer.compatReason}
+          >
+            <Check className="h-3 w-3" />
+            {t("badgeCompat")}
+          </span>
+        ) : offer.compat === "unknown" ? (
+          <span
+            className="chip bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+            title={offer.compatReason || t("badgeCompatUnknownHint")}
+          >
+            <HelpCircle className="h-3 w-3" />
+            {t("badgeCompatUnknown")}
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
