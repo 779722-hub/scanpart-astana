@@ -60,6 +60,9 @@ export function OrderForm({
 
   async function onSubmit(data: Omit<OrderInput, "items">) {
     setStatus("submitting");
+    // Open a blank tab synchronously so the popup blocker doesn't kick in
+    // after the await. We'll fill its location once we get the WhatsApp URL.
+    const waTab = typeof window !== "undefined" ? window.open("", "_blank") : null;
     try {
       const items = cart.items.map((i) => ({
         brand: i.brand,
@@ -76,13 +79,20 @@ export function OrderForm({
       const json = await res.json();
       if (!res.ok || !json.ok) {
         setStatus("error");
+        if (waTab) waTab.close();
         return;
       }
       setWhatsappUrl(json.whatsappUrl ?? null);
       setStatus("success");
       cart.clear();
+      if (json.whatsappUrl && waTab) {
+        waTab.location.href = json.whatsappUrl;
+      } else if (waTab) {
+        waTab.close();
+      }
     } catch {
       setStatus("error");
+      if (waTab) waTab.close();
     }
   }
 
@@ -90,11 +100,21 @@ export function OrderForm({
     const message = kind === "express" ? t("successExpress") : t("successPickup");
     return (
       <div className="card space-y-5">
-        <div className="flex items-center gap-3 text-brand">
+        <div className="flex items-center gap-3 text-emerald-600">
           <CheckCircle2 className="h-8 w-8" />
-          <h2 className="text-2xl font-bold">OK</h2>
+          <h2 className="text-2xl font-bold">Заказ принят</h2>
         </div>
         <p className="text-pretty leading-relaxed">{message}</p>
+        {whatsappUrl ? (
+          <p className="text-sm text-ink-mute dark:text-paper-mute">
+            Если WhatsApp не открылся автоматически — нажмите кнопку ниже.
+          </p>
+        ) : (
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+            Номер менеджера WhatsApp ещё не настроен — мы свяжемся с вами по
+            телефону.
+          </p>
+        )}
         <div className="flex flex-col gap-3 sm:flex-row">
           {whatsappUrl && (
             <a
