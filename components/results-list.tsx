@@ -187,18 +187,18 @@ function RelaxBanner({ level }: { level: RelaxLevel }) {
       </div>
     );
   }
-  const messages: Record<"no-make" | "no-words", string> = {
+  const messages: Partial<Record<RelaxLevel, string>> = {
     "no-make":
       "Точных совпадений с вашей маркой нет — показаны другие варианты в наличии в Астане.",
     "no-words":
       "По вашему запросу совпадений в Астане нет — показаны похожие позиции, которые есть в наличии.",
   };
+  const message = messages[level];
+  if (!message) return null;
   return (
     <div className="card flex items-start gap-3 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10">
       <Info className="mt-0.5 h-5 w-5 flex-none text-amber-600" />
-      <p className="text-sm text-amber-900 dark:text-amber-200">
-        {messages[level]}
-      </p>
+      <p className="text-sm text-amber-900 dark:text-amber-200">{message}</p>
     </div>
   );
 }
