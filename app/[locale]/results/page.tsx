@@ -1,6 +1,9 @@
 import { unstable_setRequestLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ResultsList } from "@/components/results-list";
+import { getSession } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
 
 export default async function ResultsPage({
   params: { locale },
@@ -14,6 +17,8 @@ export default async function ResultsPage({
   const q = (searchParams.q ?? "").trim();
   const strict = searchParams.strict === "1";
   const kind: "article" | "name" = searchParams.k === "name" ? "name" : "article";
+  const session = await getSession();
+  const vin = session.vin || "";
 
   if (!q) {
     return (
@@ -38,7 +43,7 @@ export default async function ResultsPage({
           {t("newSearch")}
         </Link>
       </div>
-      <ResultsList locale={locale} q={q} strict={strict} kind={kind} />
+      <ResultsList locale={locale} q={q} strict={strict} kind={kind} vin={vin} />
     </section>
   );
 }

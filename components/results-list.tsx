@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Package, Check, HelpCircle, Info, Clock, ShoppingCart, Trash2 } from "lucide-react";
+import { Loader2, Package, Check, HelpCircle, Info, Clock, ShoppingCart, Trash2, ExternalLink } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
 
@@ -22,11 +22,13 @@ export function ResultsList({
   q,
   strict = false,
   kind = "article",
+  vin = "",
 }: {
   locale: string;
   q: string;
   strict?: boolean;
   kind?: "article" | "name";
+  vin?: string;
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -73,12 +75,15 @@ export function ResultsList({
 
   if (state.kind === "empty") {
     return (
-      <div className="card space-y-5 text-center">
-        <Package className="mx-auto h-12 w-12 text-ink-mute" />
-        <p className="text-lg">{t("empty")}</p>
-        <Link href={`/${locale}`} className="btn-primary inline-flex">
-          {t("newSearch")}
-        </Link>
+      <div className="space-y-4">
+        <div className="card space-y-5 text-center">
+          <Package className="mx-auto h-12 w-12 text-ink-mute" />
+          <p className="text-lg">{t("empty")}</p>
+          <Link href={`/${locale}`} className="btn-primary inline-flex">
+            {t("newSearch")}
+          </Link>
+        </div>
+        <CatalogHint vin={vin} />
       </div>
     );
   }
@@ -100,11 +105,44 @@ export function ResultsList({
       {state.offers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
+      {state.level !== "exact" && <CatalogHint vin={vin} />}
       <div className="pt-2 text-center">
         <Link href={`/${locale}`} className="btn-secondary inline-flex">
           {t("newSearch")}
         </Link>
       </div>
+    </div>
+  );
+}
+
+function CatalogHint({ vin }: { vin?: string }) {
+  return (
+    <div className="card space-y-3">
+      <div className="text-sm font-semibold">
+        Проверьте номер запчасти по каталогу на сайте
+      </div>
+      <a
+        href="https://www.autodoc.ru/catalogs/car"
+        target="_blank"
+        rel="noreferrer"
+        className="btn-secondary !py-3"
+      >
+        <ExternalLink className="h-4 w-4" />
+        autodoc.ru — каталог по авто
+      </a>
+      {vin && (
+        <div className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
+          <div className="text-ink-mute dark:text-paper-mute">
+            Скопируйте VIN и вставьте в форму autodoc.ru:
+          </div>
+          <div className="mt-1 select-all font-mono text-sm font-bold">
+            {vin}
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-ink-mute dark:text-paper-mute">
+        Когда найдёте парт-номер — вернитесь и введите его в поиске по парт-номеру.
+      </p>
     </div>
   );
 }
