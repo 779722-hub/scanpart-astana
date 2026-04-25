@@ -3,7 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Loader2, Package, Check, HelpCircle, Info, Clock, ShoppingCart, Trash2, ExternalLink } from "lucide-react";
+import {
+  Loader2,
+  Package,
+  Check,
+  HelpCircle,
+  Info,
+  Clock,
+  ShoppingCart,
+  Trash2,
+  ExternalLink,
+  Truck,
+} from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
 
@@ -15,6 +26,14 @@ type State =
 
 function formatKzt(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
+}
+
+function dayWord(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "день";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "дня";
+  return "дней";
 }
 
 export function ResultsList({
@@ -148,17 +167,37 @@ function CatalogHint({ vin }: { vin?: string }) {
 }
 
 function RelaxBanner({ level }: { level: RelaxLevel }) {
-  const messages: Record<Exclude<RelaxLevel, "exact">, string> = {
-    "no-make": "Точных совпадений с вашей маркой нет — показаны другие варианты в наличии в Астане.",
-    "no-words": "По вашему запросу совпадений в Астане нет — показаны похожие позиции, которые есть в наличии.",
-    "with-delivery": "В наличии Астана нет — показаны позиции с доставкой из других городов (срок указан в карточке).",
-    "any-warehouse": "В Астане нет — показаны позиции с других складов (доставка может занять несколько дней).",
+  // For delivery-related levels we use a louder banner so the customer
+  // immediately understands the part isn't on the Astana shelf.
+  if (level === "with-delivery" || level === "any-warehouse") {
+    return (
+      <div className="card border-2 border-amber-300 bg-amber-50 p-5 dark:border-amber-700/60 dark:bg-amber-900/15">
+        <div className="flex items-start gap-3">
+          <Truck className="mt-0.5 h-7 w-7 flex-none text-amber-600" />
+          <div>
+            <div className="text-base font-bold text-amber-900 sm:text-lg dark:text-amber-100">
+              На складе в Астане нет в наличии
+            </div>
+            <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
+              Можно заказать с доставкой с другого склада. Срок доставки указан
+              в каждой карточке ниже.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  const messages: Record<"no-make" | "no-words", string> = {
+    "no-make":
+      "Точных совпадений с вашей маркой нет — показаны другие варианты в наличии в Астане.",
+    "no-words":
+      "По вашему запросу совпадений в Астане нет — показаны похожие позиции, которые есть в наличии.",
   };
   return (
     <div className="card flex items-start gap-3 border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10">
       <Info className="mt-0.5 h-5 w-5 flex-none text-amber-600" />
       <p className="text-sm text-amber-900 dark:text-amber-200">
-        {messages[level as Exclude<RelaxLevel, "exact">]}
+        {messages[level]}
       </p>
     </div>
   );
@@ -241,16 +280,20 @@ function OfferCard({
                 </span>
               )}
             </dd>
-            {offer.shipmentDays > 0 && (
-              <>
-                <dt className="text-ink-mute dark:text-paper-mute">Доставка</dt>
-                <dd className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-300">
-                  <Clock className="h-3 w-3" />
-                  ~{offer.shipmentDays} дн.
-                </dd>
-              </>
-            )}
           </dl>
+          {offer.shipmentDays > 0 && (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-2xl border-2 border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100">
+              <Clock className="h-5 w-5 flex-none" />
+              <div className="leading-tight">
+                <div className="text-[11px] uppercase tracking-wider">
+                  Доставка под заказ
+                </div>
+                <div className="text-lg font-black sm:text-xl">
+                  ~{offer.shipmentDays} {dayWord(offer.shipmentDays)}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-baseline justify-between gap-2 sm:block sm:text-right">
           <div className="text-xs uppercase tracking-wider text-ink-mute dark:text-paper-mute">
