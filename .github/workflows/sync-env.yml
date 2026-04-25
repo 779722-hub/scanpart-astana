@@ -1,0 +1,61 @@
+name: Sync .env on VPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Push GitHub Secrets to /opt/scanpart/.env
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Build .env content
+        id: build
+        run: |
+          cat <<'EOF' > .env.production
+          PHAETON_BASE_URL=${{ secrets.PHAETON_BASE_URL || 'https://api.phaeton.kz' }}
+          PHAETON_USER_GUID=${{ secrets.PHAETON_USER_GUID }}
+          PHAETON_API_KEY=${{ secrets.PHAETON_API_KEY }}
+          PHAETON_CONTRAGENT_GUID=${{ secrets.PHAETON_CONTRAGENT_GUID }}
+          PHAETON_ASTANA_WAREHOUSE_ID=${{ secrets.PHAETON_ASTANA_WAREHOUSE_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON_BASE64=${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 }}
+          SHEETS_SPREADSHEET_ID=${{ secrets.SHEETS_SPREADSHEET_ID }}
+          CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_FOLDER=${{ secrets.CLOUDINARY_FOLDER || 'scanpart' }}
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          IRON_SESSION_PASSWORD=${{ secrets.IRON_SESSION_PASSWORD }}
+          BCRYPT_PEPPER=${{ secrets.BCRYPT_PEPPER }}
+          BOOTSTRAP_TOKEN=${{ secrets.BOOTSTRAP_TOKEN }}
+          NEXT_PUBLIC_SITE_NAME=${{ secrets.NEXT_PUBLIC_SITE_NAME || 'SCANPART.ASTANA' }}
+          NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          EOF
+
+      - name: Copy to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          source: .env.production
+          target: /opt/scanpart/
+          overwrite: true
+
+      - name: Atomic rename + chmod 600 + restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd /opt/scanpart
+            mv .env.production .env
+            chmod 600 .env
+            docker compose up -d

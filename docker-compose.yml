@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    image: scanpart-astana:latest
+    container_name: scanpart-astana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    # A static egress IP is REQUIRED for Phaeton IP whitelist. Bind to one:
+    # networks: [ public ]
+    # networks:
+    #   public:
+    #     driver: host

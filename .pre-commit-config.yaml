@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        args: ["--config", ".gitleaks.toml", "--redact", "--no-banner"]
+
+  - repo: local
+    hooks:
+      - id: typecheck
+        name: TypeScript typecheck
+        entry: npm run typecheck
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx)$
+      - id: lint
+        name: ESLint
+        entry: npm run lint -- --max-warnings 0
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|js|jsx)$

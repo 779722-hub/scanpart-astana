@@ -1,0 +1,10 @@
+# Default reviewers for every PR.
+# Replace @your-github-handle once the repository owner is known.
+* @your-github-handle
+
+# Sensitive areas — require explicit owner review.
+.github/    @your-github-handle
+SECURITY.md @your-github-handle
+.gitleaks.toml @your-github-handle
+lib/auth/   @your-github-handle
+middleware.ts @your-github-handle

@@ -1,0 +1,31 @@
+# gitleaks config — supplements default ruleset with project-specific patterns.
+# Run locally: `gitleaks detect --no-banner --redact --config .gitleaks.toml`
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "phaeton-api-key"
+description = "Phaeton API key (long alnum)"
+regex = '''(?i)PHAETON_API_KEY\s*=\s*[A-Za-z0-9]{16,}'''
+tags = ["key", "phaeton"]
+
+[[rules]]
+id = "phaeton-user-guid"
+description = "Phaeton UserGuid (UUID with non-zero suffix)"
+regex = '''(?i)PHAETON_USER_GUID\s*=\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'''
+tags = ["guid", "phaeton"]
+
+[allowlist]
+description = "Files allowed to mention env var names without values"
+paths = [
+    '''\.env\.example$''',
+    '''README\.md$''',
+    '''SECURITY\.md$''',
+    '''\.github/workflows/.*\.yml$''',
+    '''docs/.*\.md$''',
+]
+regexes = [
+    '''PHAETON_(USER_GUID|API_KEY|CONTRAGENT_GUID)\s*=\s*$''',
+    '''PHAETON_(USER_GUID|API_KEY)\s*=\s*ci-placeholder''',
+]

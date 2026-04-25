@@ -1,0 +1,106 @@
+{
+  "brand": {
+    "name": "SCANPART.ASTANA",
+    "tagline": "Fast auto-parts search in Astana"
+  },
+  "nav": {
+    "home": "Home",
+    "info": "How it works",
+    "themeLight": "Day",
+    "themeDark": "Night",
+    "themeAuto": "Auto",
+    "language": "Language"
+  },
+  "home": {
+    "title": "Find the right part in seconds",
+    "subtitle": "Search by VIN, part number or name across our Astana warehouse. Original plus up to 3 analogs, price and stock at a glance.",
+    "btnVin": "By VIN",
+    "btnVinDesc": "17-character vehicle code",
+    "btnArticle": "By part number",
+    "btnArticleDesc": "OEM / aftermarket number",
+    "btnName": "By name",
+    "btnNameDesc": "e.g. front brake pads",
+    "btnInfo": "How it works",
+    "btnInfoDesc": "Service guide"
+  },
+  "vin": {
+    "title": "Search by VIN",
+    "placeholder": "JN8AS05Y37X012345",
+    "hint": "Enter your vehicle's VIN for precise matching (e.g. GN8AS05Y37X012345)",
+    "submit": "Identify vehicle",
+    "invalid": "VIN must be 17 characters (no I, O, Q)",
+    "notFound": "Please check the VIN spelling",
+    "confirmTitle": "Is this your vehicle?",
+    "confirmContinue": "Yes, continue",
+    "confirmEdit": "Edit VIN"
+  },
+  "article": {
+    "title": "Search by part number",
+    "placeholder": "W339055SA",
+    "hint": "Enter the part number (e.g. W339055SA)",
+    "submit": "Search",
+    "continueHint": "Enter the part number or a part name (e.g. 41060EG090 or \"front brake pads\"). You can also find the exact number in catalogs such as autodoc.ru.",
+    "backHome": "Back to start"
+  },
+  "name": {
+    "title": "Search by name",
+    "placeholder": "Front brake pads",
+    "hint": "Enter the part name (e.g. \"front brake pads\")",
+    "submit": "Search"
+  },
+  "results": {
+    "title": "Available at the Astana warehouse",
+    "empty": "Sorry, this part is not currently in our warehouse",
+    "newSearch": "New search",
+    "name": "Name",
+    "brand": "Brand",
+    "article": "Part number",
+    "stock": "Qty",
+    "stockSuffix": "pcs",
+    "price": "Price",
+    "priceUnit": "KZT",
+    "orderExpress": "Express delivery",
+    "orderPickup": "Pickup",
+    "badgeOriginal": "Original",
+    "badgeAnalog": "Analog"
+  },
+  "order": {
+    "expressTitle": "Please provide delivery details",
+    "pickupTitle": "Please provide your contact details",
+    "name": "Name",
+    "phone": "Phone",
+    "whatsapp": "WhatsApp",
+    "address": "Address (Astana only)",
+    "submit": "Place order",
+    "back": "New search",
+    "successExpress": "Your order has been received. Our manager will contact you shortly to confirm and take payment. Express delivery runs every 2–4 hours, Mon–Sat, 09:00–16:30, fee 3,000 KZT.",
+    "successPickup": "You can pick up your order tomorrow between 14:00 and 18:00 at 68 Respublika Ave, Astana. Our manager will contact you shortly to confirm and take payment.",
+    "openWhatsApp": "Open WhatsApp",
+    "sending": "Sending…",
+    "errorGeneric": "Something went wrong. Please try again."
+  },
+  "info": {
+    "title": "How the service works",
+    "lines": [
+      "\"By VIN\" button — search the catalog of your car by VIN (17 chars, e.g. JN8AS05Y37X012345).",
+      "\"By part number\" button — enter the part number (e.g. W339055SA).",
+      "\"By name\" button — enter the part name (e.g. \"front brake pads\").",
+      "Response from the warehouse: original and/or analogs with stock and price.",
+      "Our manager contacts you to confirm the order and arrange payment.",
+      "Express delivery: 2–4 hours, Mon–Sat 09:00–16:30, fee 3,000 KZT.",
+      "Pickup: next day, 14:00–18:00, 68 Respublika Ave, Astana."
+    ]
+  },
+  "errors": {
+    "serviceUnavailable": "Service temporarily unavailable. Please try again later.",
+    "requiredField": "Required field",
+    "invalidPhone": "Invalid phone format"
+  },
+  "admin": {
+    "title": "Admin panel",
+    "markupLabel": "Markup, %",
+    "markupHint": "Allowed range: 10–200 %",
+    "save": "Save",
+    "saved": "Saved"
+  }
+}
