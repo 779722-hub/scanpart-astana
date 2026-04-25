@@ -39,7 +39,10 @@ export async function GET() {
       checks: {
         phaeton: phaetonOk ? "ok" : "fail",
         sheets: sheetsConfigured ? "configured" : "missing",
-        cloudinary: process.env.CLOUDINARY_CLOUD_NAME ? "configured" : "missing",
+        cloudinary:
+          process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL
+            ? "configured"
+            : "missing",
         telegram: process.env.TELEGRAM_BOT_TOKEN ? "configured" : "missing",
       },
     },
