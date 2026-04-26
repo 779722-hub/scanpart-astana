@@ -26,7 +26,11 @@ export function buildOrderWhatsAppMessage(args: {
   phone: string;
   whatsapp?: string;
   address?: string;
+  pickupAddress?: string;
+  pickupHours?: string;
   items: WhatsAppOrderItem[];
+  itemsTotal: number;
+  deliveryFee: number;
   totalAmount: number;
   vehicle?: string;
   vin?: string;
@@ -45,7 +49,8 @@ export function buildOrderWhatsAppMessage(args: {
   if (args.orderType === "express") {
     lines.push(`Адрес доставки (Астана): ${args.address || "—"}`);
   } else {
-    lines.push(`Самовывоз: г. Астана, пр. Республики, 68`);
+    lines.push(`Самовывоз: ${args.pickupAddress ?? "г. Астана, пр. Республики, 68"}`);
+    lines.push(`Забрать ${args.pickupHours ?? "завтра с 14:00 до 18:00"}`);
   }
   if (args.vehicle) {
     lines.push(`Авто: ${args.vehicle}${args.vin ? ` (VIN ${args.vin})` : ""}`);
@@ -60,6 +65,12 @@ export function buildOrderWhatsAppMessage(args: {
     );
   });
   lines.push("");
+  lines.push(`Сумма запчастей: ${fmt(args.itemsTotal)} ₸`);
+  if (args.orderType === "express") {
+    lines.push(`Доставка: ${fmt(args.deliveryFee)} ₸`);
+  } else {
+    lines.push(`Самовывоз: бесплатно`);
+  }
   lines.push(`Итого: ${fmt(args.totalAmount)} ₸`);
   return lines;
 }

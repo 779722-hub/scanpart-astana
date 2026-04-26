@@ -25,9 +25,13 @@ export interface TelegramOrderMessage {
   phone: string;
   whatsapp?: string;
   address?: string;
+  pickupAddress?: string;
+  pickupHours?: string;
   vehicle?: string;
   vin?: string;
   items: TelegramOrderItem[];
+  itemsTotal: number;
+  deliveryFee: number;
   totalAmount: number;
   sheetRows?: number[];
 }
@@ -64,7 +68,7 @@ export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<bool
       : null,
     m.orderType === "Экспресс"
       ? `📍 Адрес доставки (Астана): ${m.address ? escapeHtml(m.address) : "<i>не указан</i>"}`
-      : `🏬 Самовывоз: г. Астана, пр. Республики, 68`,
+      : `🏬 Самовывоз: ${escapeHtml(m.pickupAddress ?? "г. Астана, пр. Республики, 68")}\n   ⏰ Забрать ${escapeHtml(m.pickupHours ?? "завтра с 14:00 до 18:00")}`,
     m.vehicle
       ? `🚗 Авто: ${escapeHtml(m.vehicle)}${m.vin ? ` · VIN <code>${escapeHtml(m.vin)}</code>` : ""}`
       : m.vin
@@ -74,6 +78,10 @@ export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<bool
     `🧩 <b>Позиции (${m.items.length}):</b>`,
     itemsBlock,
     ``,
+    `Сумма запчастей: <b>${fmt(m.itemsTotal)} ₸</b>`,
+    m.orderType === "Экспресс"
+      ? `Доставка: <b>${fmt(m.deliveryFee)} ₸</b>`
+      : `Самовывоз: <b>бесплатно</b>`,
     `💰 <b>Итого к оплате: ${fmt(m.totalAmount)} ₸</b>`,
     m.sheetRows && m.sheetRows.length
       ? `\n📋 Sheets: ${m.sheetRows.map((r) => `#${r}`).join(", ")}`

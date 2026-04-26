@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "scanpart_cart_v1";
+const KIND_KEY = "scanpart_cart_kind_v1";
 const STORAGE_EVENT = "scanpart_cart_changed";
 
+export type DeliveryKind = "express" | "pickup";
+
 export interface CartItem {
-  id: string; // brand|article|warehouseId
+  id: string;
   brand: string;
   article: string;
   name: string;
-  price: number; // final price after markup
+  price: number;
   quantity: number;
   availableQty: number;
 }
@@ -39,20 +42,37 @@ function load(): CartItem[] {
   return safeParse(window.localStorage.getItem(STORAGE_KEY));
 }
 
+function loadKind(): DeliveryKind {
+  if (typeof window === "undefined") return "express";
+  const v = window.localStorage.getItem(KIND_KEY);
+  return v === "pickup" ? "pickup" : "express";
+}
+
 function save(items: CartItem[]): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   window.dispatchEvent(new CustomEvent(STORAGE_EVENT));
 }
 
+function saveKind(k: DeliveryKind): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(KIND_KEY, k);
+  window.dispatchEvent(new CustomEvent(STORAGE_EVENT));
+}
+
 export function useCart() {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [kind, setKindState] = useState<DeliveryKind>("express");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setItems(load());
+    setKindState(loadKind());
     setHydrated(true);
-    const onChange = () => setItems(load());
+    const onChange = () => {
+      setItems(load());
+      setKindState(loadKind());
+    };
     window.addEventListener(STORAGE_EVENT, onChange);
     window.addEventListener("storage", onChange);
     return () => {
@@ -93,19 +113,28 @@ export function useCart() {
     setItems(cur);
   }, []);
 
+  const setKind = useCallback((k: DeliveryKind) => {
+    saveKind(k);
+    setKindState(k);
+  }, []);
+
   const clear = useCallback(() => {
     save([]);
     setItems([]);
   }, []);
 
   const totalCount = items.reduce((s, i) => s + i.quantity, 0);
-  const totalPrice = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const itemsTotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return {
     items,
     hydrated,
     totalCount,
-    totalPrice,
+    itemsTotal,
+    /** Backwards-compat alias. */
+    totalPrice: itemsTotal,
+    kind,
+    setKind,
     add,
     remove,
     setQty,

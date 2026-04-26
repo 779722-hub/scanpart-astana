@@ -57,7 +57,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const totalAmount = d.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const itemsTotal = d.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const deliveryFee =
+    d.kind === "express" ? settings?.expressDeliveryPrice ?? 4000 : 0;
+  const grandTotal = itemsTotal + deliveryFee;
+  const pickupAddress = settings?.pickupAddress ?? "г. Астана, пр. Республики, 68";
+  const pickupHours = settings?.pickupHours ?? "завтра с 14:00 до 18:00";
 
   // 2. Notify manager in Telegram (single message with full breakdown).
   if (settings?.telegramChatId) {
@@ -68,6 +73,8 @@ export async function POST(req: NextRequest) {
       phone: d.phone,
       whatsapp: d.whatsapp || undefined,
       address: d.address || undefined,
+      pickupAddress,
+      pickupHours,
       vehicle: vehicle || undefined,
       vin: vin || undefined,
       items: d.items.map((i) => ({
@@ -77,7 +84,9 @@ export async function POST(req: NextRequest) {
         price: i.price,
         quantity: i.quantity,
       })),
-      totalAmount,
+      itemsTotal,
+      deliveryFee,
+      totalAmount: grandTotal,
       sheetRows: sheetRows.filter((r): r is number => r !== null),
     });
   }
@@ -91,6 +100,8 @@ export async function POST(req: NextRequest) {
       phone: formatPhonePretty(d.phone),
       whatsapp: d.whatsapp ? formatPhonePretty(d.whatsapp) : undefined,
       address: d.address || undefined,
+      pickupAddress,
+      pickupHours,
       items: d.items.map((i) => ({
         brand: i.brand,
         article: i.article,
@@ -98,7 +109,9 @@ export async function POST(req: NextRequest) {
         price: i.price,
         quantity: i.quantity,
       })),
-      totalAmount,
+      itemsTotal,
+      deliveryFee,
+      totalAmount: grandTotal,
       vehicle: vehicle || undefined,
       vin: vin || undefined,
     });
@@ -113,7 +126,9 @@ export async function POST(req: NextRequest) {
     sheetRows,
     whatsappUrl,
     orderType: d.kind,
-    total: totalAmount,
+    itemsTotal,
+    deliveryFee,
+    total: grandTotal,
   });
 }
 

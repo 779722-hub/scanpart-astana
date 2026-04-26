@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,11 +11,19 @@ import {
   CheckCircle2,
   ExternalLink,
   ShoppingCart,
+  Truck,
+  Store,
 } from "lucide-react";
 import { orderSchema, type OrderInput } from "@/lib/schemas";
 import { useCart } from "@/lib/cart";
 
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
+
+interface PublicSettings {
+  expressDeliveryPrice: number;
+  pickupAddress: string;
+  pickupHours: string;
+}
 
 export function OrderForm({
   locale,
@@ -27,11 +34,28 @@ export function OrderForm({
 }) {
   const t = useTranslations("order");
   const tErr = useTranslations("errors");
-  const router = useRouter();
   const cart = useCart();
   const [status, setStatus] =
     useState<"idle" | "submitting" | "success" | "error">("idle");
   const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
+  const [settings, setSettings] = useState<PublicSettings>({
+    expressDeliveryPrice: 4000,
+    pickupAddress: "г. Астана, пр. Республики, 68",
+    pickupHours: "завтра с 14:00 до 18:00",
+  });
+
+  useEffect(() => {
+    fetch("/api/public/settings")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setSettings((prev) => ({ ...prev, ...j.settings }));
+      })
+      .catch(() => {});
+  }, []);
+
+  const itemsTotal = cart.itemsTotal;
+  const deliveryFee = kind === "express" ? settings.expressDeliveryPrice : 0;
+  const grandTotal = itemsTotal + deliveryFee;
 
   const {
     register,
@@ -165,9 +189,33 @@ export function OrderForm({
               </div>
             </li>
           ))}
+          <li className="border-t border-paper-mute/60 pt-2 text-xs dark:border-ink/40">
+            <div className="flex justify-between">
+              <span className="text-ink-mute dark:text-paper-mute">
+                Сумма запчастей
+              </span>
+              <span className="font-semibold">{fmt(itemsTotal)} ₸</span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="inline-flex items-center gap-1 text-ink-mute dark:text-paper-mute">
+                {kind === "express" ? (
+                  <>
+                    <Truck className="h-3 w-3" /> Экспресс-доставка (от 2 до 4 ч)
+                  </>
+                ) : (
+                  <>
+                    <Store className="h-3 w-3" /> Самовывоз ({settings.pickupHours})
+                  </>
+                )}
+              </span>
+              <span className="font-semibold">
+                {deliveryFee > 0 ? `${fmt(deliveryFee)} ₸` : "бесплатно"}
+              </span>
+            </div>
+          </li>
           <li className="flex items-baseline justify-between border-t border-paper-mute/60 pt-2 text-base font-bold dark:border-ink/40">
-            <span>Итого</span>
-            <span className="text-xl text-brand">{fmt(cart.totalPrice)} ₸</span>
+            <span>Итого к оплате</span>
+            <span className="text-xl text-brand">{fmt(grandTotal)} ₸</span>
           </li>
         </ul>
 
