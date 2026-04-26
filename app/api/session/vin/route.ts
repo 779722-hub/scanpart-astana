@@ -26,6 +26,16 @@ export async function POST(req: NextRequest) {
     year: body.vehicle.year ?? "",
   };
   await session.save();
+
+  // If a customer is signed in, save the VIN to their profile so it
+  // appears in their personal account next time.
+  if (!isManual && session.customer && vin) {
+    const { saveCustomerVin } = await import("@/lib/auth/customers");
+    saveCustomerVin(session.customer.email, vin).catch((err) =>
+      console.warn("[session/vin] saveCustomerVin failed", err.message)
+    );
+  }
+
   return NextResponse.json({ ok: true });
 }
 

@@ -9,6 +9,7 @@ interface ContentRow {
   ru: string;
   kk: string;
   en: string;
+  where?: string;
 }
 
 type Locale = "ru" | "kk" | "en";
@@ -193,6 +194,11 @@ function ContentEditor({
           <span className="text-xs text-amber-600">несохранённые изменения</span>
         )}
       </div>
+      {row.where && (
+        <div className="text-xs text-ink-mute dark:text-paper-mute">
+          📍 Где: {row.where}
+        </div>
+      )}
       {isLong ? (
         <textarea
           className="input min-h-[6rem]"

@@ -13,6 +13,13 @@ export interface AppSession {
     role: "owner" | "manager";
     loggedInAt: string;
   };
+  customer?: {
+    email: string;
+    name: string;
+    phone: string;
+    whatsapp?: string;
+    loggedInAt: string;
+  };
   csrfToken?: string;
 }
 

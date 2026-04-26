@@ -30,12 +30,15 @@ export async function POST(req: NextRequest) {
   const isoNow = new Date().toISOString();
 
   // 1. Append one row per cart item to Google Sheets.
+  // We re-use the `Telegram ID` column to store the customer email so the
+  // /account history page can filter by it.
+  const customerLink = session.customer?.email ?? "";
   const sheetRows: Array<number | null> = [];
   for (const item of d.items) {
     try {
       const row = await appendOrder({
         date: isoNow,
-        telegramId: "",
+        telegramId: customerLink,
         clientName: d.name,
         vin,
         vehicle,

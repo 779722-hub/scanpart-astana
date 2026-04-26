@@ -4,6 +4,7 @@ import { Wrench } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeSwitcher } from "./theme-switcher";
 import { CartButton } from "./cart-button";
+import { AccountButton } from "./account-button";
 import { getThemeMap } from "@/lib/content";
 
 export async function SiteHeader() {
@@ -25,6 +26,7 @@ export async function SiteHeader() {
           <span className="truncate text-base sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1.5 sm:gap-2">
+          <AccountButton />
           <CartButton />
           <LocaleSwitcher />
           <ThemeSwitcher />

@@ -7,6 +7,7 @@ const USERS_SHEET = "Users";
 const CONTENT_SHEET = "Content";
 const IMAGES_SHEET = "ContentImages";
 const THEME_SHEET = "Theme";
+const CUSTOMERS_SHEET = "Customers";
 
 export interface OrderRow {
   date: string;
@@ -40,6 +41,18 @@ export interface ContentRow {
   ru: string;
   kk: string;
   en: string;
+  where?: string;
+}
+
+export interface CustomerRow {
+  email: string;
+  passwordHash: string;
+  name: string;
+  phone: string;
+  whatsapp: string;
+  vins: string[]; // stored as JSON in the cell
+  createdAt: string;
+  rowNumber: number;
 }
 
 export interface ImageRow {
@@ -267,7 +280,7 @@ export async function readContent(): Promise<ContentRow[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${CONTENT_SHEET}!A2:D`,
+    range: `${CONTENT_SHEET}!A2:G`,
   });
   return (data.values ?? [])
     .map((r) => ({
@@ -275,8 +288,27 @@ export async function readContent(): Promise<ContentRow[]> {
       ru: String(r[1] ?? ""),
       kk: String(r[2] ?? ""),
       en: String(r[3] ?? ""),
+      where: String(r[6] ?? ""),
     }))
     .filter((c) => c.key);
+}
+
+export async function writeContentWhere(key: string, where: string): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: `${CONTENT_SHEET}!A:A`,
+  });
+  const rows = data.values ?? [];
+  const rowIdx = rows.findIndex((r) => r[0] === key);
+  if (rowIdx === -1) return;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${CONTENT_SHEET}!G${rowIdx + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[where]] },
+  });
 }
 
 export async function writeContent(
@@ -519,9 +551,18 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "Статус",
   ],
   Users: ["email", "password_hash", "role", "created_at", "active"],
-  Content: ["key", "ru", "kk", "en", "updated_at", "updated_by"],
+  Content: ["key", "ru", "kk", "en", "updated_at", "updated_by", "where"],
   ContentImages: ["slot", "public_id", "alt_ru", "alt_kk", "alt_en", "updated_at"],
   Theme: ["key", "value"],
+  Customers: [
+    "email",
+    "password_hash",
+    "name",
+    "phone",
+    "whatsapp",
+    "vins",
+    "created_at",
+  ],
 };
 
 export async function ensureSheetStructure(): Promise<void> {
@@ -555,4 +596,127 @@ export async function ensureSheetStructure(): Promise<void> {
     spreadsheetId: id,
     requestBody: { valueInputOption: "RAW", data: dataUpdates },
   });
+}
+
+// --- Customers (storefront accounts) ----------------------------------------
+
+function parseVins(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((s) => typeof s === "string") : [];
+  } catch {
+    return raw
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+  }
+}
+
+export async function listCustomers(): Promise<CustomerRow[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${CUSTOMERS_SHEET}!A2:G`,
+  });
+  return (data.values ?? [])
+    .map((r, i) => ({
+      rowNumber: i + 2,
+      email: String(r[0] ?? "").toLowerCase(),
+      passwordHash: String(r[1] ?? ""),
+      name: String(r[2] ?? ""),
+      phone: String(r[3] ?? ""),
+      whatsapp: String(r[4] ?? ""),
+      vins: parseVins(String(r[5] ?? "")),
+      createdAt: String(r[6] ?? ""),
+    }))
+    .filter((c) => c.email);
+}
+
+export async function findCustomer(email: string): Promise<CustomerRow | null> {
+  const all = await listCustomers();
+  return all.find((c) => c.email === email.toLowerCase()) ?? null;
+}
+
+export async function appendCustomer(
+  input: Omit<CustomerRow, "rowNumber">
+): Promise<void> {
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${CUSTOMERS_SHEET}!A:G`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [
+        [
+          input.email.toLowerCase(),
+          input.passwordHash,
+          input.name,
+          input.phone,
+          input.whatsapp ?? "",
+          JSON.stringify(input.vins ?? []),
+          input.createdAt,
+        ],
+      ],
+    },
+  });
+}
+
+export async function updateCustomerVins(
+  email: string,
+  vins: string[]
+): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const cur = await findCustomer(email);
+  if (!cur) return;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${CUSTOMERS_SHEET}!F${cur.rowNumber}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[JSON.stringify(vins)]] },
+  });
+}
+
+export async function updateCustomerProfile(
+  email: string,
+  patch: Partial<Pick<CustomerRow, "name" | "phone" | "whatsapp" | "passwordHash">>
+): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const cur = await findCustomer(email);
+  if (!cur) return;
+  const cells: { range: string; values: string[][] }[] = [];
+  if (patch.passwordHash !== undefined)
+    cells.push({
+      range: `${CUSTOMERS_SHEET}!B${cur.rowNumber}`,
+      values: [[patch.passwordHash]],
+    });
+  if (patch.name !== undefined)
+    cells.push({
+      range: `${CUSTOMERS_SHEET}!C${cur.rowNumber}`,
+      values: [[patch.name]],
+    });
+  if (patch.phone !== undefined)
+    cells.push({
+      range: `${CUSTOMERS_SHEET}!D${cur.rowNumber}`,
+      values: [[patch.phone]],
+    });
+  if (patch.whatsapp !== undefined)
+    cells.push({
+      range: `${CUSTOMERS_SHEET}!E${cur.rowNumber}`,
+      values: [[patch.whatsapp]],
+    });
+  if (cells.length === 0) return;
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: id,
+    requestBody: { valueInputOption: "USER_ENTERED", data: cells },
+  });
+}
+
+/** Filter Orders by Telegram-ID column (we reuse it to store customer email). */
+export async function listOrdersByCustomer(email: string): Promise<OrderListItem[]> {
+  const all = await listOrders(500);
+  const target = email.toLowerCase();
+  return all.filter((o) => o.telegramId.toLowerCase() === target);
 }
