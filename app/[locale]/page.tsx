@@ -84,10 +84,10 @@ export default async function HomePage({
     },
     {
       Icon: Truck,
-      title: "Экспресс-доставка 2–4 ч",
-      text: `Курьер по Астане каждые 2–4 часа, ${
-        settings?.expressHours ?? "Пн–Сб 09:00–16:30"
-      }, ${settings?.expressDeliveryPrice ?? 3000} ₸.`,
+      title: "Экспресс-доставка",
+      text: `От 2 до 4 часов по Астане · ${
+        settings?.expressDeliveryPrice ?? 4000
+      } ₸. Время заказа ${settings?.expressHours ?? "Пн–Сб 09:00–16:30"}.`,
     },
   ];
 
@@ -215,19 +215,20 @@ export default async function HomePage({
               <Truck className="h-5 w-5" />
               <h3 className="text-lg font-bold">Экспресс-доставка</h3>
             </div>
+            <p className="text-base font-bold text-ink dark:text-paper">
+              От 2 до 4 часов по Астане ·{" "}
+              <span className="text-brand">
+                {settings?.expressDeliveryPrice ?? 4000} ₸
+              </span>
+            </p>
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
-                Каждые 2–4 часа по Астане
-              </li>
-              <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute" />
-                {settings?.expressHours ?? "Пн–Сб 09:00–16:30"}
+                Время заказа: {settings?.expressHours ?? "Пн–Сб 09:00–16:30"}
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
-                Стоимость:{" "}
-                <strong>{settings?.expressDeliveryPrice ?? 3000} ₸</strong>
+                Курьер по всем районам Астаны
               </li>
             </ul>
           </div>
