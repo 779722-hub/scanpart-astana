@@ -647,28 +647,28 @@ function VinRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
-      <code className="select-all font-mono text-sm font-bold">{vin}</code>
-      <div className="flex flex-wrap gap-1">
-        <button
-          onClick={onSearch}
-          className="btn-secondary !px-3 !py-2 text-xs"
-        >
-          <Search className="h-3 w-3" /> Поиск запчастей
+    <li className="space-y-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
+      <code className="block select-all break-all font-mono text-sm font-bold">
+        {vin}
+      </code>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={onSearch} className="btn-primary flex-1 !px-3 !py-2 text-sm">
+          <Search className="h-4 w-4" />
+          Поиск запчастей
         </button>
         <button
           onClick={() => setEditing(true)}
-          className="rounded-xl p-2 text-ink-mute hover:bg-white hover:text-ink dark:hover:bg-ink dark:hover:text-paper"
-          aria-label="Изменить"
+          className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-3 py-2 text-sm font-semibold text-ink transition hover:border-ink-mute dark:border-ink dark:bg-ink-soft dark:text-paper"
         >
           <Pencil className="h-4 w-4" />
+          Изменить
         </button>
         <button
           onClick={onDelete}
-          className="rounded-xl p-2 text-ink-mute hover:bg-brand/10 hover:text-brand"
-          aria-label="Удалить"
+          className="inline-flex items-center justify-center gap-1.5 rounded-2xl border-2 border-brand/40 bg-brand/5 px-3 py-2 text-sm font-semibold text-brand transition hover:border-brand hover:bg-brand/10"
         >
           <Trash2 className="h-4 w-4" />
+          Удалить
         </button>
       </div>
     </li>
