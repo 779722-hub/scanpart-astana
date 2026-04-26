@@ -82,6 +82,8 @@ export interface PartOffer {
   inStockNow: boolean;
   matchesAllWords: boolean;
   shipmentDays: number;
+  /** Article originally came from autodoc.ru catalog lookup, not Phaeton text search. */
+  fromCatalog?: boolean;
 }
 
 export type RelaxLevel =

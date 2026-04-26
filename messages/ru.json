@@ -73,6 +73,7 @@
     "badgeCompat": "подходит для вашего авто",
     "badgeCompatUnknown": "совместимость не подтверждена",
     "badgeCompatUnknownHint": "Марка вашего авто не упомянута в описании запчасти. Возможно, она универсальная.",
+    "badgeCatalog": "из каталога",
     "catalogHintTitle": "Проверьте номер запчасти по каталогу на сайте",
     "catalogHintLink": "autodoc.ru — каталог по авто",
     "catalogHintVinLabel": "Скопируйте VIN и вставьте в форму autodoc.ru:",

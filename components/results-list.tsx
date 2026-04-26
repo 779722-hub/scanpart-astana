@@ -14,6 +14,7 @@ import {
   Trash2,
   ExternalLink,
   Truck,
+  BookOpen,
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
@@ -258,6 +259,15 @@ function OfferCard({
             {t("badgeCompatUnknown")}
           </span>
         ) : null}
+        {offer.fromCatalog && (
+          <span
+            className="chip bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
+            title="Парт-номер найден в каталоге автозапчастей по вашему запросу"
+          >
+            <BookOpen className="h-3 w-3" />
+            {t("badgeCatalog")}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-4">

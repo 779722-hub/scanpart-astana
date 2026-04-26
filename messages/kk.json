@@ -73,6 +73,7 @@
     "badgeCompat": "көлігіңізге сәйкес",
     "badgeCompatUnknown": "сәйкестігі расталмаған",
     "badgeCompatUnknownHint": "Көлігіңіздің маркасы бөлшек сипаттамасында көрсетілмеген. Бөлшек әмбебап болуы мүмкін.",
+    "badgeCatalog": "каталогтан",
     "catalogHintTitle": "Бөлшек нөмірін сайттың каталогынан тексеріңіз",
     "catalogHintLink": "autodoc.ru — авто бойынша каталог",
     "catalogHintVinLabel": "VIN-ді көшіріп, autodoc.ru формасына қойыңыз:",

@@ -11,10 +11,12 @@ import type {
 } from "@/lib/phaeton/types";
 import { getSession } from "@/lib/session";
 import { classifyCompat } from "@/lib/compat";
+import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
 const MAX_BRANDS_TO_QUERY_NAME = 12;
+const AUTODOC_TOP_N = 8;
 
 const STOP_WORDS = new Set([
   "и", "или", "для", "на", "в", "по", "с", "от", "до", "но",
@@ -64,8 +66,11 @@ export async function GET(req: NextRequest) {
     // Step A — brands. For name search with a known vehicle we run several
     // text variants in parallel ("колодки", "колодки Nissan", "колодки
     // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
-    // The vehicle-specific variants surface much more relevant items.
+    // For name kind we ALSO query autodoc.ru in parallel: Phaeton's text
+    // search is poor for Russian queries, but autodoc gives real (Brand,
+    // Article) pairs that we then price through Phaeton like normal.
     let brandsItems: PhaetonBrandItem[];
+    const autodocKeys = new Set<string>();
     {
       const variants: string[] = [raw];
       if (kind === "name" && vehicle?.make) {
@@ -74,9 +79,20 @@ export async function GET(req: NextRequest) {
           variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
         }
       }
-      const brandResponses = await Promise.allSettled(
-        variants.map((v) => searchBrands(v))
-      );
+      const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
+      const autodocPromise =
+        kind === "name"
+          ? autodocFindArticles(raw, {
+              make: vehicle?.make,
+              model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
+            }).catch((err) => {
+              console.warn("[api/search] autodoc lookup failed:", (err as Error).message);
+              return { parts: [], status: 0, challenge: false, triedUrls: [] };
+            })
+          : Promise.resolve({ parts: [], status: 0, challenge: false, triedUrls: [] });
+
+      const [brandResponses, autodoc] = await Promise.all([phaetonPromise, autodocPromise]);
+
       const seen = new Set<string>();
       brandsItems = [];
       for (const r of brandResponses) {
@@ -87,6 +103,14 @@ export async function GET(req: NextRequest) {
           seen.add(k);
           brandsItems.push(it);
         }
+      }
+      for (const p of (autodoc.parts ?? []).slice(0, AUTODOC_TOP_N)) {
+        const k = `${p.brand}|${p.article}`;
+        const upper = k.toUpperCase();
+        autodocKeys.add(upper);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        brandsItems.push({ Brand: p.brand, Article: p.article, Name: p.name });
       }
     }
     if (!brandsItems.length) {
@@ -135,6 +159,7 @@ export async function GET(req: NextRequest) {
         const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
         const compat = classifyCompat(name, vehicle);
         const days = shipmentDays(i);
+        const fromCatalog = autodocKeys.has(`${i.Brand}|${i.Article}`.toUpperCase());
         return {
           id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
           brand: i.Brand,
@@ -149,8 +174,12 @@ export async function GET(req: NextRequest) {
           compatReason: compat.reason,
           atAstana: isAtAstana(i),
           inStockNow: days === 0,
-          matchesAllWords: matchesAllWords(name),
+          // autodoc-curated articles are already matched semantically to the
+          // query — don't re-filter them by word presence in the (often
+          // truncated) Phaeton name.
+          matchesAllWords: fromCatalog ? true : matchesAllWords(name),
           shipmentDays: days,
+          fromCatalog,
         };
       });
 
