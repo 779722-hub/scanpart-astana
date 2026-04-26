@@ -5,6 +5,7 @@ import { applyMarkup } from "@/lib/markup";
 import { getAnalogsMax, getMarkupPercent } from "@/lib/sheets/settings";
 import type {
   PartOffer,
+  PhaetonBrandItem,
   PhaetonPriceItem,
   RelaxLevel,
 } from "@/lib/phaeton/types";
@@ -60,15 +61,41 @@ export async function GET(req: NextRequest) {
       getAnalogsMax(),
     ]);
 
-    // Step A — brands.
-    const brandsResp = await searchBrands(raw);
-    if (brandsResp.IsError || !brandsResp.Items?.length) {
+    // Step A — brands. For name search with a known vehicle we run several
+    // text variants in parallel ("колодки", "колодки Nissan", "колодки
+    // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
+    // The vehicle-specific variants surface much more relevant items.
+    let brandsItems: PhaetonBrandItem[];
+    {
+      const variants: string[] = [raw];
+      if (kind === "name" && vehicle?.make) {
+        variants.push(`${raw} ${vehicle.make}`);
+        if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
+          variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
+        }
+      }
+      const brandResponses = await Promise.allSettled(
+        variants.map((v) => searchBrands(v))
+      );
+      const seen = new Set<string>();
+      brandsItems = [];
+      for (const r of brandResponses) {
+        if (r.status !== "fulfilled" || r.value.IsError) continue;
+        for (const it of r.value.Items ?? []) {
+          const k = `${it.Brand}|${it.Article}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          brandsItems.push(it);
+        }
+      }
+    }
+    if (!brandsItems.length) {
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
 
     // Step B — prices for each brand in parallel.
     const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
-    const toQuery = brandsResp.Items.slice(0, cap);
+    const toQuery = brandsItems.slice(0, cap);
     const priceResponses = await Promise.allSettled(
       toQuery.map((b) =>
         searchPrices({
@@ -105,7 +132,7 @@ export async function GET(req: NextRequest) {
       .map((i): PartOffer => {
         const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
         const isOriginal = cleanArticle === normArticle;
-        const name = i.Name ?? brandsResp.Items.find((b) => b.Brand === i.Brand)?.Name ?? "";
+        const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
         const compat = classifyCompat(name, vehicle);
         const days = shipmentDays(i);
         return {

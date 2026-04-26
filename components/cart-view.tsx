@@ -83,8 +83,9 @@ export function CartView({ locale }: { locale: string }) {
         </div>
         <button
           onClick={cart.clear}
-          className="text-sm text-ink-mute underline hover:text-brand"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-medium text-ink-mute transition hover:border-brand hover:text-brand dark:border-ink-mute dark:text-paper-mute dark:hover:border-brand dark:hover:text-brand"
         >
+          <Trash2 className="h-3.5 w-3.5" />
           {t("clear")}
         </button>
       </header>
@@ -103,10 +104,11 @@ export function CartView({ locale }: { locale: string }) {
               </div>
               <button
                 onClick={() => cart.remove(item.id)}
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-xl text-ink-mute hover:bg-paper-soft hover:text-brand dark:hover:bg-ink-mute"
-                aria-label="Удалить"
+                className="inline-flex h-9 flex-none items-center justify-center gap-1.5 rounded-xl border border-brand/40 bg-brand/5 px-3 text-sm font-semibold text-brand transition hover:border-brand hover:bg-brand/10"
+                aria-label={t("remove")}
               >
                 <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("remove")}</span>
               </button>
             </div>
 
