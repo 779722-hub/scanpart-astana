@@ -13,7 +13,9 @@ interface ImageRow {
 }
 
 const KNOWN_SLOTS = [
-  { slot: "hero", title: "Главная — фоновое изображение" },
+  { slot: "hero_light", title: "Главная — фон для светлой темы" },
+  { slot: "hero_dark", title: "Главная — фон для тёмной темы" },
+  { slot: "hero", title: "Главная — fallback фон (если светлый/тёмный не заданы)" },
   { slot: "info-illustration", title: "Страница «Доп. информация»" },
   { slot: "og-default", title: "OpenGraph для соцсетей (1200×630)" },
 ];
