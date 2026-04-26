@@ -49,6 +49,52 @@ function maskQuery(url: string): string {
     .replace(/(ContragentGuid=)[^&]+/i, "$1***");
 }
 
+/**
+ * Phaeton's API decodes URL parameters as Windows-1251, not UTF-8. So a
+ * Cyrillic Article like "колодки" sent as %D0%BA%D0%BE… (UTF-8) lands as
+ * mojibake on their side and matches nothing. Encode Cyrillic chars to
+ * the win-1251 byte range, percent-escape them, and pass through ASCII
+ * untouched.
+ */
+function isCyrillic(s: string): boolean {
+  return /[\u0400-\u04FF]/.test(s);
+}
+
+function win1251PercentEncode(str: string): string {
+  let out = "";
+  for (const ch of str) {
+    const code = ch.charCodeAt(0);
+    if (code < 0x80) {
+      // ASCII — escape only the chars URLSearchParams would: &, =, +, #, etc.
+      if (/[A-Za-z0-9._~!*'()-]/.test(ch)) out += ch;
+      else out += "%" + code.toString(16).toUpperCase().padStart(2, "0");
+    } else {
+      let byte: number | null = null;
+      if (code >= 0x0410 && code <= 0x044f) byte = 0xc0 + (code - 0x0410); // А..я
+      else if (code === 0x0401) byte = 0xa8; // Ё
+      else if (code === 0x0451) byte = 0xb8; // ё
+      else if (code === 0x2116) byte = 0xb9; // №
+      else if (code === 0x00ab) byte = 0xab;
+      else if (code === 0x00bb) byte = 0xbb;
+      else if (code === 0x2014 || code === 0x2013) byte = 0x96; // — / –
+      else byte = 0x3f; // '?'
+      out += "%" + byte.toString(16).toUpperCase().padStart(2, "0");
+    }
+  }
+  return out;
+}
+
+function buildQueryString(
+  pairs: Iterable<[string, string]>
+): string {
+  const out: string[] = [];
+  for (const [k, v] of pairs) {
+    const enc = isCyrillic(v) ? win1251PercentEncode(v) : encodeURIComponent(v);
+    out.push(`${encodeURIComponent(k)}=${enc}`);
+  }
+  return out.join("&");
+}
+
 async function phaetonFetch<T>(
   path: string,
   params: Record<string, string | string[] | undefined>
@@ -62,17 +108,17 @@ async function phaetonFetch<T>(
   const contragent = process.env.PHAETON_CONTRAGENT_GUID;
   if (contragent) common.ContragentGuid = contragent;
 
-  const qs = new URLSearchParams();
+  const pairs: Array<[string, string]> = [];
   for (const [k, v] of Object.entries({ ...common, ...params })) {
     if (v == null) continue;
     if (Array.isArray(v)) {
-      v.forEach((val, i) => qs.append(`${k}[${i}]`, val));
+      v.forEach((val, i) => pairs.push([`${k}[${i}]`, val]));
     } else {
-      qs.append(k, v);
+      pairs.push([k, v]);
     }
   }
 
-  const url = `${base}${path}?${qs.toString()}`;
+  const url = `${base}${path}?${buildQueryString(pairs)}`;
   const safeUrl = maskQuery(url);
 
   let lastErr: Error | null = null;
