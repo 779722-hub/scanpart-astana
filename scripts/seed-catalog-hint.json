@@ -1,0 +1,16 @@
+{
+  "items": [
+    {"key":"results.catalogHintTitle","locale":"ru","value":"Проверьте номер запчасти по каталогу на сайте","where":"Страница результатов поиска (когда позиций нет или сработал расширенный поиск). Файл components/results-list.tsx → CatalogHint."},
+    {"key":"results.catalogHintTitle","locale":"kk","value":"Бөлшек нөмірін сайттың каталогынан тексеріңіз"},
+    {"key":"results.catalogHintTitle","locale":"en","value":"Look up the part number in the website catalog"},
+    {"key":"results.catalogHintLink","locale":"ru","value":"autodoc.ru — каталог по авто","where":"Подпись кнопки в блоке «Проверьте по каталогу». Файл components/results-list.tsx → CatalogHint."},
+    {"key":"results.catalogHintLink","locale":"kk","value":"autodoc.ru — авто бойынша каталог"},
+    {"key":"results.catalogHintLink","locale":"en","value":"autodoc.ru — catalog by car"},
+    {"key":"results.catalogHintVinLabel","locale":"ru","value":"Скопируйте VIN и вставьте в форму autodoc.ru:","where":"Подпись над VIN-боксом в блоке «Проверьте по каталогу». components/results-list.tsx."},
+    {"key":"results.catalogHintVinLabel","locale":"kk","value":"VIN-ді көшіріп, autodoc.ru формасына қойыңыз:"},
+    {"key":"results.catalogHintVinLabel","locale":"en","value":"Copy your VIN and paste it into the autodoc.ru form:"},
+    {"key":"results.catalogHintFooter","locale":"ru","value":"Когда найдёте парт-номер — вернитесь и введите его в поиске по парт-номеру.","where":"Текст в самом низу блока «Проверьте по каталогу». components/results-list.tsx."},
+    {"key":"results.catalogHintFooter","locale":"kk","value":"Парт-нөмірді тапқанда — қайтыңыз да, парт-нөмір бойынша іздеуге енгізіңіз."},
+    {"key":"results.catalogHintFooter","locale":"en","value":"When you find the part number, come back and use the part-number search."}
+  ]
+}

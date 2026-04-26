@@ -81,3 +81,24 @@ export async function removeCustomerVin(email: string, vin: string): Promise<voi
     c.vins.filter((x) => x !== vin.trim().toUpperCase())
   );
 }
+
+export async function replaceCustomerVin(
+  email: string,
+  oldVin: string,
+  newVin: string
+): Promise<void> {
+  const c = await findCustomer(email);
+  if (!c) return;
+  const old = oldVin.trim().toUpperCase();
+  const next = newVin.trim().toUpperCase();
+  if (!next) return;
+  const idx = c.vins.indexOf(old);
+  let vins: string[];
+  if (idx === -1) {
+    vins = [next, ...c.vins.filter((v) => v !== next)];
+  } else {
+    vins = c.vins.map((v, i) => (i === idx ? next : v));
+    vins = vins.filter((v, i) => vins.indexOf(v) === i);
+  }
+  await updateCustomerVins(email, vins.slice(0, 50));
+}

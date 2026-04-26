@@ -12,6 +12,11 @@ import {
   Package,
   Trash2,
   RefreshCw,
+  Search,
+  Pencil,
+  Check,
+  X,
+  Plus,
 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 
@@ -331,16 +336,8 @@ function Dashboard({
     router.refresh();
   }
 
-  async function selectVin(vin: string) {
-    await fetch("/api/session/vin", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        vin,
-        vehicle: { make: "—", model: "—", year: "—" },
-      }),
-    });
-    router.push(`/${locale}/search/vin`);
+  function selectVin(vin: string) {
+    router.push(`/${locale}/search/vin?vin=${encodeURIComponent(vin)}`);
   }
 
   async function deleteVin(vin: string) {
@@ -351,6 +348,36 @@ function Dashboard({
       body: JSON.stringify({ vin }),
     });
     onChange();
+  }
+
+  async function addVin(vin: string): Promise<boolean> {
+    const res = await fetch("/api/customer/vins", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vin: vin.trim().toUpperCase() }),
+    });
+    if (!res.ok) {
+      alert("VIN должен быть 17 символов (без I, O, Q).");
+      return false;
+    }
+    onChange();
+    return true;
+  }
+
+  async function editVin(oldVin: string, newVin: string): Promise<boolean> {
+    const next = newVin.trim().toUpperCase();
+    if (!next || next === oldVin) return true;
+    const res = await fetch("/api/customer/vins", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ oldVin, newVin: next }),
+    });
+    if (!res.ok) {
+      alert("VIN должен быть 17 символов (без I, O, Q).");
+      return false;
+    }
+    onChange();
+    return true;
   }
 
   // Group orders by date+parts so each "submission" appears as one block.
@@ -380,35 +407,23 @@ function Dashboard({
         </div>
         {me.vins.length === 0 ? (
           <p className="text-sm text-ink-mute dark:text-paper-mute">
-            Когда вы введёте VIN в поиске, мы сохраним его сюда.
+            Когда вы введёте VIN в поиске, мы сохраним его сюда. Или добавьте
+            вручную ниже.
           </p>
         ) : (
           <ul className="space-y-2">
             {me.vins.map((vin) => (
-              <li
+              <VinRow
                 key={vin}
-                className="flex items-center justify-between gap-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute"
-              >
-                <code className="select-all font-mono text-sm font-bold">{vin}</code>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => selectVin(vin)}
-                    className="btn-secondary !px-3 !py-2 text-xs"
-                  >
-                    Поиск запчастей
-                  </button>
-                  <button
-                    onClick={() => deleteVin(vin)}
-                    className="rounded-xl p-2 text-ink-mute hover:bg-brand/10 hover:text-brand"
-                    aria-label="Удалить"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </li>
+                vin={vin}
+                onSearch={() => selectVin(vin)}
+                onDelete={() => deleteVin(vin)}
+                onEdit={(next) => editVin(vin, next)}
+              />
             ))}
           </ul>
         )}
+        <AddVinForm onAdd={addVin} />
       </section>
 
       {/* Orders history */}
@@ -574,5 +589,146 @@ function RepeatButton({
       )}
       Повторить заказ
     </button>
+  );
+}
+
+function VinRow({
+  vin,
+  onSearch,
+  onDelete,
+  onEdit,
+}: {
+  vin: string;
+  onSearch: () => void;
+  onDelete: () => void;
+  onEdit: (next: string) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(vin);
+  const [busy, setBusy] = useState(false);
+
+  if (editing) {
+    return (
+      <li className="flex items-center justify-between gap-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
+        <input
+          className="input !py-2 font-mono text-sm uppercase"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          maxLength={17}
+          autoFocus
+        />
+        <div className="flex flex-none gap-1">
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              const ok = await onEdit(draft);
+              setBusy(false);
+              if (ok) setEditing(false);
+            }}
+            className="rounded-xl p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+            aria-label="Сохранить"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          </button>
+          <button
+            onClick={() => {
+              setDraft(vin);
+              setEditing(false);
+            }}
+            className="rounded-xl p-2 text-ink-mute hover:bg-paper dark:hover:bg-ink"
+            aria-label="Отмена"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
+      <code className="select-all font-mono text-sm font-bold">{vin}</code>
+      <div className="flex flex-wrap gap-1">
+        <button
+          onClick={onSearch}
+          className="btn-secondary !px-3 !py-2 text-xs"
+        >
+          <Search className="h-3 w-3" /> Поиск запчастей
+        </button>
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-xl p-2 text-ink-mute hover:bg-white hover:text-ink dark:hover:bg-ink dark:hover:text-paper"
+          aria-label="Изменить"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="rounded-xl p-2 text-ink-mute hover:bg-brand/10 hover:text-brand"
+          aria-label="Удалить"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function AddVinForm({ onAdd }: { onAdd: (vin: string) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
+  const [vin, setVin] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="btn-secondary !px-4 !py-2 text-sm"
+      >
+        <Plus className="h-4 w-4" /> Добавить VIN
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!vin.trim()) return;
+        setBusy(true);
+        const ok = await onAdd(vin);
+        setBusy(false);
+        if (ok) {
+          setVin("");
+          setOpen(false);
+        }
+      }}
+      className="flex flex-wrap items-center gap-2 rounded-2xl border border-paper-mute p-3 dark:border-ink-mute"
+    >
+      <input
+        className="input flex-1 min-w-[12rem] font-mono uppercase tracking-[0.15em]"
+        placeholder="JN8AS05Y37X012345"
+        value={vin}
+        onChange={(e) => setVin(e.target.value.toUpperCase())}
+        maxLength={17}
+        autoFocus
+        required
+      />
+      <button className="btn-primary !px-4 !py-2 text-sm" disabled={busy || !vin.trim()}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        Сохранить
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setVin("");
+          setOpen(false);
+        }}
+        className="btn-secondary !px-3 !py-2 text-sm"
+      >
+        Отмена
+      </button>
+    </form>
   );
 }

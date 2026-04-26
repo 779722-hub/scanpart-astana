@@ -21,11 +21,19 @@ const KNOWN_MAKES = [
 
 type Status = "idle" | "loading" | "error" | "ok" | "manual";
 
-export function VinSearchForm({ locale }: { locale: string }) {
+export function VinSearchForm({
+  locale,
+  initialVin = "",
+  savedVins = [],
+}: {
+  locale: string;
+  initialVin?: string;
+  savedVins?: string[];
+}) {
   const t = useTranslations("vin");
   const tArt = useTranslations("article");
   const tName = useTranslations("name");
-  const [vin, setVin] = useState("");
+  const [vin, setVin] = useState(initialVin);
   const [status, setStatus] = useState<Status>("idle");
   const [errorKind, setErrorKind] =
     useState<"invalid" | "notFound" | "generic">("invalid");
@@ -128,6 +136,27 @@ export function VinSearchForm({ locale }: { locale: string }) {
     <form onSubmit={handleSubmit} className="card space-y-5">
       <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
       <p className="text-ink-mute dark:text-paper-mute">{t("hint")}</p>
+
+      {savedVins.length > 0 && (
+        <div className="rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
+          <div className="mb-2 text-xs font-semibold text-ink-mute dark:text-paper-mute">
+            Мои сохранённые авто:
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {savedVins.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVin(v)}
+                className="inline-flex items-center gap-1 rounded-full border border-paper-mute bg-white px-3 py-1 font-mono text-xs font-bold transition hover:border-brand hover:text-brand dark:border-ink dark:bg-ink-soft"
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="label" htmlFor="vin">VIN</label>
         <input
