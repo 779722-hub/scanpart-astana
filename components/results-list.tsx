@@ -135,11 +135,10 @@ export function ResultsList({
 }
 
 function CatalogHint({ vin }: { vin?: string }) {
+  const t = useTranslations("results");
   return (
     <div className="card space-y-3">
-      <div className="text-sm font-semibold">
-        Проверьте номер запчасти по каталогу на сайте
-      </div>
+      <div className="text-sm font-semibold">{t("catalogHintTitle")}</div>
       <a
         href="https://www.autodoc.ru/catalogs/car"
         target="_blank"
@@ -147,12 +146,12 @@ function CatalogHint({ vin }: { vin?: string }) {
         className="btn-secondary !py-3"
       >
         <ExternalLink className="h-4 w-4" />
-        autodoc.ru — каталог по авто
+        {t("catalogHintLink")}
       </a>
       {vin && (
         <div className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
           <div className="text-ink-mute dark:text-paper-mute">
-            Скопируйте VIN и вставьте в форму autodoc.ru:
+            {t("catalogHintVinLabel")}
           </div>
           <div className="mt-1 select-all font-mono text-sm font-bold">
             {vin}
@@ -160,7 +159,7 @@ function CatalogHint({ vin }: { vin?: string }) {
         </div>
       )}
       <p className="text-xs text-ink-mute dark:text-paper-mute">
-        Когда найдёте парт-номер — вернитесь и введите его в поиске по парт-номеру.
+        {t("catalogHintFooter")}
       </p>
     </div>
   );

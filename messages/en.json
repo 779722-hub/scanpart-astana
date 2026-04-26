@@ -72,7 +72,11 @@
     "badgeAnalog": "Analog",
     "badgeCompat": "fits your car",
     "badgeCompatUnknown": "fit not confirmed",
-    "badgeCompatUnknownHint": "Your car's make is not mentioned in the part description. The part may be universal."
+    "badgeCompatUnknownHint": "Your car's make is not mentioned in the part description. The part may be universal.",
+    "catalogHintTitle": "Look up the part number in the website catalog",
+    "catalogHintLink": "autodoc.ru — catalog by car",
+    "catalogHintVinLabel": "Copy your VIN and paste it into the autodoc.ru form:",
+    "catalogHintFooter": "When you find the part number, come back and use the part-number search."
   },
   "order": {
     "expressTitle": "Please provide delivery details",

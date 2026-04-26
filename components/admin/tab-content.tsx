@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2 } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Plus } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface ContentRow {
@@ -19,6 +19,8 @@ export function TabContent() {
   const [filter, setFilter] = useState("");
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [newKey, setNewKey] = useState("");
 
   useEffect(() => {
     fetch("/api/admin/content")
@@ -88,7 +90,60 @@ export function TabContent() {
         <p className="text-xs text-ink-mute dark:text-paper-mute">
           {filtered.length}/{rows.length} ключей
         </p>
+        <button
+          onClick={() => setAdding((v) => !v)}
+          className="btn-secondary !px-3 !py-2 text-sm"
+        >
+          <Plus className="h-4 w-4" />
+          {adding ? "Отмена" : "Добавить ключ"}
+        </button>
       </div>
+
+      {adding && (
+        <form
+          className="card flex flex-wrap items-end gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const key = newKey.trim();
+            if (!/^[a-zA-Z0-9._-]{2,120}$/.test(key)) {
+              alert("Ключ: латиница, цифры, точка, дефис; 2–120 символов.");
+              return;
+            }
+            if (rows.some((r) => r.key === key)) {
+              alert("Такой ключ уже есть.");
+              return;
+            }
+            // Create with empty values for all locales — admin then edits below.
+            await fetch("/api/admin/content", {
+              method: "PUT",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ key, locale: "ru", value: "" }),
+            });
+            setRows((cur) =>
+              cur ? [...cur, { key, ru: "", kk: "", en: "" }].sort((a, b) => a.key.localeCompare(b.key)) : cur
+            );
+            setFilter(key);
+            setNewKey("");
+            setAdding(false);
+          }}
+        >
+          <div className="flex-1 min-w-[12rem]">
+            <label className="label">Новый ключ</label>
+            <input
+              className="input font-mono"
+              autoFocus
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value)}
+              placeholder="например, results.catalogHintTitle"
+              pattern="[a-zA-Z0-9._-]{2,120}"
+              required
+            />
+          </div>
+          <button className="btn-primary !px-4 !py-2 text-sm">
+            Создать
+          </button>
+        </form>
+      )}
 
       <div className="space-y-2">
         {filtered.length === 0 ? (
