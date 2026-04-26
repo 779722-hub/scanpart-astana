@@ -8,6 +8,7 @@ const CONTENT_SHEET = "Content";
 const IMAGES_SHEET = "ContentImages";
 const THEME_SHEET = "Theme";
 const CUSTOMERS_SHEET = "Customers";
+const ALIASES_SHEET = "NameAliases";
 
 export interface OrderRow {
   date: string;
@@ -61,6 +62,21 @@ export interface ImageRow {
   altRu: string;
   altKk: string;
   altEn: string;
+}
+
+/**
+ * Словарь синонимов для поиска по названию. Phaeton не умеет искать
+ * по словам — здесь админ вручную сопоставляет «колодки передние» →
+ * перечень «BRAND|ARTICLE» парт-номеров, которые Phaeton уже понимает.
+ */
+export interface AliasRow {
+  rowNumber: number;
+  query: string;
+  make: string;
+  /** raw "BRAND|ARTICLE,BRAND|ARTICLE,…" текст из ячейки */
+  articles: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 let _sheets: sheets_v4.Sheets | null = null;
@@ -563,6 +579,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "vins",
     "created_at",
   ],
+  NameAliases: ["query", "make", "articles", "updated_at", "updated_by"],
 };
 
 export async function ensureSheetStructure(): Promise<void> {
@@ -719,4 +736,91 @@ export async function listOrdersByCustomer(email: string): Promise<OrderListItem
   const all = await listOrders(500);
   const target = email.toLowerCase();
   return all.filter((o) => o.telegramId.toLowerCase() === target);
+}
+
+// --- NameAliases (manual dictionary for name → part-numbers) -----------------
+
+export async function listAliases(): Promise<AliasRow[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${ALIASES_SHEET}!A2:E`,
+  });
+  return (data.values ?? [])
+    .map((r, i) => ({
+      rowNumber: i + 2,
+      query: String(r[0] ?? "").trim(),
+      make: String(r[1] ?? "").trim(),
+      articles: String(r[2] ?? "").trim(),
+      updatedAt: String(r[3] ?? ""),
+      updatedBy: String(r[4] ?? ""),
+    }))
+    .filter((a) => a.query);
+}
+
+export async function appendAlias(input: {
+  query: string;
+  make: string;
+  articles: string;
+  by: string;
+}): Promise<void> {
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${ALIASES_SHEET}!A:E`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[input.query, input.make, input.articles, new Date().toISOString(), input.by]],
+    },
+  });
+}
+
+export async function updateAlias(
+  rowNumber: number,
+  patch: { query?: string; make?: string; articles?: string; by: string }
+): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const cells: { range: string; values: string[][] }[] = [];
+  if (patch.query !== undefined)
+    cells.push({ range: `${ALIASES_SHEET}!A${rowNumber}`, values: [[patch.query]] });
+  if (patch.make !== undefined)
+    cells.push({ range: `${ALIASES_SHEET}!B${rowNumber}`, values: [[patch.make]] });
+  if (patch.articles !== undefined)
+    cells.push({ range: `${ALIASES_SHEET}!C${rowNumber}`, values: [[patch.articles]] });
+  cells.push({
+    range: `${ALIASES_SHEET}!D${rowNumber}:E${rowNumber}`,
+    values: [[new Date().toISOString(), patch.by]],
+  });
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: id,
+    requestBody: { valueInputOption: "USER_ENTERED", data: cells },
+  });
+}
+
+export async function deleteAlias(rowNumber: number): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  // Find sheetId for the ALIASES_SHEET tab so we can issue deleteDimension.
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+  const tab = (meta.data.sheets ?? []).find((s) => s.properties?.title === ALIASES_SHEET);
+  const sheetId = tab?.properties?.sheetId;
+  if (sheetId == null) return;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: id,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: rowNumber - 1,
+              endIndex: rowNumber,
+            },
+          },
+        },
+      ],
+    },
+  });
 }

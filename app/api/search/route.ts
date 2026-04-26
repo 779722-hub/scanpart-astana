@@ -12,6 +12,7 @@ import type {
 import { getSession } from "@/lib/session";
 import { classifyCompat } from "@/lib/compat";
 import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
+import { findAliasMatches } from "@/lib/aliases";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
     // Article) pairs that we then price through Phaeton like normal.
     let brandsItems: PhaetonBrandItem[];
     const autodocKeys = new Set<string>();
+    const aliasKeys = new Set<string>();
     {
       const variants: string[] = [raw];
       if (kind === "name" && vehicle?.make) {
@@ -96,7 +98,22 @@ export async function GET(req: NextRequest) {
             })
           : Promise.resolve({ parts: [], status: 0, challenge: false, triedUrls: [] });
 
-      const [brandResponses, autodoc] = await Promise.all([phaetonPromise, autodocPromise]);
+      // Словарь синонимов из админки. Это основной источник для
+      // name-поиска: админ вручную ведёт пары query → (Brand, Article),
+      // и Phaeton прайсит их без проблем.
+      const aliasPromise =
+        kind === "name"
+          ? findAliasMatches(raw, vehicle?.make).catch((err) => {
+              console.warn("[api/search] alias lookup failed:", (err as Error).message);
+              return [];
+            })
+          : Promise.resolve([]);
+
+      const [brandResponses, autodoc, aliases] = await Promise.all([
+        phaetonPromise,
+        autodocPromise,
+        aliasPromise,
+      ]);
 
       const seen = new Set<string>();
       brandsItems = [];
@@ -116,6 +133,15 @@ export async function GET(req: NextRequest) {
         if (seen.has(k)) continue;
         seen.add(k);
         brandsItems.push({ Brand: p.brand, Article: p.article, Name: p.name });
+      }
+      for (const ba of aliases) {
+        const k = `${ba.brand}|${ba.article}`;
+        const upper = k.toUpperCase();
+        aliasKeys.add(upper);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        // Name пустой — Phaeton подставит своё в priceItem.Name.
+        brandsItems.push({ Brand: ba.brand, Article: ba.article, Name: "" });
       }
     }
     if (!brandsItems.length) {
@@ -164,7 +190,8 @@ export async function GET(req: NextRequest) {
         const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
         const compat = classifyCompat(name, vehicle);
         const days = shipmentDays(i);
-        const fromCatalog = autodocKeys.has(`${i.Brand}|${i.Article}`.toUpperCase());
+        const k = `${i.Brand}|${i.Article}`.toUpperCase();
+        const fromCatalog = autodocKeys.has(k) || aliasKeys.has(k);
         return {
           id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
           brand: i.Brand,

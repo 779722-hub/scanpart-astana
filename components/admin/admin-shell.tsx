@@ -11,6 +11,7 @@ import {
   Users,
   LogOut,
   Send,
+  BookOpen,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -22,6 +23,7 @@ import { TabTheme } from "./tab-theme";
 import { TabSettings } from "./tab-settings";
 import { TabOrders } from "./tab-orders";
 import { TabUsers } from "./tab-users";
+import { TabAliases } from "./tab-aliases";
 
 type TabKey =
   | "dashboard"
@@ -29,6 +31,7 @@ type TabKey =
   | "images"
   | "theme"
   | "settings"
+  | "aliases"
   | "orders"
   | "users";
 
@@ -45,6 +48,7 @@ const TABS: TabDef[] = [
   { key: "images", label: "Картинки", Icon: ImageIcon },
   { key: "theme", label: "Дизайн", Icon: Palette },
   { key: "settings", label: "Настройки", Icon: Settings },
+  { key: "aliases", label: "Словарь поиска", Icon: BookOpen },
   { key: "orders", label: "Заказы", Icon: Package },
   { key: "users", label: "Доступы", Icon: Users, ownerOnly: true },
 ];
@@ -125,6 +129,7 @@ export function AdminShell({
         {tab === "images" && <TabImages />}
         {tab === "theme" && <TabTheme />}
         {tab === "settings" && <TabSettings />}
+        {tab === "aliases" && <TabAliases />}
         {tab === "orders" && <TabOrders />}
         {tab === "users" && user.role === "owner" && (
           <TabUsers currentEmail={user.email} />
