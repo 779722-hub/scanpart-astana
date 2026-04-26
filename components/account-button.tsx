@@ -2,41 +2,72 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { User } from "lucide-react";
+import { User, LogOut, Loader2 } from "lucide-react";
 
 export function AccountButton() {
   const locale = useLocale();
+  const router = useRouter();
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function refresh() {
+    try {
+      const r = await fetch("/api/customer/me");
+      setSignedIn(r.ok);
+    } catch {
+      setSignedIn(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/customer/me")
-      .then((r) => {
-        if (cancelled) return;
-        setSignedIn(r.ok);
-      })
-      .catch(() => !cancelled && setSignedIn(false));
-    return () => {
-      cancelled = true;
-    };
+    refresh();
   }, []);
 
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/customer/auth/logout", { method: "POST" });
+      setSignedIn(false);
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   return (
-    <Link
-      href={`/${locale}/account`}
-      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-2.5 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
-      aria-label="Личный кабинет"
-    >
-      <User className="h-4 w-4" />
-      {signedIn ? (
-        <span className="hidden sm:inline">Кабинет</span>
-      ) : (
-        <span className="hidden sm:inline">Войти</span>
-      )}
+    <div className="inline-flex items-center gap-1">
+      <Link
+        href={`/${locale}/account`}
+        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-2.5 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
+        aria-label="Личный кабинет"
+      >
+        <User className="h-4 w-4" />
+        {signedIn ? (
+          <span className="hidden sm:inline">Кабинет</span>
+        ) : (
+          <span className="hidden sm:inline">Войти</span>
+        )}
+        {signedIn && (
+          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+        )}
+      </Link>
       {signedIn && (
-        <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+        <button
+          onClick={logout}
+          disabled={loggingOut}
+          className="inline-flex h-8 items-center justify-center rounded-2xl border border-paper-mute bg-white px-2 text-ink-mute transition hover:border-brand hover:text-brand disabled:opacity-50 sm:h-9 sm:px-2.5 dark:border-ink-mute dark:bg-ink-soft dark:text-paper-mute"
+          aria-label="Выйти"
+          title="Выйти"
+        >
+          {loggingOut ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
+        </button>
       )}
-    </Link>
+    </div>
   );
 }
