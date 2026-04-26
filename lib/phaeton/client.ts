@@ -5,7 +5,19 @@ import type {
   PhaetonPricesResponse,
 } from "./types";
 
-const DEFAULT_TIMEOUT = 15_000;
+const DEFAULT_TIMEOUT = 20_000;
+const RETRY_ATTEMPTS = 2; // initial + 1 retry on transient failure
+const RETRY_DELAY_MS = 600;
+
+function isTransient(err: Error): boolean {
+  const m = err.message;
+  return (
+    /aborted|timed?\s*out|ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up/i.test(m) ||
+    /\b5\d\d\b/.test(m) // any 5xx upstream
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Phaeton requires a static IP whitelist. On Vercel egress IPs are random,
@@ -63,41 +75,53 @@ async function phaetonFetch<T>(
   const url = `${base}${path}?${qs.toString()}`;
   const safeUrl = maskQuery(url);
 
-  const ctrl = new AbortController();
-  const tm = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT);
-  try {
-    const dispatcher = proxyAgent();
-    const res = dispatcher
-      ? await undiciFetch(url, {
-          headers: { accept: "application/json" },
-          signal: ctrl.signal,
-          dispatcher,
-        })
-      : await fetch(url, {
-          headers: { accept: "application/json" },
-          signal: ctrl.signal,
-          cache: "no-store",
-        });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(
-        `Phaeton ${path} → ${res.status} ${res.statusText}. Body: ${text.slice(
-          0,
-          300
-        )}. URL: ${safeUrl}`
-      );
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+    const ctrl = new AbortController();
+    const tm = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT);
+    try {
+      const dispatcher = proxyAgent();
+      const res = dispatcher
+        ? await undiciFetch(url, {
+            headers: { accept: "application/json" },
+            signal: ctrl.signal,
+            dispatcher,
+          })
+        : await fetch(url, {
+            headers: { accept: "application/json" },
+            signal: ctrl.signal,
+            cache: "no-store",
+          });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          `Phaeton ${path} → ${res.status} ${res.statusText}. Body: ${text.slice(
+            0,
+            300
+          )}. URL: ${safeUrl}`
+        );
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      lastErr = err as Error;
+      if (attempt < RETRY_ATTEMPTS && isTransient(lastErr)) {
+        console.warn(
+          `[phaeton] ${path} attempt ${attempt} transient: ${lastErr.message.slice(0, 120)} — retrying`
+        );
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+      break;
+    } finally {
+      clearTimeout(tm);
     }
-    return (await res.json()) as T;
-  } catch (err) {
-    // Re-throw but never leak key/guid
-    const msg = (err as Error).message.replace(
-      process.env.PHAETON_API_KEY ?? "__NOKEY__",
-      "***"
-    );
-    throw new Error(msg);
-  } finally {
-    clearTimeout(tm);
   }
+  // Re-throw but never leak key/guid
+  const msg = (lastErr ?? new Error("unknown_error")).message.replace(
+    process.env.PHAETON_API_KEY ?? "__NOKEY__",
+    "***"
+  );
+  throw new Error(msg);
 }
 
 /** Step A — list of brands matching a part number. */
