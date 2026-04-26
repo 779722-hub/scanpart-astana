@@ -9,6 +9,7 @@ const IMAGES_SHEET = "ContentImages";
 const THEME_SHEET = "Theme";
 const CUSTOMERS_SHEET = "Customers";
 const ALIASES_SHEET = "NameAliases";
+const SEARCH_LOG_SHEET = "SearchLog";
 
 export interface OrderRow {
   date: string;
@@ -77,6 +78,17 @@ export interface AliasRow {
   articles: string;
   updatedAt: string;
   updatedBy: string;
+}
+
+export interface SearchLogRow {
+  rowNumber: number;
+  timestamp: string;
+  query: string;
+  make: string;
+  model: string;
+  vin: string;
+  offersCount: number;
+  customerEmail: string;
 }
 
 let _sheets: sheets_v4.Sheets | null = null;
@@ -580,6 +592,15 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "created_at",
   ],
   NameAliases: ["query", "make", "articles", "updated_at", "updated_by"],
+  SearchLog: [
+    "timestamp",
+    "query",
+    "make",
+    "model",
+    "vin",
+    "offers_count",
+    "customer_email",
+  ],
 };
 
 export async function ensureSheetStructure(): Promise<void> {
@@ -799,11 +820,87 @@ export async function updateAlias(
 }
 
 export async function deleteAlias(rowNumber: number): Promise<void> {
+  await deleteSheetRow(ALIASES_SHEET, rowNumber);
+}
+
+/** Bulk-append aliases — used by the CSV/TSV importer. */
+export async function bulkAppendAliases(
+  rows: Array<{ query: string; make: string; articles: string }>,
+  by: string
+): Promise<number> {
+  if (!rows.length) return 0;
+  const sheets = sheetsClient();
+  const now = new Date().toISOString();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${ALIASES_SHEET}!A:E`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: rows.map((r) => [r.query, r.make, r.articles, now, by]),
+    },
+  });
+  return rows.length;
+}
+
+// --- SearchLog (failed name-search queries) ---------------------------------
+
+export async function appendSearchLog(row: Omit<SearchLogRow, "rowNumber">): Promise<void> {
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${SEARCH_LOG_SHEET}!A:G`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [
+        [
+          row.timestamp,
+          row.query,
+          row.make,
+          row.model,
+          row.vin,
+          row.offersCount,
+          row.customerEmail,
+        ],
+      ],
+    },
+  });
+}
+
+export async function listSearchLog(limit = 1000): Promise<SearchLogRow[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${SEARCH_LOG_SHEET}!A2:G`,
+  });
+  const rows = data.values ?? [];
+  const start = Math.max(0, rows.length - limit);
+  return rows.slice(start).map((r, i) => ({
+    rowNumber: start + i + 2,
+    timestamp: String(r[0] ?? ""),
+    query: String(r[1] ?? ""),
+    make: String(r[2] ?? ""),
+    model: String(r[3] ?? ""),
+    vin: String(r[4] ?? ""),
+    offersCount: Number(r[5] ?? 0),
+    customerEmail: String(r[6] ?? ""),
+  }));
+}
+
+export async function clearSearchLog(): Promise<void> {
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: spreadsheetId(),
+    range: `${SEARCH_LOG_SHEET}!A2:G`,
+  });
+}
+
+// --- Internal helper --------------------------------------------------------
+
+async function deleteSheetRow(sheetTitle: string, rowNumber: number): Promise<void> {
   const sheets = sheetsClient();
   const id = spreadsheetId();
-  // Find sheetId for the ALIASES_SHEET tab so we can issue deleteDimension.
   const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
-  const tab = (meta.data.sheets ?? []).find((s) => s.properties?.title === ALIASES_SHEET);
+  const tab = (meta.data.sheets ?? []).find((s) => s.properties?.title === sheetTitle);
   const sheetId = tab?.properties?.sheetId;
   if (sheetId == null) return;
   await sheets.spreadsheets.batchUpdate({

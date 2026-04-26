@@ -10,6 +10,7 @@ import {
   BookOpen,
   Pencil,
   X,
+  Upload,
 } from "lucide-react";
 
 interface AliasRow {
@@ -25,6 +26,7 @@ export function TabAliases() {
   const [rows, setRows] = useState<AliasRow[] | null>(null);
   const [filter, setFilter] = useState("");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function refresh() {
     const r = await fetch("/api/admin/aliases");
@@ -79,6 +81,13 @@ export function TabAliases() {
             <Plus className="h-4 w-4" />
             {adding ? "Отмена" : "Добавить запись"}
           </button>
+          <button
+            onClick={() => setImporting((v) => !v)}
+            className="btn-secondary !px-3 !py-2 text-sm"
+          >
+            <Upload className="h-4 w-4" />
+            {importing ? "Скрыть импорт" : "Импорт TSV"}
+          </button>
         </div>
         <details className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
           <summary className="cursor-pointer font-semibold">Как заполнять</summary>
@@ -101,6 +110,16 @@ export function TabAliases() {
           </div>
         </details>
       </div>
+
+      {importing && (
+        <ImportForm
+          onCancel={() => setImporting(false)}
+          onDone={async () => {
+            setImporting(false);
+            await refresh();
+          }}
+        />
+      )}
 
       {adding && (
         <AliasForm
@@ -323,6 +342,132 @@ function AliasForm({
               <Save className="h-4 w-4" /> Сохранить
             </>
           )}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ImportForm({
+  onCancel,
+  onDone,
+}: {
+  onCancel: () => void;
+  onDone: () => Promise<void>;
+}) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<{
+    inserted?: number;
+    skipped?: string[];
+    error?: string;
+  } | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy(true);
+    setReport(null);
+    try {
+      const r = await fetch("/api/admin/aliases/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        setReport({ error: j.error ?? "unknown", skipped: j.skipped });
+        return;
+      }
+      setReport({ inserted: j.inserted, skipped: j.skipped });
+      setText("");
+      await onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="card space-y-3">
+      <div className="flex items-center gap-2">
+        <Upload className="h-4 w-4 text-brand" />
+        <h3 className="font-bold">Массовый импорт записей</h3>
+      </div>
+      <details className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
+        <summary className="cursor-pointer font-semibold">Формат</summary>
+        <div className="mt-2 space-y-1 text-ink-mute dark:text-paper-mute">
+          <p>
+            Каждая строка — одна запись. Колонки разделены{" "}
+            <strong>табуляцией</strong> (так копируются ячейки из
+            Excel/Google Sheets):
+          </p>
+          <pre className="mt-1 overflow-x-auto rounded bg-paper p-2 dark:bg-ink">
+{`query<TAB>make<TAB>articles
+колодки передние<TAB>Toyota<TAB>TRW|GDB3458, FEBI|16573
+колодки передние<TAB>Nissan<TAB>TRW|GDB3434
+тормозные диски<TAB><TAB>BREMBO|09.A455.10`}
+          </pre>
+          <p>
+            Если первая строка содержит «query» / «запрос» — она
+            считается заголовком и пропускается. <code>make</code> можно
+            оставить пустым, тогда запись применяется к любой марке.
+          </p>
+          <p>
+            Удобно: открываете Google-таблицу с тремя колонками
+            (query | make | articles), выделяете все строки, Ctrl+C,
+            вставляете сюда.
+          </p>
+        </div>
+      </details>
+      <textarea
+        className="input min-h-[10rem] font-mono text-xs"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={
+          "колодки передние\tToyota\tTRW|GDB3458, FEBI|16573\nколодки задние\t\tTRW|GDB1947"
+        }
+      />
+      {report && (
+        <div className="rounded-2xl bg-paper-soft p-3 text-sm dark:bg-ink-mute">
+          {report.error ? (
+            <div className="font-semibold text-brand">
+              Ошибка: {report.error}
+            </div>
+          ) : (
+            <div className="font-semibold text-emerald-600">
+              Добавлено записей: {report.inserted}
+            </div>
+          )}
+          {report.skipped && report.skipped.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-ink-mute">
+                Пропущено: {report.skipped.length}
+              </summary>
+              <ul className="mt-1 space-y-0.5 text-xs text-ink-mute">
+                {report.skipped.slice(0, 20).map((s, i) => (
+                  <li key={i} className="truncate">
+                    · {s}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-secondary !px-4 !py-2 text-sm"
+        >
+          <X className="h-4 w-4" /> Закрыть
+        </button>
+        <button
+          className="btn-primary !px-4 !py-2 text-sm"
+          disabled={busy || !text.trim()}
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Загрузить
         </button>
       </div>
     </form>

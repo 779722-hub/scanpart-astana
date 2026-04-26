@@ -13,6 +13,7 @@ import { getSession } from "@/lib/session";
 import { classifyCompat } from "@/lib/compat";
 import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 import { findAliasMatches } from "@/lib/aliases";
+import { appendSearchLog } from "@/lib/sheets/client";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -54,6 +55,26 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
     const vehicle = session.vehicle;
+    const customerEmail = session.customer?.email ?? "";
+
+    // Log every name-search outcome for the admin "Что искали" tab.
+    // Fire-and-forget so we don't slow down the response. We log AFTER
+    // we know offer count, near the two empty-return paths and also at
+    // the success path with offersCount > 0.
+    const logSearch = (offersCount: number) => {
+      if (kind !== "name") return;
+      void appendSearchLog({
+        timestamp: new Date().toISOString(),
+        query: raw,
+        make: vehicle?.make ?? "",
+        model: vehicle?.model ?? "",
+        vin: session.vin ?? "",
+        offersCount,
+        customerEmail,
+      }).catch((err) =>
+        console.warn("[api/search] search log failed:", (err as Error).message)
+      );
+    };
 
     const [warehouseIds, markupPct, analogsMax] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
@@ -145,6 +166,7 @@ export async function GET(req: NextRequest) {
       }
     }
     if (!brandsItems.length) {
+      logSearch(0);
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
 
@@ -287,11 +309,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (!picked.length) {
+      logSearch(0);
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
 
     session.lastSearch = { kind, query: raw };
     await session.save();
+
+    logSearch(picked.length);
 
     return NextResponse.json({
       ok: true,
