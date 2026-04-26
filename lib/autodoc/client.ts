@@ -141,18 +141,66 @@ function extractPartsFromHtml(html: string, sourceUrl: string): AutodocPart[] {
     push(brand, article, name);
   });
 
-  // Strategy 4: парные регулярки — самая грубая, на крайний случай.
-  // Ищем JSON-блоки вида {"brand":"X","article":"Y","name":"Z"}.
-  const jsonRe =
-    /["']brand["']\s*:\s*["']([^"']{1,40})["'][^{}]{0,200}?["']article["']\s*:\s*["']([^"']{1,40})["'][^{}]{0,400}?["']name["']\s*:\s*["']([^"']{1,200})["']/gi;
-  let m: RegExpExecArray | null;
-  let regexHits = 0;
-  while ((m = jsonRe.exec(html)) !== null && regexHits < 30) {
-    push(m[1], m[2], m[3]);
-    regexHits++;
-  }
+  // Раньше была regex-стратегия по JSON в HTML — её сняли: она ловила
+  // нерелевантные карточки из боковых блоков «похожие товары» и баннеров.
+  // Лучше отдать пусто и не показывать клиенту мусор.
 
-  return found;
+  return found.filter(isPlausiblePart);
+}
+
+/**
+ * Эвристика «похоже ли это на реальную (Brand, Article, Name) карточку».
+ * Cuts out coincidences from generic selectors: пустые строки, цифры
+ * длиной 1–2 символа, текст в духе «Подробнее» в Name и т.п.
+ */
+function isPlausiblePart(p: AutodocPart): boolean {
+  if (p.brand.length < 2 || p.brand.length > 40) return false;
+  if (p.article.length < 3 || p.article.length > 30) return false;
+  if (!/[A-Za-z0-9]/.test(p.article)) return false;
+  if (p.name.length < 4 || p.name.length > 200) return false;
+  // brand/article не должны содержать пробелов в количестве (это, скорее
+  // всего, не имя бренда, а кусок предложения).
+  if ((p.brand.match(/\s/g) ?? []).length > 3) return false;
+  return true;
+}
+
+const STOP_WORDS = new Set([
+  "и", "или", "для", "на", "в", "по", "с", "от", "до", "но",
+  "the", "a", "an", "and", "or", "for", "to", "of", "with",
+]);
+
+function tokenize(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[«»"']/g, " ")
+    .split(/[\s\-,./()]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+/**
+ * После парсинга — оставляем только карточки, в названии которых есть
+ * ХОТЯ БЫ ОДНО слово запроса (или slot vehicle.make). Иначе мы рискуем
+ * показать клиенту посторонние товары, попавшие в HTML-страницу
+ * по соседству с поисковой выдачей.
+ */
+function filterByRelevance(
+  parts: AutodocPart[],
+  query: string,
+  vehicle?: { make?: string; model?: string }
+): AutodocPart[] {
+  const queryTokens = tokenize(query);
+  if (!queryTokens.length) return parts;
+  const makeLower = (vehicle?.make ?? "").toLowerCase();
+  return parts.filter((p) => {
+    const hay = (p.name + " " + p.brand).toLowerCase();
+    const matchesAnyQueryToken = queryTokens.some((t) => hay.includes(t));
+    const matchesMake = makeLower.length >= 3 && hay.includes(makeLower);
+    // На случай, когда у искомой запчасти название не содержит слово
+    // запроса дословно (например, autodoc нормализовал «колодки» в
+    // «колодка тормозная»), требуем хотя бы марку либо одно из слов.
+    return matchesAnyQueryToken || matchesMake;
+  });
 }
 
 /** Похоже ли что нас остановил Cloudflare/JS-челлендж. */
@@ -226,10 +274,11 @@ export async function findArticles(
           challenge = true;
           continue;
         }
-        const parts = extractPartsFromHtml(html, url).slice(0, 12);
-        if (parts.length) {
-          cache.set(cacheKey, parts);
-          return { parts, status, challenge, triedUrls };
+        const raw = extractPartsFromHtml(html, url);
+        const relevant = filterByRelevance(raw, query, vehicle).slice(0, 12);
+        if (relevant.length) {
+          cache.set(cacheKey, relevant);
+          return { parts: relevant, status, challenge, triedUrls };
         }
       } catch (err) {
         console.warn(

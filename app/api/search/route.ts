@@ -80,8 +80,13 @@ export async function GET(req: NextRequest) {
         }
       }
       const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
+      // Autodoc-фолбэк включается флагом — по умолчанию выключен,
+      // чтобы случайно не показать клиенту нерелевантные карточки из
+      // боковых блоков «похожие товары». Включается через env
+      // AUTODOC_ENABLED=true после ручной проверки в /api/catalog/debug.
+      const autodocOn = process.env.AUTODOC_ENABLED === "true";
       const autodocPromise =
-        kind === "name"
+        kind === "name" && autodocOn
           ? autodocFindArticles(raw, {
               make: vehicle?.make,
               model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
