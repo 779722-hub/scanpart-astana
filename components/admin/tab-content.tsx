@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Save, CheckCircle2, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface ContentRow {
@@ -13,6 +13,27 @@ interface ContentRow {
 }
 
 type Locale = "ru" | "kk" | "en";
+
+const GROUP_LABELS: Record<string, string> = {
+  brand: "🏷 Бренд / шапка / подвал",
+  nav: "🧭 Навигация",
+  home: "🏠 Главная страница",
+  vin: "🔎 Поиск по VIN",
+  article: "🔢 Поиск по парт-номеру",
+  name: "📝 Поиск по названию",
+  results: "📦 Страница результатов поиска",
+  order: "🛒 Форма заказа (Экспресс / Самовывоз)",
+  info: "ℹ️ Страница «Доп. информация»",
+  errors: "⚠️ Сообщения об ошибках",
+  admin: "🛠 Админ-панель",
+};
+
+function groupOf(key: string): string {
+  return key.split(".")[0] || "other";
+}
+function groupLabel(g: string): string {
+  return GROUP_LABELS[g] ?? `📁 ${g}`;
+}
 
 export function TabContent() {
   const [rows, setRows] = useState<ContentRow[] | null>(null);
@@ -41,6 +62,23 @@ export function TabContent() {
   const filtered = rows.filter((r) =>
     r.key.toLowerCase().includes(filter.toLowerCase())
   );
+
+  // Group by prefix; sort groups by label, items inside by key.
+  const grouped = useMemo(() => {
+    const map = new Map<string, ContentRow[]>();
+    for (const r of filtered) {
+      const g = groupOf(r.key);
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(r);
+    }
+    return [...map.entries()]
+      .map(([g, items]) => ({
+        group: g,
+        label: groupLabel(g),
+        items: items.sort((a, b) => a.key.localeCompare(b.key)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  }, [filtered]);
 
   async function save(row: ContentRow, value: string) {
     setSavingKey(row.key);
@@ -146,24 +184,65 @@ export function TabContent() {
         </form>
       )}
 
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
+      <div className="space-y-3">
+        {grouped.length === 0 ? (
           <div className="card text-center text-sm text-ink-mute">
-            Контент пуст. Запусти `scripts/seed-content.ts`, чтобы залить ключи из messages/*.json в Sheets, либо добавь руками.
+            Контент пуст или ничего не найдено по фильтру.
           </div>
         ) : (
-          filtered.map((row) => (
-            <ContentEditor
-              key={row.key}
-              row={row}
-              locale={locale}
-              onSave={(v) => save(row, v)}
-              saving={savingKey === row.key}
-              saved={savedKey === row.key}
-            />
+          grouped.map(({ group, label, items }) => (
+            <ContentGroup
+              key={group}
+              label={label}
+              count={items.length}
+              defaultOpen={Boolean(filter) || grouped.length === 1}
+            >
+              {items.map((row) => (
+                <ContentEditor
+                  key={row.key}
+                  row={row}
+                  locale={locale}
+                  onSave={(v) => save(row, v)}
+                  saving={savingKey === row.key}
+                  saved={savedKey === row.key}
+                />
+              ))}
+            </ContentGroup>
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function ContentGroup({
+  label,
+  count,
+  defaultOpen,
+  children,
+}: {
+  label: string;
+  count: number;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="flex items-center gap-2 text-base font-bold">
+          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          {label}
+        </span>
+        <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs font-semibold text-ink-mute dark:bg-ink-mute dark:text-paper-mute">
+          {count}
+        </span>
+      </button>
+      {open && <div className="mt-3 space-y-2">{children}</div>}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   Clock,
   MapPin,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useCart } from "@/lib/cart";
 
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
@@ -32,6 +33,7 @@ const DEFAULTS: PublicSettings = {
 };
 
 export function CartView({ locale }: { locale: string }) {
+  const t = useTranslations("cart");
   const cart = useCart();
   const [settings, setSettings] = useState<PublicSettings>(DEFAULTS);
 
@@ -56,12 +58,10 @@ export function CartView({ locale }: { locale: string }) {
     return (
       <div className="card space-y-4 text-center">
         <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute" />
-        <h1 className="text-2xl font-bold">Корзина пуста</h1>
-        <p className="text-ink-mute dark:text-paper-mute">
-          Добавьте запчасти из результатов поиска.
-        </p>
+        <h1 className="text-2xl font-bold">{t("empty")}</h1>
+        <p className="text-ink-mute dark:text-paper-mute">{t("emptyHint")}</p>
         <Link href={`/${locale}`} className="btn-primary inline-flex">
-          На главную
+          {t("toHome")}
         </Link>
       </div>
     );
@@ -75,17 +75,17 @@ export function CartView({ locale }: { locale: string }) {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Корзина
+            {t("title")}
           </h1>
           <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
-            {cart.items.length} поз. · {cart.totalCount} шт.
+            {cart.items.length} {t("addedSuffix")} · {cart.totalCount} {t("qtySuffix")}
           </p>
         </div>
         <button
           onClick={cart.clear}
           className="text-sm text-ink-mute underline hover:text-brand"
         >
-          Очистить корзину
+          {t("clear")}
         </button>
       </header>
 
@@ -154,7 +154,7 @@ export function CartView({ locale }: { locale: string }) {
 
               <div className="text-right">
                 <div className="text-xs text-ink-mute dark:text-paper-mute">
-                  Сумма
+                  {t("subtotalParts")}
                 </div>
                 <div className="text-xl font-black text-brand">
                   {fmt(item.price * item.quantity)} ₸
@@ -167,7 +167,7 @@ export function CartView({ locale }: { locale: string }) {
 
       {/* Способ получения */}
       <div className="card space-y-3">
-        <div className="text-sm font-semibold">Способ получения</div>
+        <div className="text-sm font-semibold">{t("deliveryHeader")}</div>
 
         <label
           className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-3 transition ${
@@ -187,7 +187,7 @@ export function CartView({ locale }: { locale: string }) {
             <div className="flex items-center justify-between gap-2">
               <span className="font-bold">
                 <Truck className="mr-1 inline h-4 w-4 text-brand" />
-                Экспресс-доставка
+                {t("deliveryExpress")}
               </span>
               <span className="font-black text-brand">
                 +{fmt(settings.expressDeliveryPrice)} ₸
@@ -195,7 +195,7 @@ export function CartView({ locale }: { locale: string }) {
             </div>
             <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
               <Clock className="mr-1 inline h-3 w-3" />
-              От 2 до 4 часов по Астане. Время заказа {settings.expressHours}.
+              {t("deliveryExpressHint", { hours: settings.expressHours })}
             </div>
           </div>
         </label>
@@ -218,13 +218,13 @@ export function CartView({ locale }: { locale: string }) {
             <div className="flex items-center justify-between gap-2">
               <span className="font-bold">
                 <Store className="mr-1 inline h-4 w-4 text-brand" />
-                Самовывоз
+                {t("deliveryPickup")}
               </span>
-              <span className="font-black text-emerald-600">бесплатно</span>
+              <span className="font-black text-emerald-600">{t("deliveryFree")}</span>
             </div>
             <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
               <MapPin className="mr-1 inline h-3 w-3" />
-              {settings.pickupAddress}. Забрать можно {settings.pickupHours}.
+              {t("deliveryPickupHint", { address: settings.pickupAddress, hours: settings.pickupHours })}
             </div>
           </div>
         </label>
@@ -234,12 +234,12 @@ export function CartView({ locale }: { locale: string }) {
       <div className="card sticky bottom-2 z-10 space-y-3">
         <div className="space-y-1 text-sm">
           <div className="flex items-baseline justify-between">
-            <span className="text-ink-mute dark:text-paper-mute">Запчасти</span>
+            <span className="text-ink-mute dark:text-paper-mute">{t("subtotalParts")}</span>
             <span className="font-semibold">{fmt(cart.itemsTotal)} ₸</span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-ink-mute dark:text-paper-mute">
-              {cart.kind === "express" ? "Доставка" : "Самовывоз"}
+              {cart.kind === "express" ? t("subtotalDelivery") : t("subtotalPickup")}
             </span>
             <span className="font-semibold">
               {deliveryFee > 0 ? `${fmt(deliveryFee)} ₸` : "—"}
@@ -247,7 +247,7 @@ export function CartView({ locale }: { locale: string }) {
           </div>
         </div>
         <div className="flex items-baseline justify-between border-t border-paper-mute/60 pt-3 dark:border-ink/40">
-          <span className="text-base font-semibold">Итого к оплате</span>
+          <span className="text-base font-semibold">{t("grandTotal")}</span>
           <span className="text-3xl font-black text-brand">
             {fmt(grandTotal)} ₸
           </span>
@@ -256,7 +256,7 @@ export function CartView({ locale }: { locale: string }) {
           href={`/${locale}/order/${cart.kind}`}
           className="btn-primary w-full"
         >
-          Оформить заказ
+          {t("checkout")}
         </Link>
       </div>
     </div>

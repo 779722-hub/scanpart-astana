@@ -33,6 +33,7 @@ export function VinSearchForm({
   const t = useTranslations("vin");
   const tArt = useTranslations("article");
   const tName = useTranslations("name");
+  const tRoot = useTranslations();
   const [vin, setVin] = useState(initialVin);
   const [status, setStatus] = useState<Status>("idle");
   const [errorKind, setErrorKind] =
@@ -140,7 +141,7 @@ export function VinSearchForm({
       {savedVins.length > 0 && (
         <div className="rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
           <div className="mb-2 text-xs font-semibold text-ink-mute dark:text-paper-mute">
-            Мои сохранённые авто:
+            {tRoot("vinSavedHeader")}
           </div>
           <div className="flex flex-wrap gap-2">
             {savedVins.map((v) => (
