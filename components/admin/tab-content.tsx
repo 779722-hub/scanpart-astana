@@ -51,20 +51,13 @@ export function TabContent() {
       .catch(() => setRows([]));
   }, []);
 
-  if (!rows) {
-    return (
-      <div className="card flex justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
-    );
-  }
-
-  const filtered = rows.filter((r) =>
-    r.key.toLowerCase().includes(filter.toLowerCase())
-  );
-
-  // Group by prefix; sort groups by label, items inside by key.
+  // Group by prefix; sort groups by label, items inside by key. Hooks must be
+  // unconditional → compute even when rows is null (yields empty list).
   const grouped = useMemo(() => {
+    if (!rows) return [];
+    const filtered = rows.filter((r) =>
+      r.key.toLowerCase().includes(filter.toLowerCase())
+    );
     const map = new Map<string, ContentRow[]>();
     for (const r of filtered) {
       const g = groupOf(r.key);
@@ -78,7 +71,17 @@ export function TabContent() {
         items: items.sort((a, b) => a.key.localeCompare(b.key)),
       }))
       .sort((a, b) => a.label.localeCompare(b.label, "ru"));
-  }, [filtered]);
+  }, [rows, filter]);
+
+  if (!rows) {
+    return (
+      <div className="card flex justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+
+  const filteredCount = grouped.reduce((s, g) => s + g.items.length, 0);
 
   async function save(row: ContentRow, value: string) {
     setSavingKey(row.key);
@@ -127,7 +130,7 @@ export function TabContent() {
           onChange={(e) => setFilter(e.target.value)}
         />
         <p className="text-xs text-ink-mute dark:text-paper-mute">
-          {filtered.length}/{rows.length} ключей
+          {filteredCount}/{rows.length} ключей
         </p>
         <button
           onClick={() => setAdding((v) => !v)}
