@@ -84,6 +84,8 @@ export interface PartOffer {
   shipmentDays: number;
   /** Article originally came from autodoc.ru catalog lookup, not Phaeton text search. */
   fromCatalog?: boolean;
+  /** Which supplier this offer came from. Defaults to phaeton when unset. */
+  source?: "phaeton" | "shatem";
 }
 
 export type RelaxLevel =
