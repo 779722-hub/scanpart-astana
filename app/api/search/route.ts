@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup } from "@/lib/markup";
-import { getAnalogsMax, getMarkupPercent } from "@/lib/sheets/settings";
+import { getMarkupPercent } from "@/lib/sheets/settings";
 import type {
   PartOffer,
   PhaetonBrandItem,
   PhaetonPriceItem,
-  RelaxLevel,
 } from "@/lib/phaeton/types";
 import { getSession } from "@/lib/session";
 import { classifyCompat } from "@/lib/compat";
@@ -16,6 +15,7 @@ import { findAliasMatches } from "@/lib/aliases";
 import { appendSearchLog } from "@/lib/sheets/client";
 import { searchShatemOffers } from "@/lib/shatem/search";
 import { articlesByVinAndName } from "@/lib/shatem/catalog";
+import { pickPerSource } from "@/lib/search/pick";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -47,7 +47,6 @@ function shipmentDays(i: PhaetonPriceItem): number {
 
 export async function GET(req: NextRequest) {
   const raw = (req.nextUrl.searchParams.get("q") ?? "").trim();
-  const strict = req.nextUrl.searchParams.get("strict") === "1";
   const kind: "article" | "name" =
     req.nextUrl.searchParams.get("k") === "name" ? "name" : "article";
   if (!raw) {
@@ -78,13 +77,12 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    const [warehouseIds, markupPct, analogsMax] = await Promise.all([
+    const [warehouseIds, markupPct] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
         return [] as string[];
       }),
       getMarkupPercent(),
-      getAnalogsMax(),
     ]);
 
     // Catalog (Shate-M Laximo) — name search for a known vehicle by VIN turns
@@ -292,97 +290,17 @@ export async function GET(req: NextRequest) {
     // Merge Shate-M offers (already normalized + Astana/in-stock filtered).
     if (shatemOffers.length) allOffers.push(...shatemOffers);
 
-    // Dedupe the same brand+article that came from more than one supplier —
-    // keep the single best offer (Astana → in-stock → faster → cheaper).
-    const offerRank = (o: PartOffer): [number, number, number, number] => [
-      o.atAstana ? 0 : 1,
-      o.inStockNow ? 0 : 1,
-      o.shipmentDays,
-      o.priceFinal,
-    ];
-    const isBetter = (a: PartOffer, b: PartOffer): boolean => {
-      const ra = offerRank(a), rb = offerRank(b);
-      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] < rb[i];
-      return false;
-    };
-    const bestByPart = new Map<string, PartOffer>();
-    for (const o of allOffers) {
-      const key = `${o.brand}|${o.article}`.toUpperCase().replace(/[\s-]/g, "");
-      const cur = bestByPart.get(key);
-      if (!cur || isBetter(o, cur)) bestByPart.set(key, o);
-    }
-    const uniqueOffers = [...bestByPart.values()];
-
-    // Relax ladder: try the most strict combination first, then drop one
-    // requirement at a time and try again. The first non-empty result wins.
-    type Step = { level: RelaxLevel; pred: (o: PartOffer) => boolean };
-    const wantsCompat = strict && Boolean(vehicle?.make);
+    // Show ONLY what the customer asked for: Astana warehouses, in stock now.
+    // No relaxation to delivery/other cities. Word-match applies to name
+    // search; compat is a sort hint, never a hard filter, so vehicle-fit
+    // catalog parts are never dropped.
     const wantsWords = kind === "name" && queryTokens.length > 0;
+    const inAstanaStock = allOffers.filter(
+      (o) => o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords)
+    );
 
-    const steps: Step[] = [
-      {
-        level: "exact",
-        pred: (o) =>
-          o.atAstana &&
-          o.inStockNow &&
-          (!wantsWords || o.matchesAllWords) &&
-          (!wantsCompat || o.compat === "match"),
-      },
-    ];
-    if (wantsCompat) {
-      steps.push({
-        level: "no-make",
-        pred: (o) =>
-          o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords),
-      });
-    }
-    if (wantsWords) {
-      steps.push({
-        level: "no-words",
-        pred: (o) => o.atAstana && o.inStockNow,
-      });
-    }
-    steps.push({
-      level: "with-delivery",
-      pred: (o) => o.atAstana,
-    });
-    steps.push({
-      level: "any-warehouse",
-      pred: () => true,
-    });
-
-    let pickedRaw: PartOffer[] = [];
-    let level: RelaxLevel = "exact";
-    for (const step of steps) {
-      const out = uniqueOffers.filter(step.pred);
-      if (out.length) {
-        pickedRaw = out;
-        level = step.level;
-        break;
-      }
-    }
-
-    // Pick top N: original first (if article search), then sort by compat+price.
-    const sortByCompatPrice = (a: PartOffer, b: PartOffer) => {
-      const cm = (a.compat === "match" ? 0 : 1) - (b.compat === "match" ? 0 : 1);
-      if (cm !== 0) return cm;
-      if (a.shipmentDays !== b.shipmentDays) return a.shipmentDays - b.shipmentDays;
-      return a.priceFinal - b.priceFinal;
-    };
-
-    let picked: PartOffer[];
-    if (kind === "name") {
-      picked = pickedRaw.sort(sortByCompatPrice).slice(0, 1 + analogsMax);
-    } else {
-      const originals = pickedRaw
-        .filter((o) => o.isOriginal)
-        .sort(sortByCompatPrice);
-      const analogs = pickedRaw
-        .filter((o) => !o.isOriginal)
-        .sort(sortByCompatPrice)
-        .slice(0, analogsMax);
-      picked = [...originals.slice(0, 1), ...analogs].sort(sortByCompatPrice);
-    }
+    // Up to 3 offers from EACH supplier (Р1/М2/…), deduped within a supplier.
+    const picked = pickPerSource(inAstanaStock, 3);
 
     if (!picked.length) {
       logSearch(0);
@@ -411,8 +329,8 @@ export async function GET(req: NextRequest) {
       empty: false,
       query: raw,
       offers,
-      level,
-      relaxed: level !== "exact",
+      level: "exact",
+      relaxed: false,
     });
   } catch (err) {
     const msg = (err as Error).message;
