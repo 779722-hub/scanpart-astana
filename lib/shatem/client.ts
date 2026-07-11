@@ -1,12 +1,9 @@
 /**
  * Shate-M WebApi client.  Docs: https://api-doc.shate-m.kz/
  *
- * Auth: POST /auth/loginByapiKey → Bearer access_token (~3600s). We cache the
- * token in-module and re-auth on expiry or on a 401. Base URL + key come from
- * env: SHATEM_BASE_URL, SHATEM_API_KEY.
- *
- * DRAFT against docs — request bodies for auth + prices/search are not in the
- * public docs and are marked `// VERIFY`; confirm with scripts/shatem-probe.ts.
+ * Auth: POST /auth/loginByapiKey → Bearer access_token (~1800s). We cache the
+ * token in-module (single-flight) and re-auth on expiry or on a 401. Base URL
+ * + key come from env: SHATEM_BASE_URL, SHATEM_API_KEY.
  */
 import type {
   ShatemAuthResponse,
@@ -46,14 +43,22 @@ async function login(): Promise<string> {
   }
   const json = (await res.json()) as ShatemAuthResponse;
   if (!json.access_token) throw new Error("Shate-M auth: no access_token in response");
-  const ttl = (json.expires_in ? json.expires_in * 1000 : 3600_000) - TOKEN_SKEW_MS;
+  const ttl = (json.expires_in ? json.expires_in * 1000 : 1800_000) - TOKEN_SKEW_MS;
   _token = { value: json.access_token, expiresAt: Date.now() + Math.max(ttl, 30_000) };
   return json.access_token;
 }
 
+// Single-flight: concurrent callers on a cold instance share one login().
+let _loginInFlight: Promise<string> | null = null;
+
 async function token(): Promise<string> {
   if (_token && Date.now() < _token.expiresAt) return _token.value;
-  return login();
+  if (!_loginInFlight) {
+    _loginInFlight = login().finally(() => {
+      _loginInFlight = null;
+    });
+  }
+  return _loginInFlight;
 }
 
 function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -76,15 +81,17 @@ function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const doCall = async () => {
     const t = await token();
-    return rawFetch(path, {
+    const res = await rawFetch(path, {
       ...init,
       headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${t}` },
     });
+    return { res, usedToken: t };
   };
-  let res = await doCall();
+  let { res, usedToken } = await doCall();
   if (res.status === 401) {
-    _token = null; // force re-auth
-    res = await doCall();
+    // Only invalidate if nobody else already refreshed to a newer token.
+    if (_token?.value === usedToken) _token = null;
+    ({ res } = await doCall());
   }
   if (!res.ok) {
     const text = await res.text().catch(() => "");

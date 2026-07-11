@@ -53,18 +53,21 @@ export async function searchShatemOffers(
     const code = g.article.code ?? "";
     const name = g.article.name ?? "";
     for (const p of g.prices ?? []) {
+      const price = p.price?.value ?? 0;
+      if (price <= 0) continue;
       if ((p.quantity?.available ?? 0) <= 0) continue;
       if (!isAstana(p)) continue;
       if (seen.has(p.id)) continue;
       seen.add(p.id);
       const days = shipmentDays(p.shippingDateTime);
       offers.push({
-        id: `shatem:${p.id}`,
+        // Opaque id — must NOT name the supplier (leaks to client JSON).
+        id: `m2:${p.id}`,
         brand,
         article: code,
         name,
-        priceRaw: p.price.value,
-        priceFinal: applyMarkup(p.price.value, opts.markupPct),
+        priceRaw: price,
+        priceFinal: applyMarkup(price, opts.markupPct),
         quantity: p.quantity.available,
         // Raw city only — the coded source label is applied centrally in /api/search.
         warehouse: p.addInfo?.city ?? p.locationCode,

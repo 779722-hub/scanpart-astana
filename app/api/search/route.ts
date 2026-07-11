@@ -97,15 +97,18 @@ export async function GET(req: NextRequest) {
     );
     const realVin =
       session.vin && !session.vin.startsWith("MANUAL") ? session.vin : "";
-    const catalogOems: string[] =
-      kind === "name" && realVin && webConfigured
-        ? await articlesByVinAndName(realVin, raw)
-            .then((r) => r.parts.map((p) => p.oem))
-            .catch((err) => {
-              console.warn("[api/search] shatem catalog failed:", (err as Error).message);
-              return [];
-            })
-        : [];
+    // A name search for a KNOWN vehicle must be catalog-driven so results fit
+    // the car. When true we never fall back to free-text/alias search — that
+    // fallback is exactly what produced non-fitting "фантазии".
+    const vinScoped = kind === "name" && Boolean(realVin) && webConfigured;
+    const catalogOems: string[] = vinScoped
+      ? await articlesByVinAndName(realVin, raw)
+          .then((r) => r.parts.map((p) => p.oem))
+          .catch((err) => {
+            console.warn("[api/search] shatem catalog failed:", (err as Error).message);
+            return [];
+          })
+      : [];
     const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
     const catalogArticleSet = new Set(catalogOems.map(normArt));
 
@@ -135,12 +138,11 @@ export async function GET(req: NextRequest) {
     const autodocKeys = new Set<string>();
     const aliasKeys = new Set<string>();
     {
-      // When the VIN catalog resolved concrete OEM numbers for THIS vehicle,
-      // trust ONLY those — free-text Phaeton search is not vehicle-aware and
-      // returns parts that don't fit the car (e.g. random "колодки"). Fall back
-      // to text variants only when the catalog gave nothing.
-      const variants: string[] = catalogOems.length ? [...catalogOems] : [raw];
-      if (kind === "name" && !catalogOems.length && vehicle?.make) {
+      // For a VIN-scoped name search, price ONLY the catalog OEMs (vehicle-fit).
+      // Free-text Phaeton search is not vehicle-aware and returns parts that
+      // don't fit the car, so it's used only when there is no known vehicle.
+      const variants: string[] = vinScoped ? [...catalogOems] : [raw];
+      if (kind === "name" && !vinScoped && vehicle?.make) {
         variants.push(`${raw} ${vehicle.make}`);
         if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
           variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
@@ -153,7 +155,7 @@ export async function GET(req: NextRequest) {
       // AUTODOC_ENABLED=true после ручной проверки в /api/catalog/debug.
       const autodocOn = process.env.AUTODOC_ENABLED === "true";
       const autodocPromise =
-        kind === "name" && autodocOn && !catalogOems.length
+        kind === "name" && autodocOn && !vinScoped
           ? autodocFindArticles(raw, {
               make: vehicle?.make,
               model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
@@ -167,7 +169,7 @@ export async function GET(req: NextRequest) {
       // name-поиска: админ вручную ведёт пары query → (Brand, Article),
       // и Phaeton прайсит их без проблем.
       const aliasPromise =
-        kind === "name" && !catalogOems.length
+        kind === "name" && !vinScoped
           ? findAliasMatches(raw, vehicle?.make).catch((err) => {
               console.warn("[api/search] alias lookup failed:", (err as Error).message);
               return [];
@@ -209,7 +211,11 @@ export async function GET(req: NextRequest) {
         brandsItems.push({ Brand: ba.brand, Article: ba.article, Name: "" });
       }
     }
-    if (!brandsItems.length) {
+
+    // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
+    // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
+    const shatemOffers = await shatemPromise;
+    if (!brandsItems.length && !shatemOffers.length) {
       logSearch(0);
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
@@ -284,7 +290,6 @@ export async function GET(req: NextRequest) {
       });
 
     // Merge Shate-M offers (already normalized + Astana/in-stock filtered).
-    const shatemOffers = await shatemPromise;
     if (shatemOffers.length) allOffers.push(...shatemOffers);
 
     // Dedupe the same brand+article that came from more than one supplier —
