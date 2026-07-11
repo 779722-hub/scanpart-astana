@@ -14,6 +14,8 @@ import { classifyCompat } from "@/lib/compat";
 import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 import { findAliasMatches } from "@/lib/aliases";
 import { appendSearchLog } from "@/lib/sheets/client";
+import { searchShatemOffers } from "@/lib/shatem/search";
+import { articlesByVinAndName } from "@/lib/shatem/catalog";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -85,6 +87,44 @@ export async function GET(req: NextRequest) {
       getAnalogsMax(),
     ]);
 
+    // Catalog (Shate-M Laximo) — name search for a known vehicle by VIN turns
+    // the free-text name into concrete OEM part numbers for THIS car, which we
+    // then price across Phaeton + Shate-M. Gated on web-session config and
+    // fully fail-safe.
+    const webConfigured = Boolean(
+      (process.env.SHATEM_WEB_LOGIN && process.env.SHATEM_WEB_PASSWORD) ||
+        process.env.SHATEM_SESSION_COOKIE
+    );
+    const realVin =
+      session.vin && !session.vin.startsWith("MANUAL") ? session.vin : "";
+    const catalogOems: string[] =
+      kind === "name" && realVin && webConfigured
+        ? await articlesByVinAndName(realVin, raw)
+            .then((r) => r.parts.map((p) => p.oem))
+            .catch((err) => {
+              console.warn("[api/search] shatem catalog failed:", (err as Error).message);
+              return [];
+            })
+        : [];
+    const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+    const catalogArticleSet = new Set(catalogOems.map(normArt));
+
+    // Second supplier — Shate-M price/stock (Astana, in-stock). Article search
+    // prices the query; name search prices the catalog OEMs. Gated by apikey,
+    // fully fail-safe so a Shate-M outage never breaks Phaeton results.
+    const shatemTargets = kind === "article" ? [raw] : catalogOems;
+    const shatemPromise: Promise<PartOffer[]> =
+      process.env.SHATEM_API_KEY && shatemTargets.length
+        ? Promise.all(
+            shatemTargets.map((code) =>
+              searchShatemOffers(code, { markupPct }).catch((err) => {
+                console.warn("[api/search] shatem lookup failed:", (err as Error).message);
+                return [] as PartOffer[];
+              })
+            )
+          ).then((lists) => lists.flat())
+        : Promise.resolve([]);
+
     // Step A — brands. For name search with a known vehicle we run several
     // text variants in parallel ("колодки", "колодки Nissan", "колодки
     // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
@@ -102,6 +142,9 @@ export async function GET(req: NextRequest) {
           variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
         }
       }
+      // Concrete OEM numbers from the VIN catalog — Phaeton resolves brands for
+      // these exact part numbers far better than for the free-text name.
+      variants.push(...catalogOems);
       const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
       // Autodoc-фолбэк включается флагом — по умолчанию выключен,
       // чтобы случайно не показать клиенту нерелевантные карточки из
@@ -213,7 +256,8 @@ export async function GET(req: NextRequest) {
         const compat = classifyCompat(name, vehicle);
         const days = shipmentDays(i);
         const k = `${i.Brand}|${i.Article}`.toUpperCase();
-        const fromCatalog = autodocKeys.has(k) || aliasKeys.has(k);
+        const fromCatalog =
+          autodocKeys.has(k) || aliasKeys.has(k) || catalogArticleSet.has(cleanArticle);
         return {
           id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
           brand: i.Brand,
@@ -234,8 +278,13 @@ export async function GET(req: NextRequest) {
           matchesAllWords: fromCatalog ? true : matchesAllWords(name),
           shipmentDays: days,
           fromCatalog,
+          source: "phaeton",
         };
       });
+
+    // Merge Shate-M offers (already normalized + Astana/in-stock filtered).
+    const shatemOffers = await shatemPromise;
+    if (shatemOffers.length) allOffers.push(...shatemOffers);
 
     // Relax ladder: try the most strict combination first, then drop one
     // requirement at a time and try again. The first non-empty result wins.
@@ -318,11 +367,23 @@ export async function GET(req: NextRequest) {
 
     logSearch(picked.length);
 
+    // Coded supplier label — never expose the real supplier name to customers.
+    // Each source gets an opaque code shown in parentheses after the city.
+    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2" };
+    // Strip `source` from the payload so the real supplier never reaches the
+    // client — only the opaque code survives, embedded in the warehouse label.
+    const offers = picked.map(({ source, ...o }) => ({
+      ...o,
+      warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${
+        SOURCE_CODE[source ?? "phaeton"] ?? "?"
+      })`,
+    }));
+
     return NextResponse.json({
       ok: true,
       empty: false,
       query: raw,
-      offers: picked,
+      offers,
       level,
       relaxed: level !== "exact",
     });
