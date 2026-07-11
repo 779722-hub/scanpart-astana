@@ -286,6 +286,27 @@ export async function GET(req: NextRequest) {
     const shatemOffers = await shatemPromise;
     if (shatemOffers.length) allOffers.push(...shatemOffers);
 
+    // Dedupe the same brand+article that came from more than one supplier —
+    // keep the single best offer (Astana → in-stock → faster → cheaper).
+    const offerRank = (o: PartOffer): [number, number, number, number] => [
+      o.atAstana ? 0 : 1,
+      o.inStockNow ? 0 : 1,
+      o.shipmentDays,
+      o.priceFinal,
+    ];
+    const isBetter = (a: PartOffer, b: PartOffer): boolean => {
+      const ra = offerRank(a), rb = offerRank(b);
+      for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] < rb[i];
+      return false;
+    };
+    const bestByPart = new Map<string, PartOffer>();
+    for (const o of allOffers) {
+      const key = `${o.brand}|${o.article}`.toUpperCase().replace(/[\s-]/g, "");
+      const cur = bestByPart.get(key);
+      if (!cur || isBetter(o, cur)) bestByPart.set(key, o);
+    }
+    const uniqueOffers = [...bestByPart.values()];
+
     // Relax ladder: try the most strict combination first, then drop one
     // requirement at a time and try again. The first non-empty result wins.
     type Step = { level: RelaxLevel; pred: (o: PartOffer) => boolean };
@@ -327,7 +348,7 @@ export async function GET(req: NextRequest) {
     let pickedRaw: PartOffer[] = [];
     let level: RelaxLevel = "exact";
     for (const step of steps) {
-      const out = allOffers.filter(step.pred);
+      const out = uniqueOffers.filter(step.pred);
       if (out.length) {
         pickedRaw = out;
         level = step.level;
