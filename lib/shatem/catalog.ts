@@ -59,36 +59,58 @@ async function detailsInGroup(v: ShatemVehicle, groupId: number): Promise<Catalo
   return parts;
 }
 
-/** Collect leaf groups whose name (or an ancestor's) matches the query. */
-function matchingLeafGroups(tree: ShatemGroupNode[], query: string, limit = 8): ShatemGroupNode[] {
-  const ql = query.trim().toLowerCase();
-  const out: ShatemGroupNode[] = [];
-  const seen = new Set<number>();
-  const pushLeaves = (node: ShatemGroupNode) => {
-    if (node.isLink && (!node.childs || node.childs.length === 0)) {
-      if (!seen.has(node.quickGroupId)) {
-        seen.add(node.quickGroupId);
-        out.push(node);
-      }
-      return;
-    }
-    for (const c of node.childs ?? []) pushLeaves(c);
-  };
-  const walk = (nodes: ShatemGroupNode[], ancestorMatched: boolean) => {
-    for (const n of nodes) {
-      if (out.length >= limit) return;
-      const matched = ancestorMatched || n.name.toLowerCase().includes(ql);
-      if (matched && n.isLink && (!n.childs || n.childs.length === 0)) pushLeaves(n);
-      else if (matched && (n.childs?.length ?? 0) > 0) walk(n.childs!, true);
-      else if (n.childs?.length) walk(n.childs, false);
-    }
-  };
-  walk(tree, false);
-  return out.slice(0, limit);
+/** Query tokens: lowercased letter/digit words ≥3 chars (splits on any punctuation). */
+export function tokens(s: string): string[] {
+  return s.toLowerCase().split(/[^0-9a-zа-яё]+/i).filter((w) => w.length >= 3);
 }
 
-const tokens = (s: string) =>
-  s.toLowerCase().split(/[\s,./()-]+/).filter((w) => w.length >= 3);
+/**
+ * Crude Russian stem: a 6-char prefix. Handles the common inflections that
+ * broke naive substring matching — "передние"/"переднего"→"передн",
+ * "тормозные"/"тормоза"→"тормоз", "масляный"/"масляного"→"маслян".
+ */
+export function stem(t: string): string {
+  return t.slice(0, 6);
+}
+
+/** `name` contains the stem of EVERY query token (order-independent). */
+export function nameMatchesAll(name: string, qtokens: string[]): boolean {
+  if (!qtokens.length) return false;
+  const hay = name.toLowerCase();
+  return qtokens.every((t) => hay.includes(stem(t)));
+}
+
+/**
+ * Leaf groups relevant to the query, ranked by how many query tokens their
+ * name matches (a group matching more tokens is more specific → first). Naive
+ * whole-string substring matching failed on Russian word order/inflection, so
+ * we score by per-token stems instead.
+ */
+export function matchingLeafGroups(
+  tree: ShatemGroupNode[],
+  query: string,
+  limit = 6
+): ShatemGroupNode[] {
+  const qtokens = tokens(query);
+  if (!qtokens.length) return [];
+  const scored: Array<{ node: ShatemGroupNode; score: number }> = [];
+  const seen = new Set<number>();
+  const visit = (node: ShatemGroupNode) => {
+    const isLeaf = node.isLink && (!node.childs || node.childs.length === 0);
+    if (isLeaf && node.quickGroupId != null && !seen.has(node.quickGroupId)) {
+      const hay = node.name.toLowerCase();
+      const score = qtokens.reduce((n, t) => n + (hay.includes(stem(t)) ? 1 : 0), 0);
+      if (score > 0) {
+        seen.add(node.quickGroupId);
+        scored.push({ node, score });
+      }
+    }
+    for (const c of node.childs ?? []) visit(c);
+  };
+  for (const n of tree) visit(n);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.node);
+}
 
 /**
  * VIN + free-text name → OEM part candidates for that vehicle.
@@ -111,17 +133,12 @@ export async function articlesByVinAndName(
   );
 
   const want = tokens(name);
-  const matches = (partName: string) => {
-    const hay = partName.toLowerCase();
-    return want.length === 0 || want.every((t) => hay.includes(t));
-  };
-
   const parts: CatalogPart[] = [];
   const seen = new Set<string>();
   for (const r of groups) {
     if (r.status !== "fulfilled") continue;
     for (const p of r.value) {
-      if (!matches(p.name)) continue;
+      if (want.length && !nameMatchesAll(p.name, want)) continue;
       const key = p.oem.toUpperCase();
       if (seen.has(key)) continue;
       seen.add(key);

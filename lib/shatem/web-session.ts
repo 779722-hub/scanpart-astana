@@ -48,20 +48,31 @@ async function refresh(j: CookieJar): Promise<boolean> {
   return true;
 }
 
+// Single-flight: concurrent cold-start requests share one bootstrap so they
+// don't each POST /auth/Login and clobber each other's cookies.
+let _bootstrap: Promise<CookieJar> | null = null;
+
 async function ensureSession(): Promise<CookieJar> {
   if (jar && jar.size > 0) return jar;
-  const j = jar ?? new CookieJar();
-  jar = j;
-  if (j.size === 0 && hasCreds()) await loginWeb(j);
-  if (j.size === 0 && process.env.SHATEM_SESSION_COOKIE) {
-    j.seedFromHeader(process.env.SHATEM_SESSION_COOKIE);
+  if (!_bootstrap) {
+    _bootstrap = (async () => {
+      const j = new CookieJar();
+      if (hasCreds()) await loginWeb(j);
+      if (j.size === 0 && process.env.SHATEM_SESSION_COOKIE) {
+        j.seedFromHeader(process.env.SHATEM_SESSION_COOKIE);
+      }
+      if (j.size === 0) {
+        throw new Error(
+          "Shate-M web session not bootstrapped — set SHATEM_WEB_LOGIN/PASSWORD or SHATEM_SESSION_COOKIE."
+        );
+      }
+      jar = j;
+      return j;
+    })().finally(() => {
+      _bootstrap = null;
+    });
   }
-  if (j.size === 0) {
-    throw new Error(
-      "Shate-M web session not bootstrapped — set SHATEM_WEB_LOGIN/PASSWORD or SHATEM_SESSION_COOKIE."
-    );
-  }
-  return j;
+  return _bootstrap;
 }
 
 /** Authenticated GET against the web host, with refresh/re-login retry on 401. */
