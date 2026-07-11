@@ -135,16 +135,17 @@ export async function GET(req: NextRequest) {
     const autodocKeys = new Set<string>();
     const aliasKeys = new Set<string>();
     {
-      const variants: string[] = [raw];
-      if (kind === "name" && vehicle?.make) {
+      // When the VIN catalog resolved concrete OEM numbers for THIS vehicle,
+      // trust ONLY those — free-text Phaeton search is not vehicle-aware and
+      // returns parts that don't fit the car (e.g. random "колодки"). Fall back
+      // to text variants only when the catalog gave nothing.
+      const variants: string[] = catalogOems.length ? [...catalogOems] : [raw];
+      if (kind === "name" && !catalogOems.length && vehicle?.make) {
         variants.push(`${raw} ${vehicle.make}`);
         if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
           variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
         }
       }
-      // Concrete OEM numbers from the VIN catalog — Phaeton resolves brands for
-      // these exact part numbers far better than for the free-text name.
-      variants.push(...catalogOems);
       const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
       // Autodoc-фолбэк включается флагом — по умолчанию выключен,
       // чтобы случайно не показать клиенту нерелевантные карточки из
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
       // AUTODOC_ENABLED=true после ручной проверки в /api/catalog/debug.
       const autodocOn = process.env.AUTODOC_ENABLED === "true";
       const autodocPromise =
-        kind === "name" && autodocOn
+        kind === "name" && autodocOn && !catalogOems.length
           ? autodocFindArticles(raw, {
               make: vehicle?.make,
               model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
@@ -166,7 +167,7 @@ export async function GET(req: NextRequest) {
       // name-поиска: админ вручную ведёт пары query → (Brand, Article),
       // и Phaeton прайсит их без проблем.
       const aliasPromise =
-        kind === "name"
+        kind === "name" && !catalogOems.length
           ? findAliasMatches(raw, vehicle?.make).catch((err) => {
               console.warn("[api/search] alias lookup failed:", (err as Error).message);
               return [];
