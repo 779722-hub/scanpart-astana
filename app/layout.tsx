@@ -13,7 +13,7 @@ const seo = seoFor(DEFAULT_LOCALE);
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: `${seo.title} · ${SITE_NAME}`, template: `%s · ${SITE_NAME}` },
+  title: { default: `${seo.title} · ${SITE_NAME}` },
   description: seo.description,
   keywords: seo.keywords,
   applicationName: SITE_NAME,

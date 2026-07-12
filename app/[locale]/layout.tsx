@@ -28,23 +28,23 @@ export async function generateMetadata({
     ? [{ url: cldUrl(og.publicId, { width: 1200 }), width: 1200, height: 630, alt: seo.title }]
     : undefined;
 
+  // No title.template anywhere — titles are used verbatim so the site-name
+  // suffix is never applied twice (cascading templates doubled it before).
   return {
-    title: { default: fullTitle, template: `%s · ${SITE_NAME}` },
+    title: { default: fullTitle },
     description: seo.description,
     keywords: seo.keywords,
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
       locale: OG_LOCALE[locale as SeoLocale] ?? "ru_RU",
-      // Base title only — Next applies the `%s · SITE_NAME` template to
-      // openGraph/twitter titles too, so passing fullTitle would double it.
-      title: seo.title,
+      title: fullTitle,
       description: seo.description,
       images,
     },
     twitter: {
       card: "summary_large_image",
-      title: seo.title,
+      title: fullTitle,
       description: seo.description,
       images: images?.map((i) => i.url),
     },
