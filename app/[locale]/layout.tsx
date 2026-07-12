@@ -31,7 +31,7 @@ export async function generateMetadata({
   // No title.template anywhere — titles are used verbatim so the site-name
   // suffix is never applied twice (cascading templates doubled it before).
   return {
-    title: { default: fullTitle },
+    title: fullTitle,
     description: seo.description,
     keywords: seo.keywords,
     openGraph: {
