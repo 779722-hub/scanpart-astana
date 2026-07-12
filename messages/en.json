@@ -14,8 +14,8 @@
   "home": {
     "title": "Find the right part in seconds",
     "subtitle": "Search by VIN, part number or name across our Astana warehouse. Original plus up to 3 analogs, price and stock at a glance.",
-    "btnVin": "By VIN",
-    "btnVinDesc": "17-character vehicle code",
+    "btnVin": "By VIN or make",
+    "btnVinDesc": "VIN code or car make",
     "btnArticle": "By part number",
     "btnArticleDesc": "OEM / aftermarket number",
     "btnName": "By name",
@@ -186,6 +186,7 @@
     "specifyVin": "Specify by VIN",
     "loginToChange": "Log in to change",
     "login": "Log in",
-    "savePrompt": "Log in to save your cars and switch between them in one tap."
+    "savePrompt": "Log in to save your cars and switch between them in one tap.",
+    "noCarValue": "Enter a VIN below"
   }
 }
