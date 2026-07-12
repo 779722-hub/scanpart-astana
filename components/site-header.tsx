@@ -4,6 +4,7 @@ import { Wrench, Car, ChevronRight, Lock } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
+import { BrandLink } from "./brand-link";
 import { getThemeMap, getImageSlot } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { getSession } from "@/lib/session";
@@ -29,8 +30,8 @@ export async function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-paper-mute/60 bg-paper/80 backdrop-blur dark:border-ink-mute/60 dark:bg-ink/80">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
-        <Link
-          href={`/${locale}`}
+        <BrandLink
+          locale={locale}
           className="group flex min-w-0 items-center gap-1.5 font-bold tracking-tight sm:gap-2"
         >
           {logo?.publicId ? (
@@ -47,7 +48,7 @@ export async function SiteHeader() {
           )}
           <span className="truncate text-xl sm:hidden">{logoShort}</span>
           <span className="hidden truncate sm:block sm:text-xl">{logoText}</span>
-        </Link>
+        </BrandLink>
         <div className="flex flex-none items-center gap-1 sm:gap-2">
           <LocaleSwitcher />
           <CartButton />

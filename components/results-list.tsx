@@ -25,6 +25,7 @@ interface FitWarning {
   model: string;
   year: string;
   level: "mismatch" | "unconfirmed";
+  needsVin?: boolean;
 }
 
 type State =
@@ -229,6 +230,32 @@ function CatalogHint({ vin }: { vin?: string }) {
 
 function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
   const label = [fit.make, fit.model, fit.year].filter(Boolean).join(" ");
+  // Manually-chosen car (no VIN): name results are not catalog-verified.
+  if (fit.needsVin) {
+    return (
+      <div className="card border-2 border-amber-400 bg-amber-50 dark:border-amber-600/60 dark:bg-amber-900/20">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-8 w-8 flex-none text-amber-600" />
+          <div>
+            <div className="text-lg font-bold text-amber-900 dark:text-amber-100">
+              Показаны совпадения по названию — без проверки на ваш авто
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+              Точный подбор по названию для <strong>{label}</strong> работает по
+              VIN (каталог производителя). Укажите VIN, чтобы показать только
+              подходящие детали.
+            </p>
+            <Link
+              href={`/${locale}/search/vin`}
+              className="mt-2 inline-block text-sm font-semibold text-brand underline"
+            >
+              Указать VIN
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (fit.level === "unconfirmed") {
     return (
       <div className="card border-2 border-amber-400 bg-amber-50 dark:border-amber-600/60 dark:bg-amber-900/20">

@@ -20,8 +20,15 @@ async function checkUrl(url: string, timeoutMs = 4000): Promise<boolean> {
 
 export async function GET() {
   const phaetonBase = process.env.PHAETON_BASE_URL || "https://api.phaeton.kz";
-  const [phaetonOk, sheetsConfigured] = await Promise.all([
+  const shatemBase = process.env.SHATEM_BASE_URL || "https://api.shate-m.kz";
+  const shatemConfigured = Boolean(process.env.SHATEM_API_KEY);
+  const autotradeConfigured = Boolean(
+    process.env.AUTOTRADE_API_KEY || process.env.AUTOTRADE_LOGIN
+  );
+
+  const [phaetonOk, shatemReachable, sheetsConfigured] = await Promise.all([
     checkUrl(`${phaetonBase}/`),
+    shatemConfigured ? checkUrl(`${shatemBase}/`) : Promise.resolve(false),
     Promise.resolve(
       Boolean(
         process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 &&
@@ -38,6 +45,8 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       checks: {
         phaeton: phaetonOk ? "ok" : "fail",
+        shatem: shatemConfigured ? (shatemReachable ? "ok" : "fail") : "missing",
+        autotrade: autotradeConfigured ? "configured" : "missing",
         sheets: sheetsConfigured ? "configured" : "missing",
         cloudinary:
           process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL
