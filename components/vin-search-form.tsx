@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
@@ -40,11 +40,14 @@ export function VinSearchForm({
     useState<"invalid" | "notFound" | "generic">("invalid");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // Resolve a VIN → vehicle, set it as the current car, and show the search
+  // chooser (part-number + name). Shared by the form, the saved-car chips and
+  // the auto-resolve on mount.
+  async function resolve(targetVin: string) {
+    setVin(targetVin);
     setStatus("loading");
     try {
-      const res = await fetch(`/api/vin?vin=${encodeURIComponent(vin)}`);
+      const res = await fetch(`/api/vin?vin=${encodeURIComponent(targetVin)}`);
       const json = await res.json();
       if (res.ok && json.ok) {
         setVehicle(json.vehicle);
@@ -63,6 +66,22 @@ export function VinSearchForm({
       setStatus("error");
     }
   }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    resolve(vin);
+  }
+
+  // Arriving with ?vin=... (e.g. from a saved car in the cabinet) — resolve it
+  // right away so the customer lands on the search chooser, not an empty form.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!autoRan.current && initialVin.length === 17) {
+      autoRan.current = true;
+      resolve(initialVin);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function reset() {
     setVin("");
@@ -145,14 +164,7 @@ export function VinSearchForm({
           </div>
           <div className="flex flex-wrap gap-2">
             {savedVins.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setVin(v)}
-                className="inline-flex items-center gap-1 rounded-full border border-paper-mute bg-white px-3 py-1 font-mono text-xs font-bold transition hover:border-brand hover:text-brand dark:border-ink dark:bg-ink-soft"
-              >
-                {v}
-              </button>
+              <SavedCarChip key={v} vin={v} onSelect={resolve} />
             ))}
           </div>
         </div>
@@ -214,6 +226,46 @@ export function VinSearchForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function SavedCarChip({
+  vin,
+  onSelect,
+}: {
+  vin: string;
+  onSelect: (vin: string) => void;
+}) {
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+
+  useEffect(() => {
+    if (vin.startsWith("MANUAL")) return;
+    let cancelled = false;
+    fetch(`/api/vin?vin=${encodeURIComponent(vin)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled && j.ok) setVehicle(j.vehicle);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vin]);
+
+  const label = vehicle
+    ? [vehicle.make, vehicle.model].filter((s) => s && s !== "—").join(" ")
+    : "";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(vin)}
+      title={vin}
+      className="inline-flex items-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-3 py-1.5 text-xs font-semibold transition hover:border-brand hover:text-brand dark:border-ink dark:bg-ink-soft"
+    >
+      <Car className="h-3.5 w-3.5 flex-none text-brand" />
+      {label || vin}
+    </button>
   );
 }
 
