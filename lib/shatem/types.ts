@@ -129,6 +129,41 @@ export interface ShatemAutoByVinResponse {
   vehicles?: ShatemVehicle[];
 }
 
+/** GET GetCatalogs → manufacturer catalogs (for the by-model wizard). */
+export interface ShatemCatalogItem {
+  code: string; // catalogId, e.g. "INFINITI201809"
+  brand: string; // "INFINITI"
+  name: string; // "Infiniti"
+  supportVinSearch?: boolean;
+  supportParameterIdentification?: boolean; // wizard-capable
+  supportquickgroups?: boolean;
+}
+export interface ShatemCatalogsResponse {
+  success: boolean;
+  items?: ShatemCatalogItem[];
+}
+
+/** One wizard step field (GET Parameters → fields[]). */
+export interface ShatemWizardField {
+  name: string; // "Рынок" | "Модель" | "Год" | "Привод" | "Двигатель" | …
+  determined: boolean; // already chosen
+  automatic: boolean; // auto-filled (single option) — no user input needed
+  allowListVehicles: boolean; // AutoBySsd is callable at this point
+  value?: string; // chosen value (when determined)
+  ssd?: string; // per-field ssd (when determined)
+  options: Array<{ key: string; value: string }>; // key = the ssd to pick this option
+}
+export interface ShatemParametersResponse {
+  success: boolean;
+  fields?: ShatemWizardField[];
+}
+
+/** GET AutoBySsd → matching modifications (each carries the {vehicleId,catalog,ssd} triple). */
+export interface ShatemAutoBySsdResponse {
+  success: boolean;
+  vehicles?: ShatemVehicle[];
+}
+
 /** A node in the quick-group tree (GetVinGroups.treeData). */
 export interface ShatemGroupNode {
   quickGroupId: number;

@@ -14,7 +14,7 @@ import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 import { findAliasMatches } from "@/lib/aliases";
 import { appendSearchLog } from "@/lib/sheets/client";
 import { searchShatemOffers } from "@/lib/shatem/search";
-import { articlesByVinAndName } from "@/lib/shatem/catalog";
+import { articlesByVinAndName, articlesByVehicleAndName } from "@/lib/shatem/catalog";
 import { pickPerSource } from "@/lib/search/pick";
 
 export const runtime = "nodejs";
@@ -95,17 +95,31 @@ export async function GET(req: NextRequest) {
     );
     const realVin =
       session.vin && !session.vin.startsWith("MANUAL") ? session.vin : "";
+    // A car chosen via the by-model wizard carries the Laximo triple — it drives
+    // the catalog exactly like a VIN does.
+    const ref = session.vehicleRef;
     // A name search for a KNOWN vehicle must be catalog-driven so results fit
     // the car. When true we never fall back to free-text/alias search — that
     // fallback is exactly what produced non-fitting "фантазии".
-    const vinScoped = kind === "name" && Boolean(realVin) && webConfigured;
+    const vinScoped =
+      kind === "name" && webConfigured && (Boolean(realVin) || Boolean(ref));
     const catalogOems: string[] = vinScoped
-      ? await articlesByVinAndName(realVin, raw)
-          .then((r) => r.parts.map((p) => p.oem))
-          .catch((err) => {
-            console.warn("[api/search] shatem catalog failed:", (err as Error).message);
-            return [];
-          })
+      ? await (ref
+          ? articlesByVehicleAndName(
+              {
+                vehicleId: ref.vehicleId,
+                catalog: ref.catalog,
+                ssd: ref.ssd,
+                brand: vehicle?.make ?? "",
+                name: vehicle?.model ?? "",
+              },
+              raw
+            ).then((ps) => ps.map((p) => p.oem))
+          : articlesByVinAndName(realVin, raw).then((r) => r.parts.map((p) => p.oem))
+        ).catch((err) => {
+          console.warn("[api/search] shatem catalog failed:", (err as Error).message);
+          return [];
+        })
       : [];
     const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
     const catalogArticleSet = new Set(catalogOems.map(normArt));
@@ -357,9 +371,9 @@ export async function GET(req: NextRequest) {
         ...vehLabel,
         level: picked.some((o) => o.compat === "mismatch") ? "mismatch" : "unconfirmed",
       };
-    } else if (kind === "name" && vehLabel && !realVin && picked.length > 0) {
-      // A car was chosen MANUALLY (no VIN) — the catalog is VIN-based, so these
-      // name matches aren't verified against the vehicle. Warn and point to VIN.
+    } else if (kind === "name" && vehLabel && !realVin && !ref && picked.length > 0) {
+      // A car was chosen MANUALLY without the catalog (free-text make/model, no
+      // VIN and no wizard ref) — matches aren't verified. Warn and point to VIN.
       fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
     }
 

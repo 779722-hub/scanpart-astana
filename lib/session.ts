@@ -4,6 +4,9 @@ import { cookies } from "next/headers";
 export interface AppSession {
   vin?: string;
   vehicle?: { make: string; model: string; year: string };
+  // Set when a car is chosen via the by-model catalog wizard (no VIN). Carries
+  // the Laximo triple so name search can query the catalog like a VIN does.
+  vehicleRef?: { vehicleId: number; catalog: string; ssd: string };
   lastSearch?: {
     kind: "article" | "name";
     query: string;

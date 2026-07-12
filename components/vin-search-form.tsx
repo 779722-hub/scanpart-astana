@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
+import { ModelWizard } from "./model-wizard";
 
 interface Vehicle {
   make: string;
@@ -19,7 +20,7 @@ const KNOWN_MAKES = [
   "Lada", "UAZ", "Chery", "Geely", "Haval",
 ];
 
-type Status = "idle" | "loading" | "error" | "ok" | "manual";
+type Status = "idle" | "loading" | "error" | "ok" | "manual" | "wizard";
 
 export function VinSearchForm({
   locale,
@@ -92,6 +93,10 @@ export function VinSearchForm({
   function onManualSubmitted(v: Vehicle) {
     setVehicle(v);
     setStatus("ok");
+  }
+
+  if (status === "wizard") {
+    return <ModelWizard locale={locale} onCancel={reset} />;
   }
 
   if (status === "manual") {
@@ -211,10 +216,11 @@ export function VinSearchForm({
         </button>
         <button
           type="button"
-          onClick={() => setStatus("manual")}
+          onClick={() => setStatus("wizard")}
           className="btn-secondary"
         >
-          {t("manualOpen")}
+          <Car className="h-4 w-4" />
+          По марке и модели
         </button>
         <button
           type="button"
