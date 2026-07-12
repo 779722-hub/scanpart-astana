@@ -14,7 +14,7 @@ import {
   Truck,
   Store,
 } from "lucide-react";
-import { orderSchema, type OrderInput } from "@/lib/schemas";
+import { orderFormSchema, type OrderFormInput } from "@/lib/schemas";
 import { useCart } from "@/lib/cart";
 
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
@@ -63,14 +63,14 @@ export function OrderForm({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<OrderInput>({
-    resolver: zodResolver(orderSchema),
+  } = useForm<OrderFormInput>({
+    resolver: zodResolver(orderFormSchema),
     defaultValues: {
       kind,
-      items: [],
       name: defaults?.name ?? "",
       phone: defaults?.phone ?? "",
       whatsapp: defaults?.whatsapp ?? "",
+      address: "",
     },
   });
 
@@ -90,7 +90,7 @@ export function OrderForm({
     );
   }
 
-  async function onSubmit(data: Omit<OrderInput, "items">) {
+  async function onSubmit(data: OrderFormInput) {
     setStatus("submitting");
     try {
       const items = cart.items.map((i) => ({
@@ -113,6 +113,9 @@ export function OrderForm({
       setWhatsappUrl(json.whatsappUrl ?? null);
       setStatus("success");
       cart.clear();
+      // Make the confirmation impossible to miss (esp. on mobile, where the
+      // submit button sits below the fold).
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setStatus("error");
     }
@@ -123,33 +126,32 @@ export function OrderForm({
     return (
       <div className="card space-y-5">
         <div className="flex items-center gap-3 text-emerald-600">
-          <CheckCircle2 className="h-8 w-8" />
-          <h2 className="text-2xl font-bold">Заказ принят</h2>
+          <CheckCircle2 className="h-9 w-9 flex-none" />
+          <h2 className="text-2xl font-bold sm:text-3xl">Заказ создан</h2>
         </div>
-        <p className="text-pretty leading-relaxed">{message}</p>
-        {whatsappUrl ? (
-          <p className="text-sm text-ink-mute dark:text-paper-mute">
-            Хотите ускорить? Продублируйте заказ менеджеру в WhatsApp — кнопка ниже.
-          </p>
-        ) : (
-          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-            Номер менеджера WhatsApp ещё не настроен — мы свяжемся с вами по
-            телефону.
-          </p>
+        <p className="text-pretty text-lg font-semibold leading-relaxed">
+          Наш менеджер свяжется с вами в ближайшее время для уточнения заказа и
+          оплаты.
+        </p>
+        <p className="text-pretty text-sm leading-relaxed text-ink-mute dark:text-paper-mute">
+          {message}
+        </p>
+        {whatsappUrl && (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary w-full"
+          >
+            <ExternalLink className="h-4 w-4" />
+            {t("openWhatsApp")}
+          </a>
         )}
         <div className="flex flex-col gap-3 sm:flex-row">
-          {whatsappUrl && (
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary flex-1"
-            >
-              <ExternalLink className="h-4 w-4" />
-              {t("openWhatsApp")}
-            </a>
-          )}
-          <Link href={`/${locale}`} className="btn-secondary flex-1">
+          <Link href={`/${locale}`} className="btn-primary flex-1">
+            На главную
+          </Link>
+          <Link href={`/${locale}/search/article`} className="btn-secondary flex-1">
             {t("back")}
           </Link>
         </div>
