@@ -12,9 +12,28 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react";
+import type { Metadata } from "next";
 import { getImageSlot } from "@/lib/content";
 import { getAllSettings } from "@/lib/sheets/settings";
 import { cldUrl } from "@/lib/cloudinary-url";
+import { SITE_URL, LOCALES, DEFAULT_LOCALE } from "@/lib/site";
+
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Metadata {
+  return {
+    alternates: {
+      canonical: `${SITE_URL}/${locale}`,
+      languages: {
+        ...Object.fromEntries(LOCALES.map((l) => [l, `${SITE_URL}/${l}`])),
+        "x-default": `${SITE_URL}/${DEFAULT_LOCALE}`,
+      },
+    },
+    openGraph: { url: `${SITE_URL}/${locale}` },
+  };
+}
 
 export default async function HomePage({
   params: { locale },
