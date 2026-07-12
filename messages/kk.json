@@ -177,5 +177,11 @@
     "orderRepeatNoneAvailable": "Ешбір бөлшек қазір Астанада жоқ.",
     "orderRepeatPartial": "{total} ішінен {missing} қазір Астанада жоқ — тек қолжетімдісі ({found}) қосылды."
   },
-  "vinSavedHeader": "Сақталған көліктерім:"
+  "vinSavedHeader": "Сақталған көліктерім:",
+  "vehicleBar": {
+    "searchingFor": "Іздейміз:",
+    "changeCar": "Көлікті ауыстыру",
+    "noCar": "Көлік таңдалмаған —",
+    "specifyVin": "VIN бойынша көрсету"
+  }
 }

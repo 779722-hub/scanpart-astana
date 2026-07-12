@@ -177,5 +177,11 @@
     "orderRepeatNoneAvailable": "Ни одна из позиций не доступна сейчас в Астане.",
     "orderRepeatPartial": "Из {total} позиций {missing} сейчас нет в Астане — добавлены только доступные ({found})."
   },
-  "vinSavedHeader": "Мои сохранённые авто:"
+  "vinSavedHeader": "Мои сохранённые авто:",
+  "vehicleBar": {
+    "searchingFor": "Ищем для:",
+    "changeCar": "Сменить авто",
+    "noCar": "Авто не выбрано —",
+    "specifyVin": "указать по VIN"
+  }
 }

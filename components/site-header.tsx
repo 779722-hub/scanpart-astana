@@ -13,6 +13,7 @@ export async function SiteHeader() {
   const t = await getTranslations("brand");
   const theme = await getThemeMap().catch(() => ({} as Record<string, string>));
   const logoText = theme.logo_text || t("name");
+  const tv = await getTranslations("vehicleBar");
   const session = await getSession();
   const vehicle = session.vehicle;
   const vinHref = `/${locale}/search/vin`;
@@ -37,42 +38,41 @@ export async function SiteHeader() {
         </div>
       </div>
 
-      {/* current vehicle bar — always visible so the customer knows which car
-          they're searching for, and can switch it in one tap */}
-      <div className="border-t border-paper-mute/60 bg-brand/[0.06] dark:border-ink-mute/60 dark:bg-brand/[0.12]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-1.5 text-sm sm:px-6">
-          {vehicle?.make ? (
-            <>
-              <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
-                <Car className="h-4 w-4 flex-none text-brand" />
-                <span className="flex-none">Ищем для:</span>
-                <strong className="truncate text-ink dark:text-paper">
-                  {vehicle.make}
-                  {vehicle.model && vehicle.model !== "—" ? ` ${vehicle.model}` : ""}
-                  {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
-                </strong>
-              </span>
-              <Link
-                href={vinHref}
-                className="flex flex-none items-center gap-0.5 font-semibold text-brand hover:underline"
-              >
-                Сменить авто
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </>
-          ) : (
+      {/* current vehicle bar — mounted into the header (same colour), always
+          visible so the customer knows which car they're searching for and can
+          switch it in one tap */}
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 border-t border-paper-mute/50 px-3 py-1.5 text-sm sm:px-6 dark:border-ink-mute/50">
+        {vehicle?.make ? (
+          <>
+            <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
+              <Car className="h-4 w-4 flex-none text-brand" />
+              <span className="flex-none">{tv("searchingFor")}</span>
+              <strong className="truncate text-ink dark:text-paper">
+                {vehicle.make}
+                {vehicle.model && vehicle.model !== "—" ? ` ${vehicle.model}` : ""}
+                {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
+              </strong>
+            </span>
             <Link
               href={vinHref}
-              className="flex min-w-0 items-center gap-1.5 text-ink-mute transition hover:text-brand dark:text-paper-mute"
+              className="flex flex-none items-center gap-0.5 font-semibold text-brand hover:underline"
             >
-              <Car className="h-4 w-4 flex-none" />
-              <span className="truncate">
-                Авто не выбрано —{" "}
-                <span className="font-semibold text-brand">указать по VIN</span>
-              </span>
+              {tv("changeCar")}
+              <ChevronRight className="h-4 w-4" />
             </Link>
-          )}
-        </div>
+          </>
+        ) : (
+          <Link
+            href={vinHref}
+            className="flex min-w-0 items-center gap-1.5 text-ink-mute transition hover:text-brand dark:text-paper-mute"
+          >
+            <Car className="h-4 w-4 flex-none" />
+            <span className="truncate">
+              {tv("noCar")}{" "}
+              <span className="font-semibold text-brand">{tv("specifyVin")}</span>
+            </span>
+          </Link>
+        )}
       </div>
     </header>
   );
