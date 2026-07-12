@@ -55,23 +55,26 @@ export async function SiteHeader() {
             </span>
             <Link
               href={vinHref}
-              className="flex flex-none items-center gap-0.5 font-semibold text-brand hover:underline"
+              className="inline-flex flex-none items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm"
             >
               {tv("changeCar")}
               <ChevronRight className="h-4 w-4" />
             </Link>
           </>
         ) : (
-          <Link
-            href={vinHref}
-            className="flex min-w-0 items-center gap-1.5 text-ink-mute transition hover:text-brand dark:text-paper-mute"
-          >
-            <Car className="h-4 w-4 flex-none" />
-            <span className="truncate">
-              {tv("noCar")}{" "}
-              <span className="font-semibold text-brand">{tv("specifyVin")}</span>
+          <>
+            <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
+              <Car className="h-4 w-4 flex-none" />
+              <span className="truncate">{tv("noCar")}</span>
             </span>
-          </Link>
+            <Link
+              href={vinHref}
+              className="inline-flex flex-none items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm"
+            >
+              {tv("specifyVin")}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </>
         )}
       </div>
     </header>

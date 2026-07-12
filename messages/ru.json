@@ -181,7 +181,7 @@
   "vehicleBar": {
     "searchingFor": "Ищем для:",
     "changeCar": "Сменить авто",
-    "noCar": "Авто не выбрано —",
-    "specifyVin": "указать по VIN"
+    "noCar": "Авто не выбрано",
+    "specifyVin": "Указать по VIN"
   }
 }
