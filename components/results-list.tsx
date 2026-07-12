@@ -108,7 +108,7 @@ export function ResultsList({
         <div className="card space-y-5 text-center">
           <Package className="mx-auto h-12 w-12 text-ink-mute" />
           <p className="text-lg">{t("empty")}</p>
-          <Link href={`/${locale}`} className="btn-primary inline-flex">
+          <Link href={`/${locale}/search/${kind}`} className="btn-primary inline-flex">
             {t("newSearch")}
           </Link>
         </div>
@@ -136,7 +136,7 @@ export function ResultsList({
       ))}
       {state.level !== "exact" && <CatalogHint vin={vin} />}
       <div className="pt-2 text-center">
-        <Link href={`/${locale}`} className="btn-secondary inline-flex">
+        <Link href={`/${locale}/search/${kind}`} className="btn-secondary inline-flex">
           {t("newSearch")}
         </Link>
       </div>
