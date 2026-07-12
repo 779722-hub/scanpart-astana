@@ -66,6 +66,7 @@ export function ResultsList({
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
   const [revealed, setRevealed] = useState(false);
+  const [sort, setSort] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     let cancelled = false;
@@ -155,11 +156,16 @@ export function ResultsList({
     );
   }
 
+  const sortedOffers = [...state.offers].sort((a, b) =>
+    sort === "asc" ? a.priceFinal - b.priceFinal : b.priceFinal - a.priceFinal
+  );
+
   return (
     <div className="space-y-4">
       {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
-      {state.offers.map((o, i) => (
+      {state.offers.length > 1 && <PriceSort sort={sort} onChange={setSort} />}
+      {sortedOffers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
       {state.level !== "exact" && <CatalogHint vin={vin} />}
@@ -167,6 +173,42 @@ export function ResultsList({
         <Link href={`/${locale}/search/${kind}`} className="btn-secondary inline-flex">
           {t("newSearch")}
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function PriceSort({
+  sort,
+  onChange,
+}: {
+  sort: "asc" | "desc";
+  onChange: (s: "asc" | "desc") => void;
+}) {
+  const options: { value: "asc" | "desc"; label: string }[] = [
+    { value: "asc", label: "Сначала дешевле" },
+    { value: "desc", label: "Сначала дороже" },
+  ];
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-ink-mute dark:text-paper-mute">Сортировка:</span>
+      <div className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 dark:border-ink-mute dark:bg-ink-soft">
+        {options.map(({ value, label }) => {
+          const active = sort === value;
+          return (
+            <button
+              key={value}
+              onClick={() => onChange(value)}
+              className={`rounded-xl px-3 py-1.5 font-semibold transition ${
+                active
+                  ? "bg-brand text-white shadow-card"
+                  : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
