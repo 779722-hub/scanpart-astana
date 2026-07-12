@@ -73,8 +73,9 @@ export async function SiteHeader() {
         ) : (
           <>
             <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
-              <Car className="h-4 w-4 flex-none" />
-              <span className="truncate">{tv("noCar")}</span>
+              <Car className="h-4 w-4 flex-none text-brand" />
+              <span className="flex-none">{tv("searchingFor")}</span>
+              <span className="truncate">{tv("noCarValue")}</span>
             </span>
             <Link href={vinHref} className={btnCls}>
               {tv("specifyVin")}
