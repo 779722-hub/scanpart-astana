@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Wrench, Car, ChevronRight, Lock } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
-import { ThemeSwitcher } from "./theme-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
 import { getThemeMap, getImageSlot } from "@/lib/content";
@@ -36,20 +35,19 @@ export async function SiteHeader() {
             <img
               src={cldUrl(logo.publicId, { width: 144 })}
               alt={logo.altRu || logoText}
-              className="h-7 w-auto max-w-[4.5rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
+              className="h-8 w-auto max-w-[6rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
             />
           ) : (
             <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
               <Wrench className="h-4 w-4" />
             </span>
           )}
-          <span className="truncate text-sm sm:text-xl">{logoText}</span>
+          <span className="truncate text-base sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1 sm:gap-2">
-          <AccountButton signedIn={isCustomer} />
-          <CartButton />
           <LocaleSwitcher />
-          <ThemeSwitcher />
+          <CartButton />
+          <AccountButton signedIn={isCustomer} />
         </div>
       </div>
 

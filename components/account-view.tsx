@@ -17,8 +17,22 @@ import {
   Check,
   X,
   Plus,
+  SunMoon,
 } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+
+function AppearanceCard() {
+  return (
+    <section className="card flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <SunMoon className="h-5 w-5 text-brand" />
+        <span className="font-semibold">Тема сайта</span>
+      </div>
+      <ThemeSwitcher />
+    </section>
+  );
+}
 
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
@@ -137,6 +151,7 @@ function GuestView({
         Личный кабинет: сохраним VIN ваших авто и историю заказов, чтобы вы могли
         повторить покупку в один клик.
       </p>
+      <AppearanceCard />
       <Link href={`/${locale}`} className="text-sm underline text-ink-mute">
         ← На главную
       </Link>
@@ -487,6 +502,9 @@ function Dashboard({
           </ul>
         )}
       </section>
+
+      {/* Тема сайта — перенесена сюда из шапки */}
+      <AppearanceCard />
     </div>
   );
 }
