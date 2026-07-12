@@ -68,13 +68,16 @@ export async function POST(req: NextRequest) {
   const pickupHours = settings?.pickupHours ?? "завтра с 14:00 до 18:00";
 
   // 2. Notify manager in Telegram (single message with full breakdown).
+  let telegramSent = false;
   if (settings?.telegramChatId) {
-    await sendOrderToTelegram({
+    telegramSent = await sendOrderToTelegram({
       chatId: settings.telegramChatId,
       orderType,
       clientName: d.name,
-      phone: d.phone,
-      whatsapp: d.whatsapp || undefined,
+      phone: normalizePhoneE164(d.phone) || d.phone,
+      whatsapp: d.whatsapp
+        ? normalizePhoneE164(d.whatsapp) || d.whatsapp
+        : undefined,
       address: d.address || undefined,
       pickupAddress,
       pickupHours,
@@ -91,7 +94,29 @@ export async function POST(req: NextRequest) {
       deliveryFee,
       totalAmount: grandTotal,
       sheetRows: sheetRows.filter((r): r is number => r !== null),
+    }).catch((err) => {
+      console.error("[api/order] telegram send failed", (err as Error).message);
+      return false;
     });
+    if (!telegramSent) {
+      console.warn("[api/order] telegram configured but message was not sent");
+    }
+  } else {
+    console.warn(
+      "[api/order] telegram not configured (telegram_chat_id missing) — manager not notified"
+    );
+  }
+
+  // Never acknowledge an order we failed to persist anywhere. If every Sheets
+  // append failed AND Telegram didn't deliver, tell the client it didn't go
+  // through so they can retry (instead of a false "Заказ принят").
+  const anySheetSaved = sheetRows.some((r) => r !== null);
+  if (!anySheetSaved && !telegramSent) {
+    console.error("[api/order] order NOT persisted (sheets failed + telegram off)");
+    return NextResponse.json(
+      { ok: false, error: "not_saved" },
+      { status: 502 }
+    );
   }
 
   // 3. WhatsApp deep-link for the client.
@@ -134,6 +159,3 @@ export async function POST(req: NextRequest) {
     total: grandTotal,
   });
 }
-
-// Suppress unused-import warning when bundler tree-shakes alternate paths.
-void normalizePhoneE164;

@@ -43,6 +43,7 @@ interface MeData {
 }
 
 export function AccountView({ locale }: { locale: string }) {
+  const router = useRouter();
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "guest" }
@@ -73,7 +74,17 @@ export function AccountView({ locale }: { locale: string }) {
   }
 
   if (state.kind === "guest") {
-    return <GuestView locale={locale} onSignedIn={refresh} />;
+    // Refresh the server layout too, so the header (Войти → Кабинет) and the
+    // vehicle bar reflect the new session without a full reload.
+    return (
+      <GuestView
+        locale={locale}
+        onSignedIn={() => {
+          router.refresh();
+          refresh();
+        }}
+      />
+    );
   }
 
   return (
