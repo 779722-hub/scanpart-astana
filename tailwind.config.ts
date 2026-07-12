@@ -46,6 +46,15 @@ const config: Config = {
         card: "0 8px 24px rgba(14, 18, 24, 0.08)",
         cardHover: "0 16px 40px rgba(14, 18, 24, 0.14)",
       },
+      // Corner radius is admin-controlled via the `--radius` CSS variable set in
+      // <ThemeStyle/> from the Theme sheet. One value drives buttons, cards and
+      // inputs site-wide. `full` (pills/dots) is intentionally left untouched.
+      borderRadius: {
+        lg: "var(--radius, 0.5rem)",
+        xl: "var(--radius, 0.5rem)",
+        "2xl": "var(--radius, 0.5rem)",
+        "3xl": "var(--radius, 0.5rem)",
+      },
       backgroundImage: {
         "hero-day":
           "linear-gradient(135deg, rgb(var(--c-brand) / 0.08) 0%, rgba(11,13,16,0.02) 100%)",

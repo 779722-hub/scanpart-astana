@@ -3,13 +3,24 @@
 import { useEffect, useState } from "react";
 import { Loader2, Palette, Save, CheckCircle2 } from "lucide-react";
 
-const FIELDS: { key: string; label: string; kind: "color" | "text" | "select" }[] = [
+const FIELDS: {
+  key: string;
+  label: string;
+  kind: "color" | "text" | "select" | "radius";
+}[] = [
   { key: "brand_color", label: "Основной цвет (brand)", kind: "color" },
   { key: "brand_color_dark", label: "Основной для тёмной темы", kind: "color" },
   { key: "accent_color", label: "Акцент / контраст", kind: "color" },
   { key: "logo_text", label: "Текст логотипа", kind: "text" },
   { key: "default_theme", label: "Тема по умолчанию (light/dark/system)", kind: "select" },
+  { key: "radius", label: "Скругление углов (px)", kind: "radius" },
 ];
+
+function parseRadius(v: string | undefined): number {
+  const n = Number.parseFloat(v ?? "");
+  if (!Number.isFinite(n)) return 8;
+  return Math.min(24, Math.max(0, Math.round(n)));
+}
 
 export function TabTheme() {
   const [map, setMap] = useState<Record<string, string> | null>(null);
@@ -108,6 +119,28 @@ export function TabTheme() {
                   <option value="dark">dark (ночь)</option>
                   <option value="system">system (авто)</option>
                 </select>
+              ) : f.kind === "radius" ? (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={24}
+                    step={1}
+                    value={parseRadius(draft[f.key])}
+                    onChange={(e) =>
+                      setDraft({ ...draft, [f.key]: e.target.value })
+                    }
+                    className="flex-1 accent-brand"
+                  />
+                  <span className="w-10 text-sm font-semibold tabular-nums">
+                    {parseRadius(draft[f.key])}px
+                  </span>
+                  <span
+                    className="h-10 w-14 flex-none border-2 border-brand bg-brand/10"
+                    style={{ borderRadius: `${parseRadius(draft[f.key])}px` }}
+                    aria-hidden
+                  />
+                </div>
               ) : (
                 <input
                   className="input"
