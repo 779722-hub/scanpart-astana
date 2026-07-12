@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "SCANPART Курьер",
+    "slug": "scanpart-courier",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "scanpartcourier",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "kz.scanpart.courier",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Приложению нужен доступ к геолокации, чтобы строить маршрут доставки и показывать ваше положение."
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "https://scanpart.kz",
+      "twogisMapKey": ""
+    }
+  }
+}
