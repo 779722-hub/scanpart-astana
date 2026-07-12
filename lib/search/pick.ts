@@ -11,15 +11,30 @@ export function sortForDisplay(a: PartOffer, b: PartOffer): number {
   return a.priceFinal - b.priceFinal;
 }
 
+/** Same part key — brand + article ignoring spaces, dashes and case. */
+export function partKey(o: PartOffer): string {
+  return `${o.brand}|${o.article}`.toUpperCase().replace(/[\s-]/g, "");
+}
+
 /**
- * Up to `perSourceMax` offers from EACH supplier (source), deduped within a
- * supplier by brand+article (the same part in two of that supplier's Astana
- * warehouses shows once — the best one). Callers pass offers already filtered
- * to Astana + in-stock. "по 3 позиции с каждого склада".
+ * Pick offers to show. The same part number (brand + article ignoring
+ * spaces/dashes/case) is ONE part even across suppliers/warehouses — e.g.
+ * "OC 90" and "OC90" — so it collapses to the single best offer (cheapest /
+ * in-stock / fastest). Then up to `perSourceMax` DISTINCT parts are shown from
+ * EACH supplier so every source stays represented. Callers pass offers already
+ * filtered to Astana + in-stock.
  */
 export function pickPerSource(offers: PartOffer[], perSourceMax: number): PartOffer[] {
-  const bySource = new Map<string, PartOffer[]>();
+  // 1) Collapse identical part numbers across everything, keep the best.
+  const best = new Map<string, PartOffer>();
   for (const o of offers) {
+    const k = partKey(o);
+    const cur = best.get(k);
+    if (!cur || sortForDisplay(o, cur) < 0) best.set(k, o);
+  }
+  // 2) Up to perSourceMax distinct parts from each surviving supplier.
+  const bySource = new Map<string, PartOffer[]>();
+  for (const o of best.values()) {
     const s = o.source ?? "phaeton";
     const list = bySource.get(s);
     if (list) list.push(o);
@@ -27,13 +42,7 @@ export function pickPerSource(offers: PartOffer[], perSourceMax: number): PartOf
   }
   const picked: PartOffer[] = [];
   for (const list of bySource.values()) {
-    const best = new Map<string, PartOffer>();
-    for (const o of list) {
-      const k = `${o.brand}|${o.article}`.toUpperCase().replace(/[\s-]/g, "");
-      const cur = best.get(k);
-      if (!cur || sortForDisplay(o, cur) < 0) best.set(k, o);
-    }
-    picked.push(...[...best.values()].sort(sortForDisplay).slice(0, perSourceMax));
+    picked.push(...list.sort(sortForDisplay).slice(0, perSourceMax));
   }
   return picked.sort(sortForDisplay);
 }
