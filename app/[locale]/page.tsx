@@ -104,29 +104,29 @@ export default async function HomePage({
       {lightUrl ? (
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-[60vh] bg-cover bg-center dark:hidden"
+          className="absolute inset-x-0 top-0 -z-10 h-[64vh] sm:h-[82vh] bg-cover bg-center dark:hidden"
           style={{
-            backgroundImage: `linear-gradient(180deg, rgba(248,249,251,0) 0%, rgba(248,249,251,0.85) 100%), url(${lightUrl})`,
+            backgroundImage: `linear-gradient(180deg, rgba(248,249,251,0) 0%, rgba(248,249,251,0.15) 45%, rgba(248,249,251,0.75) 80%, rgba(248,249,251,1) 100%), url(${lightUrl})`,
           }}
         />
       ) : (
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-[60vh] bg-hero-day dark:hidden"
+          className="absolute inset-x-0 top-0 -z-10 h-[64vh] sm:h-[82vh] bg-hero-day dark:hidden"
         />
       )}
       {darkUrl ? (
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 hidden h-[60vh] bg-cover bg-center dark:block"
+          className="absolute inset-x-0 top-0 -z-10 hidden h-[64vh] sm:h-[82vh] bg-cover bg-center dark:block"
           style={{
-            backgroundImage: `linear-gradient(180deg, rgba(11,13,16,0.45) 0%, rgba(11,13,16,0.95) 100%), url(${darkUrl})`,
+            backgroundImage: `linear-gradient(180deg, rgba(11,13,16,0.35) 0%, rgba(11,13,16,0.55) 45%, rgba(11,13,16,0.85) 80%, rgba(11,13,16,1) 100%), url(${darkUrl})`,
           }}
         />
       ) : (
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 hidden h-[60vh] bg-hero-night dark:block"
+          className="absolute inset-x-0 top-0 -z-10 hidden h-[64vh] sm:h-[82vh] bg-hero-night dark:block"
         />
       )}
       <div
