@@ -45,22 +45,33 @@ test("dedup WITHIN a source by brand+article (keep cheaper)", () => {
   assert.equal(picked[0].priceFinal, 4200);
 });
 
-test("SAME part from two different sources is kept (one per source)", () => {
+test("SAME part number across suppliers collapses to the cheapest", () => {
   const offers = [
     offer({ source: "phaeton", brand: "BLUEPRINT", article: "ADN1", priceFinal: 999 }),
     offer({ source: "shatem", brand: "BLUEPRINT", article: "ADN1", priceFinal: 1100 }),
   ];
   const picked = pickPerSource(offers, 3);
-  assert.equal(picked.length, 2);
-  assert.deepEqual(bySrc(picked), { phaeton: 1, shatem: 1 });
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].priceFinal, 999);
+  assert.equal(picked[0].source, "phaeton");
 });
 
-test("normalizes brand+article (spaces/dashes/case) when deduping", () => {
+test("'OC 90' and 'OC90' are the same part (spaces/dashes/case ignored)", () => {
   const offers = [
     offer({ source: "phaeton", brand: "Mahle", article: "OC 90", priceFinal: 2500 }),
-    offer({ source: "phaeton", brand: "MAHLE", article: "OC-90", priceFinal: 2200 }),
+    offer({ source: "shatem", brand: "MAHLE", article: "OC-90", priceFinal: 2245 }),
   ];
-  assert.equal(pickPerSource(offers, 3).length, 1);
+  const picked = pickPerSource(offers, 3);
+  assert.equal(picked.length, 1);
+  assert.equal(picked[0].priceFinal, 2245); // cheaper one wins
+});
+
+test("different brands with the same number are DIFFERENT parts", () => {
+  const offers = [
+    offer({ source: "phaeton", brand: "TRW", article: "GDB1", priceFinal: 5000 }),
+    offer({ source: "phaeton", brand: "BOSCH", article: "GDB1", priceFinal: 4000 }),
+  ];
+  assert.equal(pickPerSource(offers, 3).length, 2);
 });
 
 test("sortForDisplay: original first, then cheaper", () => {
