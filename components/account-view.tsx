@@ -635,12 +635,13 @@ function VinRow({
   const [vehicle, setVehicle] = useState<{ make: string; model: string; year: string } | null>(null);
   const [searching, setSearching] = useState(false);
 
-  // Resolve a human label ("Infiniti FX35") for the saved VIN. `fast=1` keeps
-  // it snappy (NHTSA only). Manual entries have no decodable VIN.
+  // Resolve a human label ("NISSAN FX35/45") for the saved VIN. Full decode
+  // (Shate-M catalog) is needed for the model — NHTSA often lacks it. Manual
+  // entries have no decodable VIN.
   useEffect(() => {
     if (vin.startsWith("MANUAL")) return;
     let cancelled = false;
-    fetch(`/api/vin?vin=${encodeURIComponent(vin)}&fast=1`)
+    fetch(`/api/vin?vin=${encodeURIComponent(vin)}`)
       .then((r) => r.json())
       .then((j) => {
         if (!cancelled && j.ok) setVehicle(j.vehicle);
@@ -651,31 +652,11 @@ function VinRow({
     };
   }, [vin]);
 
-  // Set this car as the current vehicle and jump straight to parts search —
-  // no need to re-enter the VIN.
-  async function search() {
+  // Open search for this car. The VIN page auto-resolves it and shows BOTH
+  // search types (part-number + name) with the vehicle set — no re-entry.
+  function search() {
     setSearching(true);
-    try {
-      let v = vehicle;
-      if (!v && !vin.startsWith("MANUAL")) {
-        const j = await fetch(`/api/vin?vin=${encodeURIComponent(vin)}&fast=1`)
-          .then((r) => r.json())
-          .catch(() => null);
-        if (j?.ok) v = j.vehicle;
-      }
-      await fetch("/api/session/vin", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          vin,
-          vehicle: v ?? { make: "—", model: "—", year: "" },
-        }),
-      });
-      router.push(`/${locale}/search/article`);
-      router.refresh();
-    } finally {
-      setSearching(false);
-    }
+    router.push(`/${locale}/search/vin?vin=${encodeURIComponent(vin)}`);
   }
 
   const label = vehicle
