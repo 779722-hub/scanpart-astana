@@ -36,13 +36,15 @@ export async function generateMetadata({
       type: "website",
       siteName: SITE_NAME,
       locale: OG_LOCALE[locale as SeoLocale] ?? "ru_RU",
-      title: fullTitle,
+      // Base title only — Next applies the `%s · SITE_NAME` template to
+      // openGraph/twitter titles too, so passing fullTitle would double it.
+      title: seo.title,
       description: seo.description,
       images,
     },
     twitter: {
       card: "summary_large_image",
-      title: fullTitle,
+      title: seo.title,
       description: seo.description,
       images: images?.map((i) => i.url),
     },
