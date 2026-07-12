@@ -5,7 +5,8 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeSwitcher } from "./theme-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
-import { getThemeMap } from "@/lib/content";
+import { getThemeMap, getImageSlot } from "@/lib/content";
+import { cldUrl } from "@/lib/cloudinary-url";
 import { getSession } from "@/lib/session";
 
 export async function SiteHeader() {
@@ -13,6 +14,7 @@ export async function SiteHeader() {
   const t = await getTranslations("brand");
   const theme = await getThemeMap().catch(() => ({} as Record<string, string>));
   const logoText = theme.logo_text || t("name");
+  const logo = await getImageSlot("logo").catch(() => null);
   const tv = await getTranslations("vehicleBar");
   const session = await getSession();
   const vehicle = session.vehicle;
@@ -29,9 +31,18 @@ export async function SiteHeader() {
           href={`/${locale}`}
           className="group flex min-w-0 items-center gap-2 font-bold tracking-tight"
         >
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
-            <Wrench className="h-4 w-4" />
-          </span>
+          {logo?.publicId ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={cldUrl(logo.publicId, { width: 144 })}
+              alt={logo.altRu || logoText}
+              className="h-8 w-auto max-w-[9rem] flex-none object-contain transition group-hover:scale-105 sm:h-9"
+            />
+          ) : (
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
+              <Wrench className="h-4 w-4" />
+            </span>
+          )}
           <span className="truncate text-base sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1.5 sm:gap-2">
