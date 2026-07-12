@@ -35,7 +35,7 @@ export async function SiteHeader() {
           <span className="truncate text-base sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1.5 sm:gap-2">
-          <AccountButton />
+          <AccountButton signedIn={isCustomer} />
           <CartButton />
           <LocaleSwitcher />
           <ThemeSwitcher />

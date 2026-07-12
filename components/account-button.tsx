@@ -1,35 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { User, LogOut, Loader2 } from "lucide-react";
 
-export function AccountButton() {
+// `signedIn` is passed from the server (site-header reads the session), so it
+// is always correct on render and re-syncs whenever the server layout is
+// refreshed (login/logout call router.refresh()). No client fetch, no drift.
+export function AccountButton({ signedIn }: { signedIn: boolean }) {
   const locale = useLocale();
   const router = useRouter();
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-
-  async function refresh() {
-    try {
-      const r = await fetch("/api/customer/me");
-      setSignedIn(r.ok);
-    } catch {
-      setSignedIn(false);
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
 
   async function logout() {
     setLoggingOut(true);
     try {
       await fetch("/api/customer/auth/logout", { method: "POST" });
-      setSignedIn(false);
       router.refresh();
     } finally {
       setLoggingOut(false);
@@ -47,7 +35,7 @@ export function AccountButton() {
         {signedIn ? (
           <span className="hidden sm:inline">Кабинет</span>
         ) : (
-          <span className="hidden sm:inline">Войти</span>
+          <span>Войти</span>
         )}
         {signedIn && (
           <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />

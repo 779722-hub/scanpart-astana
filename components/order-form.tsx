@@ -28,9 +28,11 @@ interface PublicSettings {
 export function OrderForm({
   locale,
   kind,
+  defaults,
 }: {
   locale: string;
   kind: "express" | "pickup";
+  defaults?: { name?: string; phone?: string; whatsapp?: string };
 }) {
   const t = useTranslations("order");
   const tErr = useTranslations("errors");
@@ -63,7 +65,13 @@ export function OrderForm({
     formState: { errors },
   } = useForm<OrderInput>({
     resolver: zodResolver(orderSchema),
-    defaultValues: { kind, items: [] },
+    defaultValues: {
+      kind,
+      items: [],
+      name: defaults?.name ?? "",
+      phone: defaults?.phone ?? "",
+      whatsapp: defaults?.whatsapp ?? "",
+    },
   });
 
   // Empty cart guard.
@@ -84,9 +92,6 @@ export function OrderForm({
 
   async function onSubmit(data: Omit<OrderInput, "items">) {
     setStatus("submitting");
-    // Open a blank tab synchronously so the popup blocker doesn't kick in
-    // after the await. We'll fill its location once we get the WhatsApp URL.
-    const waTab = typeof window !== "undefined" ? window.open("", "_blank") : null;
     try {
       const items = cart.items.map((i) => ({
         brand: i.brand,
@@ -103,20 +108,13 @@ export function OrderForm({
       const json = await res.json();
       if (!res.ok || !json.ok) {
         setStatus("error");
-        if (waTab) waTab.close();
         return;
       }
       setWhatsappUrl(json.whatsappUrl ?? null);
       setStatus("success");
       cart.clear();
-      if (json.whatsappUrl && waTab) {
-        waTab.location.href = json.whatsappUrl;
-      } else if (waTab) {
-        waTab.close();
-      }
     } catch {
       setStatus("error");
-      if (waTab) waTab.close();
     }
   }
 
@@ -131,7 +129,7 @@ export function OrderForm({
         <p className="text-pretty leading-relaxed">{message}</p>
         {whatsappUrl ? (
           <p className="text-sm text-ink-mute dark:text-paper-mute">
-            Если WhatsApp не открылся автоматически — нажмите кнопку ниже.
+            Хотите ускорить? Продублируйте заказ менеджеру в WhatsApp — кнопка ниже.
           </p>
         ) : (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
