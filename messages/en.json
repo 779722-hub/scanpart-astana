@@ -177,5 +177,11 @@
     "orderRepeatNoneAvailable": "None of the items are available in Astana right now.",
     "orderRepeatPartial": "Of {total} items, {missing} are not available in Astana — only the available ({found}) were added."
   },
-  "vinSavedHeader": "My saved cars:"
+  "vinSavedHeader": "My saved cars:",
+  "vehicleBar": {
+    "searchingFor": "Searching for:",
+    "changeCar": "Change car",
+    "noCar": "No car selected —",
+    "specifyVin": "specify by VIN"
+  }
 }
