@@ -15,6 +15,9 @@ function shatemWebConfigured(): boolean {
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("vin") ?? "";
   const vin = normalizeVin(raw);
+  // `fast=1` skips the slow Shate-M catalog and uses only the cached NHTSA
+  // decode — enough for labelling saved cars ("Infiniti FX35") in the cabinet.
+  const fast = req.nextUrl.searchParams.get("fast") === "1";
 
   if (!isVinFormatValid(vin)) {
     return NextResponse.json(
@@ -27,7 +30,7 @@ export async function GET(req: NextRequest) {
     // Prefer the Shate-M catalog (accurate KZ-market data + enables VIN parts
     // search). Fall back to NHTSA when unconfigured or when Shate-M has no hit.
     let info: VehicleInfo | null = null;
-    if (shatemWebConfigured()) {
+    if (!fast && shatemWebConfigured()) {
       info = await vehicleByVin(vin)
         .then((v) =>
           v
