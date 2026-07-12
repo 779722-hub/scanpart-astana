@@ -181,7 +181,7 @@
   "vehicleBar": {
     "searchingFor": "Іздейміз:",
     "changeCar": "Көлікті ауыстыру",
-    "noCar": "Көлік таңдалмаған —",
+    "noCar": "Көлік таңдалмаған",
     "specifyVin": "VIN бойынша көрсету"
   }
 }

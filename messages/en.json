@@ -181,7 +181,7 @@
   "vehicleBar": {
     "searchingFor": "Searching for:",
     "changeCar": "Change car",
-    "noCar": "No car selected —",
-    "specifyVin": "specify by VIN"
+    "noCar": "No car selected",
+    "specifyVin": "Specify by VIN"
   }
 }
