@@ -86,9 +86,18 @@ export function ResultsList({
 
   if (state.kind === "loading") {
     return (
-      <div className="card flex items-center justify-center gap-3 py-12 text-ink-mute dark:text-paper-mute">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>…</span>
+      <div className="card flex flex-col items-center justify-center gap-4 py-14 text-center">
+        <span className="relative flex h-16 w-16 items-center justify-center">
+          <span className="absolute inset-0 animate-ping rounded-full bg-brand/20" />
+          <span className="absolute inset-2 rounded-full bg-brand/10" />
+          <Loader2 className="h-9 w-9 animate-spin text-brand" />
+        </span>
+        <div>
+          <div className="text-lg font-bold">Ожидайте, идёт поиск по базе…</div>
+          <div className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+            Проверяем наличие на складе в Астане
+          </div>
+        </div>
       </div>
     );
   }
