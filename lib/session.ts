@@ -23,6 +23,12 @@ export interface AppSession {
     whatsapp?: string;
     loggedInAt: string;
   };
+  courier?: {
+    id: string;
+    name: string;
+    phone: string;
+    loggedInAt: string;
+  };
   csrfToken?: string;
 }
 

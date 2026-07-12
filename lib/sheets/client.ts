@@ -1,5 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import type { Warehouse } from "@/lib/delivery/warehouse";
+import type { Courier, Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const SETTINGS_RANGE = "Settings!A:B";
@@ -12,6 +13,8 @@ const CUSTOMERS_SHEET = "Customers";
 const ALIASES_SHEET = "NameAliases";
 const SEARCH_LOG_SHEET = "SearchLog";
 const WAREHOUSES_SHEET = "Warehouses";
+const COURIERS_SHEET = "Couriers";
+const DELIVERIES_SHEET = "Deliveries";
 
 export interface OrderRow {
   date: string;
@@ -633,6 +636,170 @@ export async function deleteWarehouse(warehouseId: string): Promise<void> {
   await deleteSheetRow(WAREHOUSES_SHEET, rowIdx + 1);
 }
 
+// --- Couriers ----------------------------------------------------------------
+
+export async function readCouriers(): Promise<Courier[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${COURIERS_SHEET}!A2:G`,
+  });
+  return (data.values ?? [])
+    .map((r) => ({
+      id: String(r[0] ?? "").trim(),
+      name: String(r[1] ?? "").trim(),
+      phone: String(r[2] ?? "").trim(),
+      login: String(r[3] ?? "").trim(),
+      passwordHash: String(r[4] ?? ""),
+      active: String(r[5] ?? "").toLowerCase() !== "false",
+    }))
+    .filter((c) => c.id);
+}
+
+export async function findCourierByLogin(login: string): Promise<Courier | null> {
+  const all = await readCouriers();
+  const l = login.trim().toLowerCase();
+  return all.find((c) => c.login.toLowerCase() === l) ?? null;
+}
+
+/** Create/update a courier. `passwordHash` empty on update keeps the old one. */
+export async function upsertCourier(c: Courier): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: `${COURIERS_SHEET}!A:A`,
+  });
+  const rows = data.values ?? [];
+  const rowIdx = rows.findIndex((r) => r[0] === c.id);
+  if (rowIdx === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: id,
+      range: `${COURIERS_SHEET}!A:G`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [
+          [c.id, c.name, c.phone, c.login, c.passwordHash, c.active ? "true" : "false", new Date().toISOString()],
+        ],
+      },
+    });
+    return;
+  }
+  const rowNumber = rowIdx + 1;
+  const updates: { range: string; values: string[][] }[] = [
+    { range: `${COURIERS_SHEET}!B${rowNumber}`, values: [[c.name]] },
+    { range: `${COURIERS_SHEET}!C${rowNumber}`, values: [[c.phone]] },
+    { range: `${COURIERS_SHEET}!D${rowNumber}`, values: [[c.login]] },
+    { range: `${COURIERS_SHEET}!F${rowNumber}`, values: [[c.active ? "true" : "false"]] },
+  ];
+  if (c.passwordHash) updates.push({ range: `${COURIERS_SHEET}!E${rowNumber}`, values: [[c.passwordHash]] });
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: id,
+    requestBody: { valueInputOption: "USER_ENTERED", data: updates },
+  });
+}
+
+export async function deleteCourier(courierId: string): Promise<void> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${COURIERS_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === courierId);
+  if (rowIdx === -1) return;
+  await deleteSheetRow(COURIERS_SHEET, rowIdx + 1);
+}
+
+// --- Deliveries --------------------------------------------------------------
+
+function rowToDelivery(r: unknown[]): Delivery {
+  return {
+    id: String(r[0] ?? "").trim(),
+    createdAt: String(r[1] ?? ""),
+    customerName: String(r[2] ?? ""),
+    phone: String(r[3] ?? ""),
+    whatsapp: String(r[4] ?? ""),
+    address: String(r[5] ?? ""),
+    lat: r[6] === "" || r[6] == null ? null : Number(r[6]),
+    lng: r[7] === "" || r[7] == null ? null : Number(r[7]),
+    items: String(r[8] ?? ""),
+    warehouseIds: String(r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    courierId: String(r[10] ?? "").trim(),
+    status: (String(r[11] ?? "new").trim() || "new") as DeliveryStatus,
+    handoverCode: String(r[12] ?? ""),
+    deliveredAt: String(r[13] ?? ""),
+  };
+}
+
+function deliveryToRow(d: Delivery): (string | number)[] {
+  return [
+    d.id,
+    d.createdAt,
+    d.customerName,
+    d.phone,
+    d.whatsapp,
+    d.address,
+    d.lat ?? "",
+    d.lng ?? "",
+    d.items,
+    d.warehouseIds.join(","),
+    d.courierId,
+    d.status,
+    d.handoverCode,
+    d.deliveredAt,
+  ];
+}
+
+export async function readDeliveries(): Promise<Delivery[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${DELIVERIES_SHEET}!A2:N`,
+  });
+  return (data.values ?? []).map(rowToDelivery).filter((d) => d.id);
+}
+
+export async function upsertDelivery(d: Delivery): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: `${DELIVERIES_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === d.id);
+  if (rowIdx === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: id,
+      range: `${DELIVERIES_SHEET}!A:N`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [deliveryToRow(d)] },
+    });
+    return;
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${DELIVERIES_SHEET}!A${rowIdx + 1}:N${rowIdx + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [deliveryToRow(d)] },
+  });
+}
+
+export async function getDelivery(deliveryId: string): Promise<Delivery | null> {
+  const all = await readDeliveries();
+  return all.find((d) => d.id === deliveryId) ?? null;
+}
+
+export async function deleteDelivery(deliveryId: string): Promise<void> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${DELIVERIES_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === deliveryId);
+  if (rowIdx === -1) return;
+  await deleteSheetRow(DELIVERIES_SHEET, rowIdx + 1);
+}
+
 const SHEET_HEADERS: Record<string, string[]> = {
   Settings: ["key", "value"],
   Orders: [
@@ -684,6 +851,23 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "pickup_minutes",
     "active",
     "updated_at",
+  ],
+  Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at"],
+  Deliveries: [
+    "id",
+    "created_at",
+    "customer_name",
+    "phone",
+    "whatsapp",
+    "address",
+    "lat",
+    "lng",
+    "items",
+    "warehouse_ids",
+    "courier_id",
+    "status",
+    "handover_code",
+    "delivered_at",
   ],
 };
 
