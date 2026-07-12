@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/guards";
-import { setOrderStatus } from "@/lib/sheets/client";
+import { setOrderStatus, deleteOrder } from "@/lib/sheets/client";
 
 export const runtime = "nodejs";
 
@@ -25,5 +25,19 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   }
   await setOrderStatus(rowNumber, parsed.data.status);
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { row: string } }
+) {
+  const guard = await requireAuth();
+  if (guard instanceof NextResponse) return guard;
+  const rowNumber = Number(params.row);
+  if (!Number.isInteger(rowNumber) || rowNumber < 2) {
+    return NextResponse.json({ ok: false, error: "bad_row" }, { status: 400 });
+  }
+  await deleteOrder(rowNumber);
   return NextResponse.json({ ok: true });
 }

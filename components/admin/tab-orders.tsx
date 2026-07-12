@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search } from "lucide-react";
+import { Loader2, Package, Search, Trash2, MessageCircle } from "lucide-react";
+import { normalizePhoneE164 } from "@/lib/schemas";
 
 interface Order {
   rowNumber: number;
@@ -44,10 +45,13 @@ export function TabOrders() {
     return orders
       .filter(
         (o) =>
-          o.phone.toLowerCase().includes(needle) ||
+          o.partName.toLowerCase().includes(needle) ||
+          o.brand.toLowerCase().includes(needle) ||
+          o.partArticle.toLowerCase().includes(needle) ||
           o.clientName.toLowerCase().includes(needle) ||
+          o.phone.toLowerCase().includes(needle) ||
           o.vin.toLowerCase().includes(needle) ||
-          o.partArticle.toLowerCase().includes(needle)
+          o.vehicle.toLowerCase().includes(needle)
       )
       .reverse();
   }, [orders, q]);
@@ -68,6 +72,18 @@ export function TabOrders() {
     }
   }
 
+  async function removeOrder(row: number) {
+    if (!confirm("Удалить этот заказ безвозвратно?")) return;
+    setSavingRow(row);
+    try {
+      await fetch(`/api/admin/orders/${row}`, { method: "DELETE" });
+      // Row numbers shift after a delete — re-read to stay in sync.
+      await refresh();
+    } finally {
+      setSavingRow(null);
+    }
+  }
+
   if (!orders) {
     return (
       <div className="card flex justify-center py-12">
@@ -82,7 +98,7 @@ export function TabOrders() {
         <Search className="h-4 w-4 text-ink-mute" />
         <input
           className="input flex-1 min-w-[12rem]"
-          placeholder="Поиск: телефон, имя, VIN, парт-номер"
+          placeholder="Поиск: название, бренд, парт-номер, имя, телефон, VIN"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -143,6 +159,32 @@ export function TabOrders() {
                     Авто: {o.vehicle} · VIN <code>{o.vin}</code>
                   </div>
                 )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-paper-mute/50 pt-3 dark:border-ink-mute/50">
+                {o.whatsapp ? (
+                  <a
+                    href={`https://wa.me/${normalizePhoneE164(o.whatsapp)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    WhatsApp
+                  </a>
+                ) : (
+                  <span className="text-xs text-ink-mute dark:text-paper-mute">
+                    WhatsApp не указан
+                  </span>
+                )}
+                <button
+                  onClick={() => removeOrder(o.rowNumber)}
+                  disabled={savingRow === o.rowNumber}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Удалить
+                </button>
               </div>
             </article>
           ))}

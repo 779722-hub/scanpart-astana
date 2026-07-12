@@ -9,6 +9,7 @@ import {
   Settings,
   Package,
   Users,
+  Contact,
   LogOut,
   Send,
   BookOpen,
@@ -23,6 +24,7 @@ import { TabImages } from "./tab-images";
 import { TabTheme } from "./tab-theme";
 import { TabSettings } from "./tab-settings";
 import { TabOrders } from "./tab-orders";
+import { TabCustomers } from "./tab-customers";
 import { TabUsers } from "./tab-users";
 import { TabAliases } from "./tab-aliases";
 import { TabSearchLog } from "./tab-search-log";
@@ -36,6 +38,7 @@ type TabKey =
   | "aliases"
   | "search-log"
   | "orders"
+  | "customers"
   | "users";
 
 interface TabDef {
@@ -47,13 +50,14 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: "dashboard", label: "Дашборд", Icon: LayoutDashboard },
+  { key: "orders", label: "Заказы", Icon: Package },
+  { key: "customers", label: "Клиенты", Icon: Contact },
   { key: "content", label: "Контент", Icon: FileText },
   { key: "images", label: "Картинки", Icon: ImageIcon },
   { key: "theme", label: "Дизайн", Icon: Palette },
-  { key: "settings", label: "Настройки", Icon: Settings },
   { key: "aliases", label: "Словарь поиска", Icon: BookOpen },
   { key: "search-log", label: "Что искали", Icon: ClipboardList },
-  { key: "orders", label: "Заказы", Icon: Package },
+  { key: "settings", label: "Настройки", Icon: Settings },
   { key: "users", label: "Доступы", Icon: Users, ownerOnly: true },
 ];
 
@@ -109,16 +113,16 @@ export function AdminShell({
         </div>
       </header>
 
-      <nav className="flex flex-wrap gap-2">
+      <nav className="flex flex-wrap gap-1.5 rounded-2xl bg-paper-soft p-1.5 dark:bg-ink-mute/50">
         {visibleTabs.map(({ key, label, Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={cn(
-              "inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition",
+              "inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition",
               tab === key
-                ? "border-brand bg-brand text-white shadow-card"
-                : "border-paper-mute bg-white hover:border-ink-mute dark:border-ink-mute dark:bg-ink-soft dark:hover:border-paper-mute"
+                ? "bg-brand text-white shadow-card"
+                : "text-ink-mute hover:bg-white hover:text-ink dark:text-paper-mute dark:hover:bg-ink-soft dark:hover:text-paper"
             )}
           >
             <Icon className="h-4 w-4" />
@@ -128,7 +132,9 @@ export function AdminShell({
       </nav>
 
       <div>
-        {tab === "dashboard" && <TabDashboard />}
+        {tab === "dashboard" && (
+          <TabDashboard onOpenOrders={() => setTab("orders")} />
+        )}
         {tab === "content" && <TabContent />}
         {tab === "images" && <TabImages />}
         {tab === "theme" && <TabTheme />}
@@ -136,6 +142,7 @@ export function AdminShell({
         {tab === "aliases" && <TabAliases />}
         {tab === "search-log" && <TabSearchLog />}
         {tab === "orders" && <TabOrders />}
+        {tab === "customers" && <TabCustomers />}
         {tab === "users" && user.role === "owner" && (
           <TabUsers currentEmail={user.email} />
         )}

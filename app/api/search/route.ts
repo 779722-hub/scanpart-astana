@@ -330,6 +330,22 @@ export async function GET(req: NextRequest) {
         : {}),
     }));
 
+    // Part-number search for a KNOWN vehicle: if every result names a different
+    // car (and none matches the vehicle's make family), the entered number is
+    // for another car. Flag it so the UI warns loudly instead of quietly
+    // showing a part that doesn't fit.
+    const vehicleMismatch =
+      kind === "article" &&
+      vehicle?.make &&
+      picked.some((o) => o.compat === "mismatch") &&
+      !picked.some((o) => o.compat === "match")
+        ? {
+            make: vehicle.make,
+            model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
+            year: vehicle.year && vehicle.year !== "—" ? vehicle.year : "",
+          }
+        : null;
+
     return NextResponse.json({
       ok: true,
       empty: false,
@@ -337,6 +353,7 @@ export async function GET(req: NextRequest) {
       offers,
       level: "exact",
       relaxed: false,
+      vehicleMismatch,
     });
   } catch (err) {
     const msg = (err as Error).message;

@@ -67,15 +67,50 @@ const MAKE_SYNONYMS: Record<string, string[]> = {
   great_wall: ["great wall", "грейт уолл"],
 };
 
+// Related makes share platforms/parts — a part for one fits the whole family
+// (e.g. Nissan ↔ Infiniti: a Shate-M "NISSAN"-labelled FX still takes Infiniti
+// parts). Used so a related-brand part is NOT flagged as a mismatch.
+const MAKE_FAMILY: Record<string, string> = {
+  nissan: "nissan", infiniti: "nissan", datsun: "nissan",
+  toyota: "toyota", lexus: "toyota",
+  honda: "honda",
+  hyundai: "hyundai", kia: "hyundai",
+  volkswagen: "vag", audi: "vag", skoda: "vag", seat: "vag", porsche: "vag",
+  "mercedes-benz": "mercedes", smart: "mercedes",
+  bmw: "bmw", mini: "bmw",
+  chevrolet: "gm", cadillac: "gm", buick: "gm", gmc: "gm", opel: "gm", daewoo: "gm",
+  ford: "ford", lincoln: "ford",
+  jeep: "chrysler", dodge: "chrysler", chrysler: "chrysler", ram: "chrysler",
+  fiat: "fiat", alfa: "fiat",
+  jaguar: "jlr", "land rover": "jlr",
+};
+
 function normalize(s: string): string {
   return s.toLowerCase().trim();
 }
 
-function makeMatches(make: string, name: string): boolean {
+function familyOf(makeKey: string): string {
+  return MAKE_FAMILY[makeKey] ?? makeKey;
+}
+
+/** Resolve a free-form make string to a MAKE_SYNONYMS key. */
+function makeKeyOf(make: string): string | null {
   const m = normalize(make);
+  if (MAKE_SYNONYMS[m]) return m;
+  for (const [key, syns] of Object.entries(MAKE_SYNONYMS)) {
+    if (syns.some((s) => m.includes(s))) return key;
+  }
+  return null;
+}
+
+/** All make keys whose synonyms appear in a part description. */
+function makesMentioned(name: string): string[] {
   const n = normalize(name);
-  const synonyms = MAKE_SYNONYMS[m] ?? [m];
-  return synonyms.some((syn) => n.includes(syn));
+  const found: string[] = [];
+  for (const [key, syns] of Object.entries(MAKE_SYNONYMS)) {
+    if (syns.some((s) => n.includes(s))) found.push(key);
+  }
+  return found;
 }
 
 /** Try to extract a year range from the part description. */
@@ -113,24 +148,37 @@ export interface CompatVehicle {
 export function classifyCompat(
   name: string,
   vehicle: CompatVehicle | undefined
-): { compat: "match" | "unknown"; reason?: string } {
+): { compat: "match" | "unknown" | "mismatch"; reason?: string } {
   if (!vehicle?.make) return { compat: "unknown" };
 
-  const makeOk = makeMatches(vehicle.make, name);
-  if (!makeOk) return { compat: "unknown" };
+  const selfKey = makeKeyOf(vehicle.make);
+  const selfFamily = selfKey ? familyOf(selfKey) : normalize(vehicle.make);
+  const mentioned = makesMentioned(name);
+  const families = new Set(mentioned.map(familyOf));
 
-  // If we have a year, try to narrow with year-range hint.
-  if (vehicle.year) {
-    const y = Number(vehicle.year);
-    const range = extractYearRange(name);
-    if (range && Number.isFinite(y) && (y < range.from || y > range.to)) {
-      // Make matches but year falls outside an explicit range — still show as
-      // unknown rather than reject; not all listings carry accurate ranges.
-      return { compat: "unknown", reason: `год ${y} вне диапазона ${range.from}–${range.to}` };
+  // Selected make's family is mentioned → compatible (narrow by year if given).
+  if (families.has(selfFamily)) {
+    if (vehicle.year) {
+      const y = Number(vehicle.year);
+      const range = extractYearRange(name);
+      if (range && Number.isFinite(y) && (y < range.from || y > range.to)) {
+        // Make matches but year falls outside an explicit range — still show as
+        // unknown rather than reject; not all listings carry accurate ranges.
+        return { compat: "unknown", reason: `год ${y} вне диапазона ${range.from}–${range.to}` };
+      }
+      if (range) {
+        return { compat: "match", reason: `${vehicle.make} ${range.from}–${range.to}` };
+      }
     }
-    if (range) {
-      return { compat: "match", reason: `${vehicle.make} ${range.from}–${range.to}` };
-    }
+    return { compat: "match", reason: vehicle.make };
   }
-  return { compat: "match", reason: vehicle.make };
+
+  // The description names OTHER make(s) and not the selected family — the part
+  // is for a different car.
+  if (mentioned.length) {
+    return { compat: "mismatch", reason: mentioned.join(", ").toUpperCase() };
+  }
+
+  // No make mentioned at all — could be universal; stay neutral.
+  return { compat: "unknown" };
 }
