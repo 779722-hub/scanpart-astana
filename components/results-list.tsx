@@ -20,10 +20,11 @@ import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
 import { CopyVin } from "@/components/copy-vin";
 
-interface VehicleMismatch {
+interface FitWarning {
   make: string;
   model: string;
   year: string;
+  level: "mismatch" | "unconfirmed";
 }
 
 type State =
@@ -34,7 +35,7 @@ type State =
       kind: "ok";
       offers: PartOffer[];
       level: RelaxLevel;
-      vehicleMismatch: VehicleMismatch | null;
+      fit: FitWarning | null;
     };
 
 function formatKzt(n: number): string {
@@ -87,7 +88,7 @@ export function ResultsList({
           kind: "ok",
           offers: json.offers as PartOffer[],
           level: (json.level as RelaxLevel) ?? "exact",
-          vehicleMismatch: (json.vehicleMismatch as VehicleMismatch | null) ?? null,
+          fit: (json.fitWarning as FitWarning | null) ?? null,
         });
       } catch {
         if (!cancelled) setState({ kind: "error" });
@@ -142,13 +143,13 @@ export function ResultsList({
     );
   }
 
-  // Part-number for a different car than the one selected — warn loudly and
-  // hide the parts until the customer chooses to see them anyway.
-  if (state.vehicleMismatch && !revealed) {
+  // Part-number names a DIFFERENT car — warn loudly and hide the parts until
+  // the customer chooses to see them anyway.
+  if (state.fit?.level === "mismatch" && !revealed) {
     return (
       <MismatchWarning
         locale={locale}
-        vehicle={state.vehicleMismatch}
+        vehicle={state.fit}
         onReveal={() => setRevealed(true)}
       />
     );
@@ -156,18 +157,7 @@ export function ResultsList({
 
   return (
     <div className="space-y-4">
-      {state.vehicleMismatch && (
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/15 dark:text-amber-100">
-          <AlertTriangle className="mr-1 inline h-4 w-4" />
-          Показаны детали по введённому номеру. По описанию они, похоже, не для{" "}
-          <strong>
-            {[state.vehicleMismatch.make, state.vehicleMismatch.model, state.vehicleMismatch.year]
-              .filter(Boolean)
-              .join(" ")}
-          </strong>
-          .
-        </div>
-      )}
+      {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
       {state.offers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
@@ -195,13 +185,59 @@ function CatalogHint({ vin }: { vin?: string }) {
   );
 }
 
+function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
+  const label = [fit.make, fit.model, fit.year].filter(Boolean).join(" ");
+  if (fit.level === "unconfirmed") {
+    return (
+      <div className="card border-2 border-amber-400 bg-amber-50 dark:border-amber-600/60 dark:bg-amber-900/20">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-8 w-8 flex-none text-amber-600" />
+          <div>
+            <div className="text-lg font-bold text-amber-900 dark:text-amber-100">
+              Совместимость с вашим авто не подтверждена
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+              Не удалось подтвердить, что этот номер подходит для{" "}
+              <strong>{label}</strong>. Проверьте номер или подберите деталь по
+              названию для вашего авто.
+            </p>
+            <Link
+              href={`/${locale}/search/name`}
+              className="mt-2 inline-block text-sm font-semibold text-brand underline"
+            >
+              Подобрать по названию для {label}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // mismatch, shown after "Показать всё равно"
+  return (
+    <div className="card border-2 border-brand bg-brand/5">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-8 w-8 flex-none text-brand" />
+        <div>
+          <div className="text-lg font-bold text-brand">
+            Эти детали не для вашего авто
+          </div>
+          <p className="mt-1 text-sm leading-relaxed">
+            Показаны результаты по номеру, но по описанию они для другого
+            автомобиля, а не для <strong>{label}</strong>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MismatchWarning({
   locale,
   vehicle,
   onReveal,
 }: {
   locale: string;
-  vehicle: VehicleMismatch;
+  vehicle: FitWarning;
   onReveal: () => void;
 }) {
   const label = [vehicle.make, vehicle.model, vehicle.year]

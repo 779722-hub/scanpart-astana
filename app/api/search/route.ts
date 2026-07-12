@@ -213,6 +213,11 @@ export async function GET(req: NextRequest) {
     // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
     // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
     const shatemOffers = await shatemPromise;
+    // Classify Shate-M offers against the vehicle too (they arrive as
+    // "unknown"), so the fit check below sees their make hints as well.
+    if (kind === "article" && vehicle?.make) {
+      for (const o of shatemOffers) o.compat = classifyCompat(o.name, vehicle).compat;
+    }
     if (!brandsItems.length && !shatemOffers.length) {
       logSearch(0);
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
@@ -330,19 +335,20 @@ export async function GET(req: NextRequest) {
         : {}),
     }));
 
-    // Part-number search for a KNOWN vehicle: if every result names a different
-    // car (and none matches the vehicle's make family), the entered number is
-    // for another car. Flag it so the UI warns loudly instead of quietly
-    // showing a part that doesn't fit.
-    const vehicleMismatch =
-      kind === "article" &&
-      vehicle?.make &&
-      picked.some((o) => o.compat === "mismatch") &&
+    // Part-number search for a KNOWN vehicle: warn whenever NO result is a
+    // confirmed fit. "mismatch" = the description names a different car (loud,
+    // hidden). "unconfirmed" = we can't confirm fit from the description (loud
+    // banner, parts still shown). A single confirmed "match" clears the warning.
+    const fitWarning =
+      kind === "article" && vehicle?.make && picked.length > 0 &&
       !picked.some((o) => o.compat === "match")
         ? {
             make: vehicle.make,
             model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
             year: vehicle.year && vehicle.year !== "—" ? vehicle.year : "",
+            level: picked.some((o) => o.compat === "mismatch")
+              ? ("mismatch" as const)
+              : ("unconfirmed" as const),
           }
         : null;
 
@@ -353,7 +359,7 @@ export async function GET(req: NextRequest) {
       offers,
       level: "exact",
       relaxed: false,
-      vehicleMismatch,
+      fitWarning,
     });
   } catch (err) {
     const msg = (err as Error).message;
