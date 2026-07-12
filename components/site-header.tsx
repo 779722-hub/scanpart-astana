@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Wrench, Car, ChevronRight } from "lucide-react";
+import { Wrench, Car, ChevronRight, Lock } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeSwitcher } from "./theme-switcher";
 import { CartButton } from "./cart-button";
@@ -16,7 +16,11 @@ export async function SiteHeader() {
   const tv = await getTranslations("vehicleBar");
   const session = await getSession();
   const vehicle = session.vehicle;
+  const isCustomer = Boolean(session.customer);
   const vinHref = `/${locale}/search/vin`;
+  const accountHref = `/${locale}/account`;
+  const btnCls =
+    "inline-flex flex-none items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm";
 
   return (
     <header className="sticky top-0 z-40 border-b border-paper-mute/60 bg-paper/80 backdrop-blur dark:border-ink-mute/60 dark:bg-ink/80">
@@ -53,13 +57,18 @@ export async function SiteHeader() {
                 {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
               </strong>
             </span>
-            <Link
-              href={vinHref}
-              className="inline-flex flex-none items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm"
-            >
-              {tv("changeCar")}
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+            {isCustomer ? (
+              <Link href={vinHref} className={btnCls}>
+                {tv("changeCar")}
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              // Switching cars is a cabinet feature — send guests to log in.
+              <Link href={accountHref} className={btnCls}>
+                <Lock className="h-3.5 w-3.5" />
+                {tv("loginToChange")}
+              </Link>
+            )}
           </>
         ) : (
           <>
@@ -67,10 +76,7 @@ export async function SiteHeader() {
               <Car className="h-4 w-4 flex-none" />
               <span className="truncate">{tv("noCar")}</span>
             </span>
-            <Link
-              href={vinHref}
-              className="inline-flex flex-none items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm"
-            >
+            <Link href={vinHref} className={btnCls}>
               {tv("specifyVin")}
               <ChevronRight className="h-4 w-4" />
             </Link>

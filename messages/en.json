@@ -103,7 +103,8 @@
       "Response from the warehouse: original and/or analogs with stock and price.",
       "Our manager contacts you to confirm the order and arrange payment.",
       "Express delivery: 2–4 hours, Mon–Sat 09:00–16:30, fee 3,000 KZT.",
-      "Pickup: next day, 14:00–18:00, 68 Respublika Ave, Astana."
+      "Pickup: next day, 14:00–18:00, 68 Respublika Ave, Astana.",
+      "In your account you can save several of your cars and switch between them in one tap — every page shows which car the search is for."
     ]
   },
   "errors": {
@@ -182,6 +183,9 @@
     "searchingFor": "Searching for:",
     "changeCar": "Change car",
     "noCar": "No car selected",
-    "specifyVin": "Specify by VIN"
+    "specifyVin": "Specify by VIN",
+    "loginToChange": "Log in to change",
+    "login": "Log in",
+    "savePrompt": "Log in to save your cars and switch between them in one tap."
   }
 }
