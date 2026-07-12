@@ -1,4 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
+import type { Warehouse } from "@/lib/delivery/warehouse";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const SETTINGS_RANGE = "Settings!A:B";
@@ -10,6 +11,7 @@ const THEME_SHEET = "Theme";
 const CUSTOMERS_SHEET = "Customers";
 const ALIASES_SHEET = "NameAliases";
 const SEARCH_LOG_SHEET = "SearchLog";
+const WAREHOUSES_SHEET = "Warehouses";
 
 export interface OrderRow {
   date: string;
@@ -563,6 +565,74 @@ export async function writeTheme(key: string, value: string): Promise<void> {
 
 // --- Bootstrap (create all sheets + headers) ---------------------------------
 
+// --- Warehouses --------------------------------------------------------------
+
+export async function readWarehouses(): Promise<Warehouse[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${WAREHOUSES_SHEET}!A2:H`,
+  });
+  return (data.values ?? [])
+    .map((r) => ({
+      id: String(r[0] ?? "").trim(),
+      name: String(r[1] ?? "").trim(),
+      address: String(r[2] ?? ""),
+      lat: r[3] === "" || r[3] == null ? null : Number(r[3]),
+      lng: r[4] === "" || r[4] == null ? null : Number(r[4]),
+      pickupMinutes: Number(r[5] ?? 0) || 0,
+      active: String(r[6] ?? "").toLowerCase() !== "false",
+    }))
+    .filter((w) => w.id);
+}
+
+/** Create or update a warehouse (matched by id). */
+export async function upsertWarehouse(w: Warehouse): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const row = [
+    w.id,
+    w.name,
+    w.address,
+    w.lat ?? "",
+    w.lng ?? "",
+    w.pickupMinutes,
+    w.active ? "true" : "false",
+    new Date().toISOString(),
+  ];
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: `${WAREHOUSES_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === w.id);
+  if (rowIdx === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: id,
+      range: `${WAREHOUSES_SHEET}!A:H`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+    return;
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${WAREHOUSES_SHEET}!A${rowIdx + 1}:H${rowIdx + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+}
+
+export async function deleteWarehouse(warehouseId: string): Promise<void> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${WAREHOUSES_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === warehouseId);
+  if (rowIdx === -1) return;
+  await deleteSheetRow(WAREHOUSES_SHEET, rowIdx + 1);
+}
+
 const SHEET_HEADERS: Record<string, string[]> = {
   Settings: ["key", "value"],
   Orders: [
@@ -604,6 +674,16 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "vin",
     "offers_count",
     "customer_email",
+  ],
+  Warehouses: [
+    "id",
+    "name",
+    "address",
+    "lat",
+    "lng",
+    "pickup_minutes",
+    "active",
+    "updated_at",
   ],
 };
 
