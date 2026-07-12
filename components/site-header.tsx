@@ -36,14 +36,14 @@ export async function SiteHeader() {
             <img
               src={cldUrl(logo.publicId, { width: 144 })}
               alt={logo.altRu || logoText}
-              className="h-8 w-auto max-w-[9rem] flex-none object-contain transition group-hover:scale-105 sm:h-9"
+              className="h-8 w-auto max-w-[6rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
             />
           ) : (
             <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
               <Wrench className="h-4 w-4" />
             </span>
           )}
-          <span className="truncate text-base sm:text-xl">{logoText}</span>
+          <span className="truncate text-sm sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1.5 sm:gap-2">
           <AccountButton signedIn={isCustomer} />
