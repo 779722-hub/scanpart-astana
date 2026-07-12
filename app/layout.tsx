@@ -1,5 +1,7 @@
 import "./globals.css";
+import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import { SITE_URL, SITE_NAME, seoFor, DEFAULT_LOCALE } from "@/lib/site";
 
 const manrope = Manrope({
   subsets: ["latin", "cyrillic", "cyrillic-ext"],
@@ -7,11 +9,16 @@ const manrope = Manrope({
   variable: "--font-manrope",
 });
 
-export const metadata = {
-  title: "SCANPART.ASTANA — быстрый поиск автозапчастей",
-  description:
-    "Поиск автозапчастей по VIN, парт-номеру и названию на складе Астана",
+const seo = seoFor(DEFAULT_LOCALE);
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${seo.title} · ${SITE_NAME}`, template: `%s · ${SITE_NAME}` },
+  description: seo.description,
+  keywords: seo.keywords,
+  applicationName: SITE_NAME,
   icons: { icon: "/favicon.svg" },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

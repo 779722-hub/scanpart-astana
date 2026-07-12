@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, unstable_setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -6,9 +7,46 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ThemeStyle } from "@/components/theme-style";
+import { SeoJsonLd } from "@/components/seo-jsonld";
+import { getImageSlot } from "@/lib/content";
+import { cldUrl } from "@/lib/cloudinary-url";
+import { SITE_NAME, OG_LOCALE, seoFor, type SeoLocale } from "@/lib/site";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
+}
+
+export async function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const seo = seoFor(locale);
+  const fullTitle = `${seo.title} · ${SITE_NAME}`;
+  const og = await getImageSlot("og-default").catch(() => null);
+  const images = og?.publicId
+    ? [{ url: cldUrl(og.publicId, { width: 1200 }), width: 1200, height: 630, alt: seo.title }]
+    : undefined;
+
+  return {
+    title: { default: fullTitle, template: `%s · ${SITE_NAME}` },
+    description: seo.description,
+    keywords: seo.keywords,
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: OG_LOCALE[locale as SeoLocale] ?? "ru_RU",
+      title: fullTitle,
+      description: seo.description,
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: fullTitle,
+      description: seo.description,
+      images: images?.map((i) => i.url),
+    },
+  };
 }
 
 export default async function LocaleLayout({
@@ -25,6 +63,7 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <ThemeStyle />
+      <SeoJsonLd locale={locale} />
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
