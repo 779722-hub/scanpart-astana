@@ -61,7 +61,7 @@
   .input {
     @apply block w-full rounded-2xl border border-paper-mute bg-white
            px-4 py-3 text-base sm:text-lg
-           outline-none transition focus:border-brand focus:ring-2 focus:ring-brand-200
+           outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30
            dark:border-paper-mute/40 dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute;
     /* keep ≥16px to avoid iOS auto-zoom on focus */
     font-size: 16px;
