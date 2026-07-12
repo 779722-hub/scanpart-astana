@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     model: body.vehicle.model ?? "—",
     year: body.vehicle.year ?? "",
   };
+  session.vehicleRef = undefined; // a VIN/manual entry replaces any wizard car
   await session.save();
 
   // If a customer is signed in, save the VIN to their profile so it
@@ -43,6 +44,7 @@ export async function DELETE() {
   const session = await getSession();
   session.vin = undefined;
   session.vehicle = undefined;
+  session.vehicleRef = undefined;
   await session.save();
   return NextResponse.json({ ok: true });
 }

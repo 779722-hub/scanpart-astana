@@ -9,6 +9,11 @@ import type {
   ShatemVinGroupsResponse,
   ShatemGroupNode,
   ShatemDetailsInGroupResponse,
+  ShatemCatalogsResponse,
+  ShatemCatalogItem,
+  ShatemParametersResponse,
+  ShatemWizardField,
+  ShatemAutoBySsdResponse,
 } from "./types";
 
 const P = "/vin/api/v1/laximoExtended";
@@ -128,20 +133,18 @@ export function matchingLeafGroups(
 }
 
 /**
- * VIN + free-text name → OEM part candidates for that vehicle.
- * Filters details to those whose name matches the query words.
+ * Known vehicle (from VIN or the by-model wizard) + free-text name → OEM part
+ * candidates for that vehicle. Filters details to those whose name matches the
+ * query words. The vehicle must carry the {vehicleId, catalog, ssd} triple.
  */
-export async function articlesByVinAndName(
-  vin: string,
+export async function articlesByVehicleAndName(
+  vehicle: ShatemVehicle,
   name: string,
   opts: { maxGroups?: number; maxParts?: number } = {}
-): Promise<{ vehicle: ShatemVehicle | null; parts: CatalogPart[] }> {
-  const vehicle = await vehicleByVin(vin);
-  if (!vehicle) return { vehicle: null, parts: [] };
-
+): Promise<CatalogPart[]> {
   const tree = await vinGroups(vehicle);
   const leaves = matchingLeafGroups(tree, name, opts.maxGroups ?? 6);
-  if (!leaves.length) return { vehicle, parts: [] };
+  if (!leaves.length) return [];
 
   const groups = await Promise.allSettled(
     leaves.map((g) => detailsInGroup(vehicle, g.quickGroupId))
@@ -158,8 +161,65 @@ export async function articlesByVinAndName(
       if (seen.has(key)) continue;
       seen.add(key);
       parts.push(p);
-      if (parts.length >= (opts.maxParts ?? 20)) return { vehicle, parts };
+      if (parts.length >= (opts.maxParts ?? 20)) return parts;
     }
   }
+  return parts;
+}
+
+/**
+ * VIN + free-text name → OEM part candidates for that vehicle.
+ */
+export async function articlesByVinAndName(
+  vin: string,
+  name: string,
+  opts: { maxGroups?: number; maxParts?: number } = {}
+): Promise<{ vehicle: ShatemVehicle | null; parts: CatalogPart[] }> {
+  const vehicle = await vehicleByVin(vin);
+  if (!vehicle) return { vehicle: null, parts: [] };
+  const parts = await articlesByVehicleAndName(vehicle, name, opts);
   return { vehicle, parts };
+}
+
+// ---------------------------------------------------------------------------
+// By-model wizard (no VIN): GetCatalogs → Parameters (cascade) → AutoBySsd →
+// vehicle, which then feeds the exact same groups → OEM → price chain above.
+// Endpoint names confirmed live via DevTools network capture.
+// ---------------------------------------------------------------------------
+
+export interface CatalogInfo {
+  code: string; // catalogId, e.g. "INFINITI201809"
+  brand: string;
+  name: string;
+}
+
+/** Manufacturer catalogs that support the by-model wizard, sorted by name. */
+export async function listCatalogs(): Promise<CatalogInfo[]> {
+  const res = await catalogGet<ShatemCatalogsResponse>(`${P}/GetCatalogs`);
+  return (res.items ?? [])
+    .filter((c: ShatemCatalogItem) => c.supportParameterIdentification && c.code)
+    .map((c) => ({ code: c.code, brand: c.brand, name: c.name || c.brand }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
+/** One wizard step: re-call with an option's `key` as the next ssd. */
+export async function wizardParameters(
+  catalogId: string,
+  ssd: string
+): Promise<ShatemWizardField[]> {
+  const res = await catalogGet<ShatemParametersResponse>(
+    `${P}/Parameters?vin=&catalogId=${q(catalogId)}&ssd=${q(ssd)}&firstFrame=&twoFrame=`
+  );
+  return res.fields ?? [];
+}
+
+/** Resolve the accumulated ssd to concrete vehicle modifications. */
+export async function wizardVehicles(
+  catalogId: string,
+  ssd: string
+): Promise<ShatemVehicle[]> {
+  const res = await catalogGet<ShatemAutoBySsdResponse>(
+    `${P}/AutoBySsd?vin=&catalogId=${q(catalogId)}&ssd=${q(ssd)}&firstFrame=&twoFrame=`
+  );
+  return res.vehicles ?? [];
 }
