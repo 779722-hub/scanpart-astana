@@ -51,18 +51,18 @@
            bg-white px-5 py-3 sm:px-6 sm:py-4
            text-base font-semibold text-ink shadow-card transition
            hover:border-ink-mute hover:shadow-cardHover
-           dark:border-ink-mute dark:bg-ink-soft dark:text-paper dark:hover:border-paper-mute;
+           dark:border-paper-mute/50 dark:bg-ink-soft dark:text-paper dark:hover:border-paper-mute;
   }
   .card {
     @apply rounded-2xl bg-white p-4 shadow-card ring-1 ring-paper-mute
            sm:rounded-3xl sm:p-6
-           dark:bg-ink-soft dark:ring-ink-mute;
+           dark:bg-ink-soft dark:ring-paper-mute/20;
   }
   .input {
     @apply block w-full rounded-2xl border border-paper-mute bg-white
            px-4 py-3 text-base sm:text-lg
            outline-none transition focus:border-brand focus:ring-2 focus:ring-brand-200
-           dark:border-ink-mute dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute;
+           dark:border-paper-mute/40 dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute;
     /* keep ≥16px to avoid iOS auto-zoom on focus */
     font-size: 16px;
   }
