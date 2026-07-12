@@ -232,8 +232,9 @@ export function CartView({ locale }: { locale: string }) {
         </label>
       </div>
 
-      {/* Итог + кнопка оформления */}
-      <div className="card sticky bottom-2 z-10 space-y-3">
+      {/* Итог + кнопка оформления — брендовая обводка, чтобы было понятно,
+          что это окно корзины; компактнее основной сетки (~15%). */}
+      <div className="card sticky bottom-2 z-10 space-y-2 !p-3.5 ring-2 ring-brand sm:!p-5">
         <div className="space-y-1 text-sm">
           <div className="flex items-baseline justify-between">
             <span className="text-ink-mute dark:text-paper-mute">{t("subtotalParts")}</span>
@@ -248,15 +249,15 @@ export function CartView({ locale }: { locale: string }) {
             </span>
           </div>
         </div>
-        <div className="flex items-baseline justify-between border-t border-paper-mute/60 pt-3 dark:border-ink/40">
-          <span className="text-base font-semibold">{t("grandTotal")}</span>
-          <span className="text-3xl font-black text-brand">
+        <div className="flex items-baseline justify-between border-t border-paper-mute/60 pt-2 dark:border-ink/40">
+          <span className="text-sm font-semibold">{t("grandTotal")}</span>
+          <span className="text-2xl font-black text-brand">
             {fmt(grandTotal)} ₸
           </span>
         </div>
         <Link
           href={`/${locale}/order/${cart.kind}`}
-          className="btn-primary w-full"
+          className="btn-primary w-full !py-2.5 sm:!py-3"
         >
           {t("checkout")}
         </Link>
