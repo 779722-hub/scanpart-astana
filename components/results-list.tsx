@@ -14,16 +14,28 @@ import {
   Trash2,
   Truck,
   BookOpen,
+  AlertTriangle,
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
 import { CopyVin } from "@/components/copy-vin";
 
+interface VehicleMismatch {
+  make: string;
+  model: string;
+  year: string;
+}
+
 type State =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message?: string }
-  | { kind: "ok"; offers: PartOffer[]; level: RelaxLevel };
+  | {
+      kind: "ok";
+      offers: PartOffer[];
+      level: RelaxLevel;
+      vehicleMismatch: VehicleMismatch | null;
+    };
 
 function formatKzt(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
@@ -52,6 +64,7 @@ export function ResultsList({
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +87,7 @@ export function ResultsList({
           kind: "ok",
           offers: json.offers as PartOffer[],
           level: (json.level as RelaxLevel) ?? "exact",
+          vehicleMismatch: (json.vehicleMismatch as VehicleMismatch | null) ?? null,
         });
       } catch {
         if (!cancelled) setState({ kind: "error" });
@@ -128,8 +142,32 @@ export function ResultsList({
     );
   }
 
+  // Part-number for a different car than the one selected — warn loudly and
+  // hide the parts until the customer chooses to see them anyway.
+  if (state.vehicleMismatch && !revealed) {
+    return (
+      <MismatchWarning
+        locale={locale}
+        vehicle={state.vehicleMismatch}
+        onReveal={() => setRevealed(true)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {state.vehicleMismatch && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/15 dark:text-amber-100">
+          <AlertTriangle className="mr-1 inline h-4 w-4" />
+          Показаны детали по введённому номеру. По описанию они, похоже, не для{" "}
+          <strong>
+            {[state.vehicleMismatch.make, state.vehicleMismatch.model, state.vehicleMismatch.year]
+              .filter(Boolean)
+              .join(" ")}
+          </strong>
+          .
+        </div>
+      )}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
       {state.offers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
@@ -153,6 +191,44 @@ function CatalogHint({ vin }: { vin?: string }) {
       <p className="text-xs text-ink-mute dark:text-paper-mute">
         {t("catalogHintFooter")}
       </p>
+    </div>
+  );
+}
+
+function MismatchWarning({
+  locale,
+  vehicle,
+  onReveal,
+}: {
+  locale: string;
+  vehicle: VehicleMismatch;
+  onReveal: () => void;
+}) {
+  const label = [vehicle.make, vehicle.model, vehicle.year]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <div className="card space-y-4 border-2 border-brand bg-brand/5">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-9 w-9 flex-none text-brand" />
+        <div>
+          <div className="text-lg font-bold text-brand sm:text-xl">
+            Этот парт-номер не для вашего авто
+          </div>
+          <p className="mt-1 text-sm leading-relaxed">
+            Введённый парт-номер, судя по описанию, для другого автомобиля, а не
+            для <strong>{label}</strong>. Проверьте номер или смените авто.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link href={`/${locale}/search/vin`} className="btn-primary flex-1">
+          Сменить авто
+        </Link>
+        <button onClick={onReveal} className="btn-secondary flex-1">
+          Показать всё равно
+        </button>
+      </div>
     </div>
   );
 }
@@ -240,6 +316,14 @@ function OfferCard({
           >
             <Check className="h-3 w-3" />
             {t("badgeCompat")}
+          </span>
+        ) : offer.compat === "mismatch" ? (
+          <span
+            className="chip bg-brand/10 text-brand"
+            title={offer.compatReason}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            не для вашего авто
           </span>
         ) : offer.compat === "unknown" ? (
           <span

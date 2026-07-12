@@ -227,6 +227,10 @@ export async function setOrderStatus(rowNumber: number, status: string): Promise
   });
 }
 
+export async function deleteOrder(rowNumber: number): Promise<void> {
+  await deleteSheetRow(ORDERS_SHEET, rowNumber);
+}
+
 // --- Users ------------------------------------------------------------------
 
 export async function listUsers(): Promise<UserRow[]> {

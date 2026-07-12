@@ -62,7 +62,7 @@ export interface PhaetonDictionaryResponse {
 }
 
 /** Vehicle-compatibility hint computed by name-matching against the VIN-decoded vehicle. */
-export type CompatHint = "match" | "unknown";
+export type CompatHint = "match" | "unknown" | "mismatch";
 
 /** Normalized cross-layer part item used by our API + UI. */
 export interface PartOffer {

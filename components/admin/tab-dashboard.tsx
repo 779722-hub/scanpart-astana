@@ -10,7 +10,7 @@ interface Health {
   checks: Record<string, string>;
 }
 
-export function TabDashboard() {
+export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
   const [health, setHealth] = useState<Health | null>(null);
   const [orders, setOrders] = useState<{ count: number; today: number } | null>(null);
 
@@ -55,21 +55,29 @@ export function TabDashboard() {
         )}
       </div>
 
-      <div className="card">
-        <div className="text-sm text-ink-mute dark:text-paper-mute">
-          Заказов всего
+      <button
+        onClick={onOpenOrders}
+        className="card text-left transition hover:-translate-y-0.5 hover:shadow-cardHover"
+      >
+        <div className="flex items-center justify-between text-sm text-ink-mute dark:text-paper-mute">
+          <span>Заказов всего</span>
+          <span className="text-brand">Открыть →</span>
         </div>
         <div className="mt-4 text-5xl font-black text-brand">
           {orders?.count ?? "—"}
         </div>
-      </div>
+      </button>
 
-      <div className="card">
-        <div className="text-sm text-ink-mute dark:text-paper-mute">
-          Сегодня
+      <button
+        onClick={onOpenOrders}
+        className="card text-left transition hover:-translate-y-0.5 hover:shadow-cardHover"
+      >
+        <div className="flex items-center justify-between text-sm text-ink-mute dark:text-paper-mute">
+          <span>Заказы сегодня</span>
+          <span className="text-brand">Открыть →</span>
         </div>
         <div className="mt-4 text-5xl font-black">{orders?.today ?? "—"}</div>
-      </div>
+      </button>
     </div>
   );
 }
