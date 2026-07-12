@@ -270,9 +270,9 @@ function OfferCard({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end sm:gap-4">
-        <div>
-          <h3 className="text-base font-bold leading-tight sm:text-xl">{offer.name}</h3>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-4">
+        <div className="min-w-0">
+          <h3 className="text-base font-bold leading-tight break-words sm:text-xl">{offer.name}</h3>
           <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-ink-mute dark:text-paper-mute">{t("brand")}</dt>
             <dd className="font-semibold">{offer.brand}</dd>
