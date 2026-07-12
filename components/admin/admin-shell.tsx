@@ -14,6 +14,7 @@ import {
   Send,
   BookOpen,
   ClipboardList,
+  Warehouse,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -25,6 +26,7 @@ import { TabTheme } from "./tab-theme";
 import { TabSettings } from "./tab-settings";
 import { TabOrders } from "./tab-orders";
 import { TabCustomers } from "./tab-customers";
+import { TabWarehouses } from "./tab-warehouses";
 import { TabUsers } from "./tab-users";
 import { TabAliases } from "./tab-aliases";
 import { TabSearchLog } from "./tab-search-log";
@@ -39,6 +41,7 @@ type TabKey =
   | "search-log"
   | "orders"
   | "customers"
+  | "warehouses"
   | "users";
 
 interface TabDef {
@@ -52,6 +55,7 @@ const TABS: TabDef[] = [
   { key: "dashboard", label: "Дашборд", Icon: LayoutDashboard },
   { key: "orders", label: "Заказы", Icon: Package },
   { key: "customers", label: "Клиенты", Icon: Contact },
+  { key: "warehouses", label: "Склады", Icon: Warehouse },
   { key: "content", label: "Контент", Icon: FileText },
   { key: "images", label: "Картинки", Icon: ImageIcon },
   { key: "theme", label: "Дизайн", Icon: Palette },
@@ -143,6 +147,7 @@ export function AdminShell({
         {tab === "search-log" && <TabSearchLog />}
         {tab === "orders" && <TabOrders />}
         {tab === "customers" && <TabCustomers />}
+        {tab === "warehouses" && <TabWarehouses />}
         {tab === "users" && user.role === "owner" && (
           <TabUsers currentEmail={user.email} />
         )}
