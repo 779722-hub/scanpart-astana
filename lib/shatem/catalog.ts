@@ -64,13 +64,22 @@ export function tokens(s: string): string[] {
   return s.toLowerCase().split(/[^0-9a-zа-яё]+/i).filter((w) => w.length >= 3);
 }
 
+// Common Russian adjective/participle/noun inflection endings, longest first.
+const RU_ENDING =
+  /(ого|его|ому|ему|ыми|ими|ых|их|ая|яя|ое|ее|ые|ие|ий|ый|ой|ом|ем|ах|ях|ам|ям|ов|ев|ы|и|а|я|е|о|у|ю)$/u;
+
 /**
- * Crude Russian stem: a 6-char prefix. Handles the common inflections that
- * broke naive substring matching — "передние"/"переднего"→"передн",
- * "тормозные"/"тормоза"→"тормоз", "масляный"/"масляного"→"маслян".
+ * Crude Russian stem: strip a common inflection ending, then take a 6-char
+ * prefix. A plain 6-char prefix failed on SHORT words — "задние"(6) stayed
+ * "задние" and never matched the catalog's "заднего"; both now reduce to
+ * "задн". The ending is only stripped when ≥4 chars remain, so short tokens
+ * ("оси", "шрус") are left intact.
  */
 export function stem(t: string): string {
-  return t.slice(0, 6);
+  const s = t.toLowerCase();
+  const stripped = s.replace(RU_ENDING, "");
+  const base = stripped.length >= 4 ? stripped : s;
+  return base.slice(0, 6);
 }
 
 /** `name` contains the stem of EVERY query token (order-independent). */
@@ -99,7 +108,13 @@ export function matchingLeafGroups(
     const isLeaf = node.isLink && (!node.childs || node.childs.length === 0);
     if (isLeaf && node.quickGroupId != null && !seen.has(node.quickGroupId)) {
       const hay = node.name.toLowerCase();
-      const score = qtokens.reduce((n, t) => n + (hay.includes(stem(t)) ? 1 : 0), 0);
+      // Weight each matched token by its stem length: a category noun like
+      // "колодк"(6) outranks a position qualifier like "задн"(4), so brake-pad
+      // groups sort above unrelated "…задний" groups (lamps, seals, glass).
+      const score = qtokens.reduce(
+        (n, t) => n + (hay.includes(stem(t)) ? stem(t).length : 0),
+        0
+      );
       if (score > 0) {
         seen.add(node.quickGroupId);
         scored.push({ node, score });

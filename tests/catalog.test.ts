@@ -48,6 +48,27 @@ test("stem: 6-char prefix handles Russian inflection", () => {
   assert.equal(stem("тормозные"), "тормоз");
 });
 
+test("stem: strips inflection for short words (задние/заднего → задн)", () => {
+  assert.equal(stem("задние"), stem("заднего")); // was the bug: "задние" stayed whole
+  assert.equal(stem("задние"), "задн");
+  assert.equal(stem("оси"), "оси"); // too short to strip an ending
+});
+
+test("nameMatchesAll: 'задние' matches catalog 'заднего' (reported bug)", () => {
+  assert.equal(nameMatchesAll("Колодки заднего дискового тормоза", tokens("колодки задние")), true);
+  assert.equal(nameMatchesAll("Колодки переднего дискового тормоза", tokens("колодки задние")), false);
+});
+
+test("matchingLeafGroups: category noun outranks position qualifier", () => {
+  const t: ShatemGroupNode[] = [
+    leaf(15, "Колодки тормозные"),
+    leaf(91, "Фонарь задний"),
+    leaf(92, "Сальник коленвала задний"),
+  ];
+  // "колодк"(6) must beat the "задн"(4)-only lamp/seal groups.
+  assert.deepEqual(matchingLeafGroups(t, "колодки задние", 1).map((n) => n.quickGroupId), [15]);
+});
+
 test("nameMatchesAll: order-independent, morphology-tolerant", () => {
   assert.equal(nameMatchesAll("Масляный фильтр", tokens("фильтр масляный")), true);
   assert.equal(nameMatchesAll("Колодки переднего дискового тормоза", tokens("колодки передние")), true);

@@ -10,6 +10,16 @@ interface Health {
   checks: Record<string, string>;
 }
 
+// Admin-only view — supplier names + their opaque customer codes are fine here.
+const STATUS_LABELS: Record<string, string> = {
+  phaeton: "Phaeton (Р1)",
+  shatem: "Shate-M (М2)",
+  autotrade: "Autotrade (Т3)",
+  sheets: "Google Sheets",
+  cloudinary: "Cloudinary",
+  telegram: "Telegram",
+};
+
 export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
   const [health, setHealth] = useState<Health | null>(null);
   const [orders, setOrders] = useState<{ count: number; today: number } | null>(null);
@@ -42,7 +52,7 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
         <div className="mt-4 space-y-2">
           {health ? (
             Object.entries(health.checks).map(([k, v]) => (
-              <Row key={k} label={k} ok={v === "ok" || v === "configured"} value={v} />
+              <Row key={k} label={STATUS_LABELS[k] ?? k} ok={v === "ok" || v === "configured"} value={v} />
             ))
           ) : (
             <Loader2 className="h-5 w-5 animate-spin" />

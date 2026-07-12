@@ -339,18 +339,29 @@ export async function GET(req: NextRequest) {
     // confirmed fit. "mismatch" = the description names a different car (loud,
     // hidden). "unconfirmed" = we can't confirm fit from the description (loud
     // banner, parts still shown). A single confirmed "match" clears the warning.
-    const fitWarning =
-      kind === "article" && vehicle?.make && picked.length > 0 &&
+    const vehLabel = vehicle
+      ? {
+          make: vehicle.make,
+          model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
+          year: vehicle.year && vehicle.year !== "—" ? vehicle.year : "",
+        }
+      : null;
+    let fitWarning:
+      | { make: string; model: string; year: string; level: "mismatch" | "unconfirmed"; needsVin?: boolean }
+      | null = null;
+    if (
+      kind === "article" && vehLabel && picked.length > 0 &&
       !picked.some((o) => o.compat === "match")
-        ? {
-            make: vehicle.make,
-            model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
-            year: vehicle.year && vehicle.year !== "—" ? vehicle.year : "",
-            level: picked.some((o) => o.compat === "mismatch")
-              ? ("mismatch" as const)
-              : ("unconfirmed" as const),
-          }
-        : null;
+    ) {
+      fitWarning = {
+        ...vehLabel,
+        level: picked.some((o) => o.compat === "mismatch") ? "mismatch" : "unconfirmed",
+      };
+    } else if (kind === "name" && vehLabel && !realVin && picked.length > 0) {
+      // A car was chosen MANUALLY (no VIN) — the catalog is VIN-based, so these
+      // name matches aren't verified against the vehicle. Warn and point to VIN.
+      fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
+    }
 
     return NextResponse.json({
       ok: true,
