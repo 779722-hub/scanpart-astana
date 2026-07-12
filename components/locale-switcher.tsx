@@ -3,13 +3,15 @@
 import { useLocale } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { locales } from "@/lib/i18n-config";
-import { cn } from "@/lib/cn";
 
 const LABELS: Record<string, { flag: string; short: string }> = {
   ru: { flag: "🇷🇺", short: "RU" },
   kk: { flag: "🇰🇿", short: "KZ" },
   en: { flag: "🇬🇧", short: "EN" },
 };
+
+const selectCls =
+  "h-8 cursor-pointer rounded-2xl border border-paper-mute bg-white px-2 text-xs font-semibold text-ink transition hover:bg-paper focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-ink-mute dark:bg-ink-soft dark:text-paper sm:h-9 sm:px-3 sm:text-sm";
 
 export function LocaleSwitcher() {
   const active = useLocale();
@@ -24,30 +26,17 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <div
-      role="radiogroup"
-      className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 sm:p-1 dark:border-ink-mute dark:bg-ink-soft"
+    <select
+      aria-label="Язык / Тіл / Language"
+      value={active}
+      onChange={(e) => switchTo(e.target.value)}
+      className={selectCls}
     >
-      {locales.map((l) => {
-        const is = l === active;
-        return (
-          <button
-            key={l}
-            role="radio"
-            aria-checked={is}
-            onClick={() => switchTo(l)}
-            className={cn(
-              "flex h-8 items-center gap-1 rounded-xl px-2 text-xs font-semibold transition sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm",
-              is
-                ? "bg-brand text-white shadow-card"
-                : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
-            )}
-          >
-            <span aria-hidden className="hidden sm:inline">{LABELS[l].flag}</span>
-            <span>{LABELS[l].short}</span>
-          </button>
-        );
-      })}
-    </div>
+      {locales.map((l) => (
+        <option key={l} value={l}>
+          {LABELS[l].flag} {LABELS[l].short}
+        </option>
+      ))}
+    </select>
   );
 }
