@@ -13,6 +13,9 @@ export async function SiteHeader() {
   const t = await getTranslations("brand");
   const theme = await getThemeMap().catch(() => ({} as Record<string, string>));
   const logoText = theme.logo_text || t("name");
+  // Mobile shows only the first word (before the dot), enlarged; desktop keeps
+  // the full name.
+  const logoShort = logoText.split(".")[0].trim() || logoText;
   const logo = await getImageSlot("logo").catch(() => null);
   const tv = await getTranslations("vehicleBar");
   const session = await getSession();
@@ -42,7 +45,8 @@ export async function SiteHeader() {
               <Wrench className="h-4 w-4" />
             </span>
           )}
-          <span className="truncate text-base sm:text-xl">{logoText}</span>
+          <span className="truncate text-xl sm:hidden">{logoShort}</span>
+          <span className="hidden truncate sm:block sm:text-xl">{logoText}</span>
         </Link>
         <div className="flex flex-none items-center gap-1 sm:gap-2">
           <LocaleSwitcher />
