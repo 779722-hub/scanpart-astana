@@ -29,14 +29,14 @@ export async function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
         <Link
           href={`/${locale}`}
-          className="group flex min-w-0 items-center gap-2 font-bold tracking-tight"
+          className="group flex min-w-0 items-center gap-1.5 font-bold tracking-tight sm:gap-2"
         >
           {logo?.publicId ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={cldUrl(logo.publicId, { width: 144 })}
               alt={logo.altRu || logoText}
-              className="h-8 w-auto max-w-[6rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
+              className="h-7 w-auto max-w-[4.5rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
             />
           ) : (
             <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
@@ -45,7 +45,7 @@ export async function SiteHeader() {
           )}
           <span className="truncate text-sm sm:text-xl">{logoText}</span>
         </Link>
-        <div className="flex flex-none items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-none items-center gap-1 sm:gap-2">
           <AccountButton signedIn={isCustomer} />
           <CartButton />
           <LocaleSwitcher />

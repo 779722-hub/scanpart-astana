@@ -45,7 +45,7 @@ export function AccountButton({ signedIn }: { signedIn: boolean }) {
         <button
           onClick={logout}
           disabled={loggingOut}
-          className="inline-flex h-8 items-center justify-center rounded-2xl border border-paper-mute bg-white px-2 text-ink-mute transition hover:border-brand hover:text-brand disabled:opacity-50 sm:h-9 sm:px-2.5 dark:border-ink-mute dark:bg-ink-soft dark:text-paper-mute"
+          className="inline-flex h-8 items-center justify-center rounded-2xl border border-paper-mute bg-white px-2.5 text-ink transition hover:border-brand hover:text-brand disabled:opacity-50 sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft dark:text-paper"
           aria-label="Выйти"
           title="Выйти"
         >
