@@ -168,6 +168,7 @@ export function VinSearchForm({
           onChange={(e) => setVin(e.target.value.toUpperCase())}
           maxLength={17}
           autoComplete="off"
+          autoFocus
           required
           disabled={status === "loading"}
         />
