@@ -5,7 +5,16 @@ import { uploadBuffer } from "@/lib/cloudinary";
 export const runtime = "nodejs";
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
+const ALLOWED = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+  "image/gif",
+  "image/avif",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+]);
 
 export async function POST(req: NextRequest) {
   const guard = await requireAuth();

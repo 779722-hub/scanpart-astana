@@ -13,6 +13,7 @@ interface ImageRow {
 }
 
 const KNOWN_SLOTS = [
+  { slot: "logo", title: "Логотип — слева от названия в шапке" },
   { slot: "hero_light", title: "Главная — фон для светлой темы" },
   { slot: "hero_dark", title: "Главная — фон для тёмной темы" },
   { slot: "hero", title: "Главная — fallback фон (если светлый/тёмный не заданы)" },
@@ -154,7 +155,7 @@ function SlotCard({
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            accept="image/*"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -187,7 +188,11 @@ function SlotCard({
           <img
             src={cldUrl(row.publicId, { width: 800 })}
             alt={altRu || slot}
-            className="h-48 w-full object-cover"
+            className={
+              slot === "logo"
+                ? "h-24 w-full bg-paper-soft object-contain p-3 dark:bg-ink-mute"
+                : "h-48 w-full object-cover"
+            }
           />
         </div>
       ) : (
