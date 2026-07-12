@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/session";
+import { readDeliveries, readWarehouses } from "@/lib/sheets/client";
+import { buildRoute } from "@/lib/delivery/route";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** The logged-in courier's active deliveries + an optimised route with ETAs. */
+export async function GET(req: NextRequest) {
+  const session = await getSession();
+  const courier = session.courier;
+  if (!courier) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const [allDeliveries, warehouses] = await Promise.all([
+    readDeliveries().catch(() => []),
+    readWarehouses().catch(() => []),
+  ]);
+
+  const active = allDeliveries.filter(
+    (d) =>
+      d.courierId === courier.id &&
+      (d.status === "assigned" || d.status === "picking" || d.status === "en_route")
+  );
+
+  // Optional courier start location from the app (?lat=&lng=).
+  const lat = Number(req.nextUrl.searchParams.get("lat"));
+  const lng = Number(req.nextUrl.searchParams.get("lng"));
+  const start =
+    Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0
+      ? { lat, lng }
+      : null;
+
+  const route = buildRoute(
+    active.map((d) => ({
+      id: d.id,
+      label: d.customerName || d.address,
+      lat: d.lat,
+      lng: d.lng,
+      warehouseIds: d.warehouseIds,
+    })),
+    warehouses.map((w) => ({
+      id: w.id,
+      name: w.name,
+      lat: w.lat,
+      lng: w.lng,
+      pickupMinutes: w.pickupMinutes,
+    })),
+    { start }
+  );
+
+  // Never leak the handover code to the courier before it is issued/needed.
+  const deliveries = active.map((d) => ({
+    id: d.id,
+    customerName: d.customerName,
+    phone: d.phone,
+    whatsapp: d.whatsapp,
+    address: d.address,
+    lat: d.lat,
+    lng: d.lng,
+    items: d.items,
+    warehouseIds: d.warehouseIds,
+    status: d.status,
+  }));
+
+  return NextResponse.json({ ok: true, deliveries, route });
+}

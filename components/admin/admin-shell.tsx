@@ -15,6 +15,8 @@ import {
   BookOpen,
   ClipboardList,
   Warehouse,
+  Truck,
+  Bike,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -27,6 +29,8 @@ import { TabSettings } from "./tab-settings";
 import { TabOrders } from "./tab-orders";
 import { TabCustomers } from "./tab-customers";
 import { TabWarehouses } from "./tab-warehouses";
+import { TabCouriers } from "./tab-couriers";
+import { TabDeliveries } from "./tab-deliveries";
 import { TabUsers } from "./tab-users";
 import { TabAliases } from "./tab-aliases";
 import { TabSearchLog } from "./tab-search-log";
@@ -42,6 +46,8 @@ type TabKey =
   | "orders"
   | "customers"
   | "warehouses"
+  | "deliveries"
+  | "couriers"
   | "users";
 
 interface TabDef {
@@ -55,6 +61,8 @@ const TABS: TabDef[] = [
   { key: "dashboard", label: "Дашборд", Icon: LayoutDashboard },
   { key: "orders", label: "Заказы", Icon: Package },
   { key: "customers", label: "Клиенты", Icon: Contact },
+  { key: "deliveries", label: "Доставки", Icon: Truck },
+  { key: "couriers", label: "Курьеры", Icon: Bike },
   { key: "warehouses", label: "Склады", Icon: Warehouse },
   { key: "content", label: "Контент", Icon: FileText },
   { key: "images", label: "Картинки", Icon: ImageIcon },
@@ -148,6 +156,8 @@ export function AdminShell({
         {tab === "orders" && <TabOrders />}
         {tab === "customers" && <TabCustomers />}
         {tab === "warehouses" && <TabWarehouses />}
+        {tab === "deliveries" && <TabDeliveries />}
+        {tab === "couriers" && <TabCouriers />}
         {tab === "users" && user.role === "owner" && (
           <TabUsers currentEmail={user.email} />
         )}
