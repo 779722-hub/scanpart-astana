@@ -92,8 +92,20 @@ export function TabContent() {
         body: JSON.stringify({ key: row.key, locale, value }),
       });
       if (!res.ok) throw new Error();
+      const j = (await res.json().catch(() => ({}))) as {
+        translations?: { kk: string; en: string };
+      };
       setRows((cur) =>
-        cur?.map((r) => (r.key === row.key ? { ...r, [locale]: value } : r)) ?? null
+        cur?.map((r) => {
+          if (r.key !== row.key) return r;
+          const next = { ...r, [locale]: value };
+          // RU save auto-fills KK/EN (Google Translate) — reflect it instantly.
+          if (j.translations) {
+            next.kk = j.translations.kk;
+            next.en = j.translations.en;
+          }
+          return next;
+        }) ?? null
       );
       setSavedKey(row.key);
       setTimeout(() => setSavedKey((k) => (k === row.key ? null : k)), 1500);
@@ -132,6 +144,11 @@ export function TabContent() {
         <p className="text-xs text-ink-mute dark:text-paper-mute">
           {filteredCount}/{rows.length} ключей
         </p>
+        {locale === "ru" && (
+          <p className="w-full text-xs text-brand">
+            При сохранении русского текста казахский и английский переводятся автоматически.
+          </p>
+        )}
         <button
           onClick={() => setAdding((v) => !v)}
           className="btn-secondary !px-3 !py-2 text-sm"
