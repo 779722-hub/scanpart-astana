@@ -24,29 +24,44 @@ export const cartItemSchema = z.object({
 });
 export type CartItemInput = z.infer<typeof cartItemSchema>;
 
-export const orderSchema = z
-  .object({
-    kind: z.enum(["express", "pickup"]),
-    name: z.string().min(2, { message: "required" }).max(80),
-    phone: phoneSchema,
-    whatsapp: z
-      .string()
-      .max(30)
-      .refine((s) => s === "" || phoneOk(s), { message: "invalidPhone" })
-      .optional()
-      .or(z.literal("")),
-    address: z.string().max(200).optional().or(z.literal("")),
-    items: z.array(cartItemSchema).min(1).max(50),
-  })
-  .superRefine((data, ctx) => {
-    if (data.kind === "express" && !data.address?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["address"],
-        message: "required",
-      });
-    }
-  });
+// Customer-entered fields only. The checkout form validates against this —
+// the cart items are attached in the submit handler, not typed by the user,
+// so they must NOT be part of the form schema (an empty `items` would fail
+// validation and silently block submit).
+const orderBase = z.object({
+  kind: z.enum(["express", "pickup"]),
+  name: z.string().min(2, { message: "required" }).max(80),
+  phone: phoneSchema,
+  whatsapp: z
+    .string()
+    .max(30)
+    .refine((s) => s === "" || phoneOk(s), { message: "invalidPhone" })
+    .optional()
+    .or(z.literal("")),
+  address: z.string().max(200).optional().or(z.literal("")),
+});
+
+const requireAddressForExpress = (
+  data: { kind: "express" | "pickup"; address?: string },
+  ctx: z.RefinementCtx
+) => {
+  if (data.kind === "express" && !data.address?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["address"],
+      message: "required",
+    });
+  }
+};
+
+/** Checkout form (client) — no items. */
+export const orderFormSchema = orderBase.superRefine(requireAddressForExpress);
+export type OrderFormInput = z.infer<typeof orderFormSchema>;
+
+/** Full order (API) — includes cart items. */
+export const orderSchema = orderBase
+  .extend({ items: z.array(cartItemSchema).min(1).max(50) })
+  .superRefine(requireAddressForExpress);
 
 export type OrderInput = z.infer<typeof orderSchema>;
 
