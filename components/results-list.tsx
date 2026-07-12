@@ -12,12 +12,12 @@ import {
   Clock,
   ShoppingCart,
   Trash2,
-  ExternalLink,
   Truck,
   BookOpen,
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
+import { CopyVin } from "@/components/copy-vin";
 
 type State =
   | { kind: "loading" }
@@ -140,25 +140,7 @@ function CatalogHint({ vin }: { vin?: string }) {
   return (
     <div className="card space-y-3">
       <div className="text-sm font-semibold">{t("catalogHintTitle")}</div>
-      <a
-        href="https://www.autodoc.ru/catalogs/car"
-        target="_blank"
-        rel="noreferrer"
-        className="btn-secondary !py-3"
-      >
-        <ExternalLink className="h-4 w-4" />
-        {t("catalogHintLink")}
-      </a>
-      {vin && (
-        <div className="rounded-2xl bg-paper-soft p-3 text-xs dark:bg-ink-mute">
-          <div className="text-ink-mute dark:text-paper-mute">
-            {t("catalogHintVinLabel")}
-          </div>
-          <div className="mt-1 select-all font-mono text-sm font-bold">
-            {vin}
-          </div>
-        </div>
-      )}
+      {vin && <CopyVin vin={vin} />}
       <p className="text-xs text-ink-mute dark:text-paper-mute">
         {t("catalogHintFooter")}
       </p>
