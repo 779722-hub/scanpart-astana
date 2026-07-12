@@ -362,10 +362,6 @@ function Dashboard({
     router.refresh();
   }
 
-  function selectVin(vin: string) {
-    router.push(`/${locale}/search/vin?vin=${encodeURIComponent(vin)}`);
-  }
-
   async function deleteVin(vin: string) {
     if (!confirm(`Убрать VIN ${vin} из сохранённых?`)) return;
     await fetch("/api/customer/vins", {
@@ -442,7 +438,7 @@ function Dashboard({
               <VinRow
                 key={vin}
                 vin={vin}
-                onSearch={() => selectVin(vin)}
+                locale={locale}
                 onDelete={() => deleteVin(vin)}
                 onEdit={(next) => editVin(vin, next)}
               />
@@ -623,18 +619,68 @@ function RepeatButton({
 
 function VinRow({
   vin,
-  onSearch,
+  locale,
   onDelete,
   onEdit,
 }: {
   vin: string;
-  onSearch: () => void;
+  locale: string;
   onDelete: () => void;
   onEdit: (next: string) => Promise<boolean>;
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(vin);
   const [busy, setBusy] = useState(false);
+  const [vehicle, setVehicle] = useState<{ make: string; model: string; year: string } | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // Resolve a human label ("Infiniti FX35") for the saved VIN. `fast=1` keeps
+  // it snappy (NHTSA only). Manual entries have no decodable VIN.
+  useEffect(() => {
+    if (vin.startsWith("MANUAL")) return;
+    let cancelled = false;
+    fetch(`/api/vin?vin=${encodeURIComponent(vin)}&fast=1`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled && j.ok) setVehicle(j.vehicle);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [vin]);
+
+  // Set this car as the current vehicle and jump straight to parts search —
+  // no need to re-enter the VIN.
+  async function search() {
+    setSearching(true);
+    try {
+      let v = vehicle;
+      if (!v && !vin.startsWith("MANUAL")) {
+        const j = await fetch(`/api/vin?vin=${encodeURIComponent(vin)}&fast=1`)
+          .then((r) => r.json())
+          .catch(() => null);
+        if (j?.ok) v = j.vehicle;
+      }
+      await fetch("/api/session/vin", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          vin,
+          vehicle: v ?? { make: "—", model: "—", year: "" },
+        }),
+      });
+      router.push(`/${locale}/search/article`);
+      router.refresh();
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  const label = vehicle
+    ? [vehicle.make, vehicle.model].filter((s) => s && s !== "—").join(" ")
+    : "";
 
   if (editing) {
     return (
@@ -677,12 +723,25 @@ function VinRow({
 
   return (
     <li className="space-y-2 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
-      <code className="block select-all break-all font-mono text-sm font-bold">
+      <div className="flex items-center gap-2">
+        <Car className="h-4 w-4 flex-none text-brand" />
+        <span className="font-bold">
+          {label || (vin.startsWith("MANUAL") ? "Автомобиль" : "Определяем модель…")}
+        </span>
+        {vehicle?.year && vehicle.year !== "—" && (
+          <span className="text-sm text-ink-mute dark:text-paper-mute">{vehicle.year}</span>
+        )}
+      </div>
+      <code className="block select-all break-all font-mono text-xs text-ink-mute dark:text-paper-mute">
         {vin}
       </code>
       <div className="flex flex-wrap gap-2">
-        <button onClick={onSearch} className="btn-primary flex-1 !px-3 !py-2 text-sm">
-          <Search className="h-4 w-4" />
+        <button
+          onClick={search}
+          disabled={searching}
+          className="btn-primary flex-1 !px-3 !py-2 text-sm"
+        >
+          {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Поиск запчастей
         </button>
         <button
