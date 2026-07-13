@@ -27,6 +27,7 @@ export interface DeliveryMapProps {
   couriers: MapCourier[];
   warehouses: MapPoint[];
   drops: MapPoint[];
+  office?: MapPoint | null; // pickup/office point (Республика 68), shown green
   routeGeometry?: [number, number][] | null;
   className?: string;
 }
@@ -35,6 +36,7 @@ const RED = "#E10600";
 const AMBER = "#F59E0B";
 const BLUE = "#2563EB";
 const GRAY = "#9CA3AF";
+const GREEN = "#16A34A";
 const ASTANA = { lat: 51.13, lng: 71.43, zoom: 11 };
 const MAPGL_SRC = "https://mapgl.2gis.com/api/js/v1";
 
@@ -44,18 +46,23 @@ interface Pin {
   name: string;
   color: string;
   hint: string;
+  size: number;
+  permanent: boolean; // keep the label always visible (warehouses / office)
 }
 
 function buildPins(props: DeliveryMapProps): Pin[] {
   const pins: Pin[] = [];
   for (const c of props.couriers) {
-    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : RED, hint: "Курьер" });
+    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : RED, hint: "Курьер", size: 18, permanent: false });
   }
   for (const w of props.warehouses) {
-    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: AMBER, hint: "Склад" });
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: AMBER, hint: "Склад", size: 22, permanent: true });
+  }
+  if (props.office) {
+    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: GREEN, hint: "Офис", size: 24, permanent: true });
   }
   for (const d of props.drops) {
-    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: BLUE, hint: "Клиент" });
+    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: BLUE, hint: "Клиент", size: 15, permanent: false });
   }
   return pins;
 }
@@ -152,7 +159,19 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
     if (twogisKey) drawGis(props);
     else drawLeaflet(props);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.couriers, props.warehouses, props.drops, props.routeGeometry]);
+  }, [props.couriers, props.warehouses, props.drops, props.office, props.routeGeometry]);
+
+  // Keep the map sized to its container (fullscreen toggle, responsive).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      lMapRef.current?.invalidateSize();
+      gisMapRef.current?.invalidateSize?.();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   function drawLeaflet(data: DeliveryMapProps) {
     const leaflet = leafletRef.current;
@@ -163,13 +182,20 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
 
     const pins = buildPins(data);
     for (const p of pins) {
+      const half = p.size / 2;
       const icon = leaflet.divIcon({
         className: "",
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-        html: `<div style="background:${p.color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3)"></div>`,
+        iconSize: [p.size, p.size],
+        iconAnchor: [half, half],
+        html: `<div style="background:${p.color};width:${p.size}px;height:${p.size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div>`,
       });
-      leaflet.marker([p.lat, p.lng], { icon }).bindTooltip(p.name).addTo(layer);
+      const marker = leaflet.marker([p.lat, p.lng], { icon });
+      if (p.permanent) {
+        marker.bindTooltip(p.name, { permanent: true, direction: "top", offset: [0, -half], className: "font-semibold" });
+      } else {
+        marker.bindTooltip(p.name);
+      }
+      marker.addTo(layer);
     }
 
     if (data.routeGeometry && data.routeGeometry.length > 1) {
