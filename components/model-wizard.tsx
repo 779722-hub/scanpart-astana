@@ -171,7 +171,7 @@ export function ModelWizard({
     <div className="card space-y-5">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Подбор по марке и модели</h1>
-        <button onClick={onCancel} className="inline-flex items-center gap-1 text-sm text-ink-mute underline">
+        <button onClick={onCancel} className="inline-flex items-center gap-1 text-sm text-ink-mute dark:text-paper-mute underline">
           <ArrowLeft className="h-4 w-4" /> Назад
         </button>
       </div>
@@ -215,7 +215,7 @@ export function ModelWizard({
       {catalogId && vehicles === null && (
         <>
           {busy && !field ? (
-            <div className="flex items-center gap-2 text-sm text-ink-mute">
+            <div className="flex items-center gap-2 text-sm text-ink-mute dark:text-paper-mute">
               <Loader2 className="h-4 w-4 animate-spin" /> Загрузка…
             </div>
           ) : field ? (
@@ -267,12 +267,12 @@ export function ModelWizard({
                   </span>
                 </span>
               </span>
-              <ChevronRight className="h-4 w-4 flex-none text-ink-mute" />
+              <ChevronRight className="h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
             </button>
           ))}
           <button
             onClick={() => setVehicles(null)}
-            className="text-sm text-ink-mute underline"
+            className="text-sm text-ink-mute dark:text-paper-mute underline"
           >
             ← Уточнить параметры
           </button>

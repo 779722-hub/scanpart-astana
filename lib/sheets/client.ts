@@ -33,6 +33,8 @@ export interface OrderRow {
   phone: string;
   whatsapp: string;
   status: string;
+  /** Opaque supplier code (Р1/М2) — internal; used to auto-pick the warehouse. */
+  source?: string;
 }
 
 export interface UserRow {
@@ -178,11 +180,12 @@ export async function appendOrder(row: OrderRow): Promise<number | null> {
       row.phone,
       row.whatsapp,
       row.status,
+      row.source ?? "",
     ],
   ];
   const res = await sheets.spreadsheets.values.append({
     spreadsheetId: spreadsheetId(),
-    range: `${ORDERS_SHEET}!A:O`,
+    range: `${ORDERS_SHEET}!A:P`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values },
@@ -200,7 +203,7 @@ export async function listOrders(limit = 200): Promise<OrderListItem[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${ORDERS_SHEET}!A2:O`,
+    range: `${ORDERS_SHEET}!A2:P`,
   });
   const rows = data.values ?? [];
   return rows.slice(-limit).map((r, i) => ({
@@ -220,6 +223,7 @@ export async function listOrders(limit = 200): Promise<OrderListItem[]> {
     phone: String(r[12] ?? ""),
     whatsapp: String(r[13] ?? ""),
     status: String(r[14] ?? "Новый"),
+    source: String(r[15] ?? ""),
   }));
 }
 
@@ -594,7 +598,7 @@ export async function readWarehouses(): Promise<Warehouse[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${WAREHOUSES_SHEET}!A2:H`,
+    range: `${WAREHOUSES_SHEET}!A2:I`,
   });
   return (data.values ?? [])
     .map((r) => ({
@@ -605,6 +609,7 @@ export async function readWarehouses(): Promise<Warehouse[]> {
       lng: parseCoord(r[4] as string | number | null),
       pickupMinutes: Number(r[5] ?? 0) || 0,
       active: String(r[6] ?? "").toLowerCase() !== "false",
+      sourceCode: String(r[8] ?? "").trim(),
     }))
     .filter((w) => w.id);
 }
@@ -622,6 +627,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
     w.pickupMinutes,
     w.active ? "true" : "false",
     new Date().toISOString(),
+    w.sourceCode ?? "",
   ];
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: id,
@@ -631,7 +637,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
   if (rowIdx === -1) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: id,
-      range: `${WAREHOUSES_SHEET}!A:H`,
+      range: `${WAREHOUSES_SHEET}!A:I`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [row] },
     });
@@ -639,7 +645,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
   }
   await sheets.spreadsheets.values.update({
     spreadsheetId: id,
-    range: `${WAREHOUSES_SHEET}!A${rowIdx + 1}:H${rowIdx + 1}`,
+    range: `${WAREHOUSES_SHEET}!A${rowIdx + 1}:I${rowIdx + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
   });
@@ -893,6 +899,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "Телефон",
     "WhatsApp",
     "Статус",
+    "Склад (источник)",
   ],
   Users: ["email", "password_hash", "role", "created_at", "active"],
   Content: ["key", "ru", "kk", "en", "updated_at", "updated_by", "where"],
@@ -926,6 +933,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "pickup_minutes",
     "active",
     "updated_at",
+    "source_code",
   ],
   Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at"],
   CourierLocations: ["courier_id", "lat", "lng", "updated_at"],

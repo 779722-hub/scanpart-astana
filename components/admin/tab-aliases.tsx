@@ -142,7 +142,7 @@ export function TabAliases() {
 
       <div className="space-y-2">
         {filtered.length === 0 ? (
-          <div className="card text-center text-sm text-ink-mute">
+          <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
             {rows.length === 0
               ? "Словарь пуст. Добавьте первую запись — например, «колодки передние» → TRW|GDB3458."
               : "Ничего не найдено по фильтру."}
@@ -440,10 +440,10 @@ function ImportForm({
           )}
           {report.skipped && report.skipped.length > 0 && (
             <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-ink-mute">
+              <summary className="cursor-pointer text-xs text-ink-mute dark:text-paper-mute">
                 Пропущено: {report.skipped.length}
               </summary>
-              <ul className="mt-1 space-y-0.5 text-xs text-ink-mute">
+              <ul className="mt-1 space-y-0.5 text-xs text-ink-mute dark:text-paper-mute">
                 {report.skipped.slice(0, 20).map((s, i) => (
                   <li key={i} className="truncate">
                     · {s}

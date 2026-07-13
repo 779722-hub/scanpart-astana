@@ -23,7 +23,7 @@ interface Delivery {
   deliveredAt: string;
 }
 interface Courier { id: string; name: string }
-interface Warehouse { id: string; name: string; lat: number | null; lng: number | null }
+interface Warehouse { id: string; name: string; lat: number | null; lng: number | null; sourceCode: string }
 interface OrderItem {
   rowNumber: number;
   clientName: string;
@@ -34,6 +34,7 @@ interface OrderItem {
   partName: string;
   quantity: number;
   status: string;
+  source: string;
 }
 interface Office { address: string; lat: number | null; lng: number | null }
 interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
@@ -169,6 +170,14 @@ export function TabDeliveries() {
   function prefillFromOrder(o: OrderItem) {
     const isPickup = o.orderType === "Самовывоз";
     const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
+    // Auto-pick the warehouse tied to the order's source code (Р1/М2/…);
+    // fall back to the only warehouse when there is just one.
+    const bySource = o.source ? warehouses.find((w) => w.sourceCode === o.source) : undefined;
+    const warehouseIds = bySource
+      ? [bySource.id]
+      : warehouses.length === 1
+        ? [warehouses[0].id]
+        : [];
     setDraft((cur) => ({
       ...(cur ?? emptyDraft),
       customerName: o.clientName,
@@ -177,7 +186,7 @@ export function TabDeliveries() {
       items,
       address: isPickup ? office?.address ?? "" : o.address,
       latlng: isPickup && office?.lat != null && office?.lng != null ? `${office.lat}, ${office.lng}` : cur?.latlng ?? "",
-      warehouseIds: warehouses.length === 1 ? [warehouses[0].id] : cur?.warehouseIds ?? [],
+      warehouseIds: warehouseIds.length ? warehouseIds : cur?.warehouseIds ?? [],
     }));
   }
 
@@ -451,7 +460,7 @@ export function TabDeliveries() {
                 <option value="">— выберите заказ —</option>
                 {orders.slice().reverse().map((o) => (
                   <option key={o.rowNumber} value={o.rowNumber}>
-                    #{o.rowNumber} · {o.clientName || o.phone} · {o.partName}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
+                    #{o.rowNumber} · {o.clientName || o.phone} · {o.partName}{o.source ? ` · ${o.source}` : ""}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
                   </option>
                 ))}
               </select>

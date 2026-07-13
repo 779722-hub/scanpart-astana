@@ -341,6 +341,9 @@ export async function GET(req: NextRequest) {
       warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${
         SOURCE_CODE[source ?? "phaeton"] ?? "?"
       })`,
+      // Opaque supplier code (Р1/М2) — already shown to the client in the label;
+      // carried explicitly so it can be stored on the order for internal routing.
+      sourceCode: SOURCE_CODE[source ?? "phaeton"] ?? "",
       // A VIN-scoped search draws every part from the vehicle's own catalog, so
       // they all fit — show them all as confirmed rather than the misleading
       // "совместимость не подтверждена" that name-text heuristics produce.

@@ -149,7 +149,7 @@ export function VinSearchForm({
               {tName("title")}
             </Link>
           </div>
-          <button onClick={reset} className="text-sm text-ink-mute underline">
+          <button onClick={reset} className="text-sm text-ink-mute dark:text-paper-mute underline">
             {t("confirmEdit")}
           </button>
         </div>
@@ -378,7 +378,7 @@ function ManualForm({
         <div>
           <label className="label flex items-center gap-2">
             {labels.model}
-            {loadingModels && <Loader2 className="h-3 w-3 animate-spin text-ink-mute" />}
+            {loadingModels && <Loader2 className="h-3 w-3 animate-spin text-ink-mute dark:text-paper-mute" />}
           </label>
           <input
             list="models-list"

@@ -83,7 +83,7 @@ export function TabCouriers() {
           <div>
             <div className="flex items-center gap-2 font-bold">
               {c.name}
-              {!c.active && <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs text-ink-mute dark:bg-ink-mute">выключен</span>}
+              {!c.active && <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs text-ink-mute dark:bg-ink-mute dark:text-paper-mute">выключен</span>}
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
               <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{c.phone}</span>
@@ -131,7 +131,7 @@ export function TabCouriers() {
               <input className="input" value={draft.login} onChange={(e) => setDraft({ ...draft, login: e.target.value })} />
             </div>
             <div>
-              <label className="label">Пароль {draft.id && <span className="text-ink-mute">(пусто = не менять)</span>}</label>
+              <label className="label">Пароль {draft.id && <span className="text-ink-mute dark:text-paper-mute">(пусто = не менять)</span>}</label>
               <input className="input" type="text" value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} />
             </div>
           </div>

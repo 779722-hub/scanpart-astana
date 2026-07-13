@@ -206,7 +206,7 @@ export function TabContent() {
 
       <div className="space-y-3">
         {grouped.length === 0 ? (
-          <div className="card text-center text-sm text-ink-mute">
+          <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
             Контент пуст или ничего не найдено по фильтру.
           </div>
         ) : (

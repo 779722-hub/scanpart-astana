@@ -50,7 +50,7 @@ export function TabCustomers() {
   return (
     <div className="space-y-4">
       <div className="card flex flex-wrap items-center gap-2">
-        <Search className="h-4 w-4 text-ink-mute" />
+        <Search className="h-4 w-4 text-ink-mute dark:text-paper-mute" />
         <input
           className="input flex-1 min-w-[12rem]"
           placeholder="Поиск: имя, email, телефон, VIN"
@@ -63,7 +63,7 @@ export function TabCustomers() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card text-center text-sm text-ink-mute">
+        <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
           <Users className="mx-auto mb-2 h-8 w-8" />
           Зарегистрированных клиентов нет.
         </div>

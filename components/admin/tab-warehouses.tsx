@@ -12,6 +12,7 @@ interface Warehouse {
   lng: number | null;
   pickupMinutes: number;
   active: boolean;
+  sourceCode: string;
 }
 
 type Draft = {
@@ -22,9 +23,12 @@ type Draft = {
   lng: string;
   pickupMinutes: string;
   active: boolean;
+  sourceCode: string;
 };
 
-const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true };
+const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true, sourceCode: "" };
+const SOURCE_CODES = ["", "Р1", "М2", "Т3"];
+const SOURCE_LABEL: Record<string, string> = { "": "—", "Р1": "Р1 (поставщик 1)", "М2": "М2 (поставщик 2)", "Т3": "Т3 (поставщик 3)" };
 
 export function TabWarehouses() {
   const [rows, setRows] = useState<Warehouse[] | null>(null);
@@ -74,6 +78,7 @@ export function TabWarehouses() {
           lng: draft.lng,
           pickupMinutes: draft.pickupMinutes,
           active: draft.active,
+          sourceCode: draft.sourceCode,
         }),
       });
       const j = await res.json();
@@ -130,6 +135,11 @@ export function TabWarehouses() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 font-bold">
               {w.name}
+              {w.sourceCode && (
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
+                  {w.sourceCode}
+                </span>
+              )}
               {!w.active && (
                 <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs text-ink-mute dark:bg-ink-mute">
                   выключен
@@ -157,6 +167,7 @@ export function TabWarehouses() {
                   lng: w.lng?.toString() ?? "",
                   pickupMinutes: String(w.pickupMinutes),
                   active: w.active,
+                  sourceCode: w.sourceCode ?? "",
                 })
               }
             >
@@ -189,6 +200,21 @@ export function TabWarehouses() {
                 value={draft.pickupMinutes}
                 onChange={(e) => setDraft({ ...draft, pickupMinutes: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="label">Источник (код склада в заказе)</label>
+              <select
+                className="input"
+                value={draft.sourceCode}
+                onChange={(e) => setDraft({ ...draft, sourceCode: e.target.value })}
+              >
+                {SOURCE_CODES.map((c) => (
+                  <option key={c} value={c}>{SOURCE_LABEL[c]}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+                Свяжите склад с кодом из заказа (Р1/М2/Т3) — тогда доставка из заказа сама подставит этот склад.
+              </p>
             </div>
           </div>
           <div>

@@ -78,7 +78,7 @@ export function OrderForm({
   if (cart.hydrated && cart.items.length === 0 && status !== "success") {
     return (
       <div className="card space-y-4 text-center">
-        <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute" />
+        <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute dark:text-paper-mute" />
         <h1 className="text-2xl font-bold">Корзина пуста</h1>
         <p className="text-ink-mute dark:text-paper-mute">
           Сначала добавьте позиции из поиска.
@@ -99,6 +99,7 @@ export function OrderForm({
         partName: i.name,
         price: i.price,
         quantity: i.quantity,
+        sourceCode: i.sourceCode,
       }));
       const res = await fetch("/api/order", {
         method: "POST",
@@ -168,7 +169,7 @@ export function OrderForm({
           </h1>
           <Link
             href={`/${locale}/cart`}
-            className="rounded-full p-2 text-ink-mute hover:bg-paper-soft dark:hover:bg-ink-mute"
+            className="rounded-full p-2 text-ink-mute dark:text-paper-mute hover:bg-paper-soft dark:hover:bg-ink-mute"
             title="Назад в корзину"
           >
             <ChevronLeft className="h-5 w-5" />

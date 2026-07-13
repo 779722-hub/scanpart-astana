@@ -94,7 +94,7 @@ export function TabUsers({ currentEmail }: { currentEmail: string }) {
 
       <div className="space-y-2">
         {users.length === 0 && (
-          <div className="card text-center text-sm text-ink-mute">
+          <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
             Пока нет пользователей. Создайте первого через /api/admin/auth/bootstrap.
           </div>
         )}
