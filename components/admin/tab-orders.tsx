@@ -33,9 +33,20 @@ export function TabOrders() {
   const [editing, setEditing] = useState<number | null>(null);
   const [editType, setEditType] = useState<string>("Экспресс");
   const [editAddr, setEditAddr] = useState<string>("");
+  const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
 
   useEffect(() => {
     refresh();
+    fetch("/api/admin/settings")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok && j.settings) {
+          const g = j.settings as Record<string, string>;
+          const num = (v: string) => (v && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
+          setOffice({ address: g.pickup_address ?? "", lat: num(g.office_lat ?? ""), lng: num(g.office_lng ?? "") });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   async function refresh() {
@@ -104,7 +115,9 @@ export function TabOrders() {
   }
 
   async function createDelivery(o: Order) {
-    if (!confirm(`Создать доставку для «${o.clientName || o.phone}»? Курьера и координаты назначьте во вкладке «Доставки».`)) return;
+    const isPickup = o.orderType === "Самовывоз";
+    const dest = isPickup ? office.address || "офис (задайте адрес самовывоза в Настройках)" : o.address || "адрес не указан";
+    if (!confirm(`Создать доставку для «${o.clientName || o.phone}»?\nКуда везти: ${dest}${isPickup ? "\n(самовывоз — курьер привозит в офис)" : ""}\nСклад и курьера назначьте во вкладке «Доставки».`)) return;
     setSavingRow(o.rowNumber);
     try {
       const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
@@ -115,7 +128,9 @@ export function TabOrders() {
           customerName: o.clientName,
           phone: o.phone,
           whatsapp: o.whatsapp,
-          address: o.address,
+          address: isPickup ? office.address : o.address,
+          lat: isPickup ? office.lat : undefined,
+          lng: isPickup ? office.lng : undefined,
           items,
         }),
       });
@@ -124,7 +139,7 @@ export function TabOrders() {
         alert(`Ошибка: ${j.error}`);
         return;
       }
-      alert("Доставка создана. Откройте вкладку «Доставки», задайте координаты и назначьте курьера.");
+      alert("Доставка создана. Откройте вкладку «Доставки»: проверьте склад, задайте координаты (если нужно) и назначьте курьера.");
     } finally {
       setSavingRow(null);
     }
@@ -277,16 +292,14 @@ export function TabOrders() {
                   </span>
                 )}
                 <div className="flex items-center gap-2">
-                  {o.orderType !== "Самовывоз" && (
-                    <button
-                      onClick={() => createDelivery(o)}
-                      disabled={savingRow === o.rowNumber}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
-                    >
-                      <Truck className="h-4 w-4" />
-                      Создать доставку
-                    </button>
-                  )}
+                  <button
+                    onClick={() => createDelivery(o)}
+                    disabled={savingRow === o.rowNumber}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                  >
+                    <Truck className="h-4 w-4" />
+                    Создать доставку
+                  </button>
                   <button
                     onClick={() => (editing === o.rowNumber ? setEditing(null) : startEdit(o))}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-semibold transition hover:border-ink-mute dark:border-ink-mute"

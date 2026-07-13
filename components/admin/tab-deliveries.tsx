@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, CheckCircle2 } from "lucide-react";
+import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, CheckCircle2, Maximize2, X, ClipboardList } from "lucide-react";
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 import { agoLabel, isStale } from "@/lib/delivery/live";
@@ -24,6 +24,18 @@ interface Delivery {
 }
 interface Courier { id: string; name: string }
 interface Warehouse { id: string; name: string; lat: number | null; lng: number | null }
+interface OrderItem {
+  rowNumber: number;
+  clientName: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  orderType: string;
+  partName: string;
+  quantity: number;
+  status: string;
+}
+interface Office { address: string; lat: number | null; lng: number | null }
 interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
 interface Route { stops: RouteStop[]; totalKm: number; totalMinutes: number; geometry?: [number, number][] | null }
 interface LiveCourier {
@@ -70,8 +82,11 @@ export function TabDeliveries() {
   const [rows, setRows] = useState<Delivery[] | null>(null);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [office, setOffice] = useState<Office | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const [live, setLive] = useState<LiveCourier[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -79,14 +94,22 @@ export function TabDeliveries() {
   const [route, setRoute] = useState<Route | null>(null);
 
   async function refresh() {
-    const [d, c, w] = await Promise.all([
+    const [d, c, w, o, s] = await Promise.all([
       fetch("/api/admin/deliveries").then((r) => r.json()),
       fetch("/api/admin/couriers").then((r) => r.json()),
       fetch("/api/admin/warehouses").then((r) => r.json()),
+      fetch("/api/admin/orders").then((r) => r.json()).catch(() => ({ ok: false })),
+      fetch("/api/admin/settings").then((r) => r.json()).catch(() => ({ ok: false })),
     ]);
     setRows(d.ok ? d.deliveries : []);
     setCouriers(c.ok ? c.couriers : []);
     setWarehouses(w.ok ? w.warehouses : []);
+    setOrders(o.ok ? o.orders : []);
+    if (s.ok && s.settings) {
+      const g = s.settings as Record<string, string>;
+      const num = (v: string) => (v && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
+      setOffice({ address: g.pickup_address ?? "", lat: num(g.office_lat ?? ""), lng: num(g.office_lng ?? "") });
+    }
   }
   useEffect(() => {
     refresh();
@@ -136,6 +159,27 @@ export function TabDeliveries() {
   const mapDrops: MapPoint[] = (rows ?? [])
     .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null)
     .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number }));
+  const officePoint: MapPoint | null =
+    office && office.lat != null && office.lng != null
+      ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng }
+      : null;
+
+  // Prefill the delivery draft from an existing order. Самовывоз → the office
+  // address/coords (the courier brings the parcel to the office).
+  function prefillFromOrder(o: OrderItem) {
+    const isPickup = o.orderType === "Самовывоз";
+    const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
+    setDraft((cur) => ({
+      ...(cur ?? emptyDraft),
+      customerName: o.clientName,
+      phone: o.phone,
+      whatsapp: o.whatsapp,
+      items,
+      address: isPickup ? office?.address ?? "" : o.address,
+      latlng: isPickup && office?.lat != null && office?.lng != null ? `${office.lat}, ${office.lng}` : cur?.latlng ?? "",
+      warehouseIds: warehouses.length === 1 ? [warehouses[0].id] : cur?.warehouseIds ?? [],
+    }));
+  }
 
   async function save() {
     if (!draft) return;
@@ -209,25 +253,54 @@ export function TabDeliveries() {
       <div className="card space-y-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <MapPin className="h-4 w-4 text-brand" /> Карта
-          {selected && (
-            <button className="ml-auto text-xs font-semibold text-brand" onClick={() => toggleSelect(selected)}>
-              сбросить маршрут
+          <div className="ml-auto flex items-center gap-3">
+            {selected && (
+              <button className="text-xs font-semibold text-brand" onClick={() => toggleSelect(selected)}>
+                сбросить маршрут
+              </button>
+            )}
+            <button className="inline-flex items-center gap-1 text-xs font-semibold text-brand" onClick={() => setFullscreen(true)}>
+              <Maximize2 className="h-3.5 w-3.5" /> на весь экран
             </button>
-          )}
+          </div>
         </div>
-        <DeliveryMap
-          couriers={mapCouriers}
-          warehouses={mapWarehouses}
-          drops={mapDrops}
-          routeGeometry={selected ? route?.geometry ?? null : null}
-          className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
-        />
-        <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
-          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#E10600" }} /> курьер</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#F59E0B" }} /> склад</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#2563EB" }} /> клиент</span>
-        </div>
+        {!fullscreen && (
+          <DeliveryMap
+            couriers={mapCouriers}
+            warehouses={mapWarehouses}
+            drops={mapDrops}
+            office={officePoint}
+            routeGeometry={selected ? route?.geometry ?? null : null}
+            className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
+          />
+        )}
+        <MapLegend hasOffice={!!officePoint} />
       </div>
+
+      {/* Fullscreen map overlay */}
+      {fullscreen && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-paper dark:bg-ink">
+          <div className="flex items-center justify-between gap-2 border-b border-paper-mute px-4 py-3 dark:border-ink-mute">
+            <span className="flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4 text-brand" /> Карта · курьеры</span>
+            <div className="flex items-center gap-3">
+              {selected && (
+                <button className="text-xs font-semibold text-brand" onClick={() => toggleSelect(selected)}>сбросить маршрут</button>
+              )}
+              <button className="btn-secondary !px-3 !py-2 text-sm" onClick={() => setFullscreen(false)}>
+                <X className="h-4 w-4" /> Закрыть
+              </button>
+            </div>
+          </div>
+          <DeliveryMap
+            couriers={mapCouriers}
+            warehouses={mapWarehouses}
+            drops={mapDrops}
+            office={officePoint}
+            routeGeometry={selected ? route?.geometry ?? null : null}
+            className="w-full flex-1"
+          />
+        </div>
+      )}
 
       {/* Live couriers */}
       {live.length > 0 && (
@@ -352,6 +425,29 @@ export function TabDeliveries() {
       {draft ? (
         <div className="card space-y-3">
           <div className="text-base font-bold">{draft.id ? "Изменить доставку" : "Новая доставка"}</div>
+          {!draft.id && orders.length > 0 && (
+            <div>
+              <label className="label"><ClipboardList className="mr-1 inline h-4 w-4" />Взять из заказа</label>
+              <select
+                className="input"
+                value=""
+                onChange={(e) => {
+                  const o = orders.find((x) => String(x.rowNumber) === e.target.value);
+                  if (o) prefillFromOrder(o);
+                }}
+              >
+                <option value="">— выберите заказ —</option>
+                {orders.slice().reverse().map((o) => (
+                  <option key={o.rowNumber} value={o.rowNumber}>
+                    #{o.rowNumber} · {o.clientName || o.phone} · {o.partName}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+                Подставит клиента, адрес и товар. Склад проверьте и поменяйте ниже, если позиции нет в наличии.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div><label className="label">Клиент</label><input className="input" value={draft.customerName} onChange={(e) => setDraft({ ...draft, customerName: e.target.value })} /></div>
             <div><label className="label">Телефон</label><input className="input" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} /></div>
@@ -395,6 +491,17 @@ export function TabDeliveries() {
           <Plus className="h-4 w-4" /> Добавить доставку
         </button>
       )}
+    </div>
+  );
+}
+
+function MapLegend({ hasOffice }: { hasOffice: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
+      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#E10600" }} /> курьер</span>
+      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#F59E0B" }} /> склад</span>
+      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#2563EB" }} /> клиент</span>
+      {hasOffice && <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16A34A" }} /> офис</span>}
     </div>
   );
 }
