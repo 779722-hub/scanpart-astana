@@ -6,6 +6,7 @@ import { getDelivery, upsertDelivery } from "@/lib/sheets/client";
 import { canTransition, type DeliveryStatus } from "@/lib/delivery/types";
 import { codesMatch } from "@/lib/delivery/handover";
 import { sendHandoverCode } from "@/lib/delivery/notify";
+import { notifyDelivery } from "@/lib/delivery/notify-telegram";
 
 export const runtime = "nodejs";
 
@@ -70,6 +71,13 @@ export async function PATCH(
 
   d.status = target;
   await upsertDelivery(d);
+
+  // Best-effort manager notification for the two key moments.
+  if (parsed.data.action === "enroute") {
+    await notifyDelivery("en_route", d, { courierName: courier.name }).catch(() => {});
+  } else if (parsed.data.action === "deliver") {
+    await notifyDelivery("delivered", d, { courierName: courier.name }).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true, status: d.status, codeSent, waLink });
 }

@@ -55,6 +55,8 @@ export interface BuildRouteOptions {
   dropoffMinutes?: number; // service time per customer, default 5
 }
 
+import { optimizeRoute } from "./optimize";
+
 const R = 6371; // km
 export function haversineKm(a: LatLng, b: LatLng): number {
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -65,37 +67,6 @@ export function haversineKm(a: LatLng, b: LatLng): number {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-interface Node {
-  id: string;
-  label: string;
-  lat: number;
-  lng: number;
-  kind: "pickup" | "dropoff";
-  service: number; // minutes at this node
-}
-
-/** Order nodes greedily by nearest-neighbour from `from`. Deterministic. */
-function nearestOrder(from: LatLng, nodes: Node[]): Node[] {
-  const remaining = [...nodes];
-  const out: Node[] = [];
-  let cur = from;
-  while (remaining.length) {
-    let best = 0;
-    let bestKm = Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const km = haversineKm(cur, remaining[i]);
-      if (km < bestKm - 1e-9) {
-        bestKm = km;
-        best = i;
-      }
-    }
-    const [n] = remaining.splice(best, 1);
-    out.push(n);
-    cur = n;
-  }
-  return out;
 }
 
 export function buildRoute(
@@ -112,63 +83,44 @@ export function buildRoute(
   );
   const skipped = deliveries.filter((d) => d.lat === null || d.lng === null).map((d) => d.id);
 
-  // Needed pickup warehouses (union), with coordinates.
-  const neededIds = new Set<string>();
-  for (const d of withCoords) for (const w of d.warehouseIds) neededIds.add(w);
   const whById = new Map(warehouses.map((w) => [w.id, w]));
-  const pickupNodes: Node[] = [];
-  for (const id of neededIds) {
-    const w = whById.get(id);
-    if (w && w.lat !== null && w.lng !== null) {
-      pickupNodes.push({
-        id: w.id,
-        label: w.name,
-        lat: w.lat,
-        lng: w.lng,
-        kind: "pickup",
-        service: w.pickupMinutes,
-      });
-    }
-  }
-  const dropNodes: Node[] = withCoords.map((d) => ({
-    id: d.id,
-    label: d.label,
-    lat: d.lat,
-    lng: d.lng,
-    kind: "dropoff",
-    service: dropoffMin,
-  }));
+  const dropById = new Map(withCoords.map((d) => [d.id, d]));
+
+  // Optimal interleaved order: pickups and dropoffs mixed to minimize travel,
+  // with each dropoff still after all its required warehouse pickups.
+  const opt = optimizeRoute(
+    opts.start ?? null,
+    withCoords.map((d) => ({ id: d.id, lat: d.lat, lng: d.lng, warehouseIds: d.warehouseIds })),
+    warehouses
+      .filter((w): w is RouteWarehouse & { lat: number; lng: number } => w.lat !== null && w.lng !== null)
+      .map((w) => ({ id: w.id, lat: w.lat, lng: w.lng }))
+  );
 
   const start: LatLng =
-    opts.start ?? pickupNodes[0] ?? dropNodes[0] ?? { lat: 0, lng: 0 };
-
-  const orderedPickups = nearestOrder(start, pickupNodes);
-  const afterPickups = orderedPickups.length
-    ? orderedPickups[orderedPickups.length - 1]
-    : start;
-  const orderedDrops = nearestOrder(afterPickups, dropNodes);
-  const sequence = [...orderedPickups, ...orderedDrops];
+    opts.start ?? (opt.order[0] ? { lat: opt.order[0].lat, lng: opt.order[0].lng } : { lat: 0, lng: 0 });
 
   const stops: RouteStop[] = [];
   let cur: LatLng = start;
   let clock = 0; // minutes since start
   let totalKm = 0;
-  for (const n of sequence) {
-    const legKm = haversineKm(cur, n);
-    const travelMin = (legKm / avgSpeed) * 60;
-    clock += travelMin; // arrival time
+  for (const s of opt.order) {
+    const legKm = haversineKm(cur, s);
+    clock += (legKm / avgSpeed) * 60; // arrival time
     totalKm += legKm;
+    const label =
+      s.kind === "pickup" ? whById.get(s.refId)?.name ?? s.refId : dropById.get(s.refId)?.label ?? s.refId;
+    const service = s.kind === "pickup" ? whById.get(s.refId)?.pickupMinutes ?? 0 : dropoffMin;
     stops.push({
-      kind: n.kind,
-      refId: n.id,
-      label: n.label,
-      lat: n.lat,
-      lng: n.lng,
+      kind: s.kind,
+      refId: s.refId,
+      label,
+      lat: s.lat,
+      lng: s.lng,
       legKm: Math.round(legKm * 10) / 10,
       etaMinutes: Math.round(clock),
     });
-    clock += n.service; // service before the next leg
-    cur = n;
+    clock += service; // service before the next leg
+    cur = s;
   }
 
   return {

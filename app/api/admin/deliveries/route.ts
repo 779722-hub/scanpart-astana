@@ -7,10 +7,12 @@ import {
   deleteDelivery,
   readWarehouses,
   readCourierLocations,
+  readCouriers,
   ensureSheetStructure,
 } from "@/lib/sheets/client";
 import { buildRoute } from "@/lib/delivery/route";
 import { roadPath, type LatLng } from "@/lib/delivery/roadroute";
+import { notifyDelivery } from "@/lib/delivery/notify-telegram";
 import type { Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 export const runtime = "nodejs";
@@ -140,6 +142,23 @@ export async function PUT(req: NextRequest) {
     deliveredAt: existing?.deliveredAt ?? "",
   };
   await upsertDelivery(delivery);
+
+  // Notify the manager chat on creation / (re)assignment.
+  try {
+    let courierName: string | undefined;
+    if (delivery.courierId) {
+      const couriers = await readCouriers().catch(() => []);
+      courierName = couriers.find((c) => c.id === delivery.courierId)?.name;
+    }
+    if (!existing) {
+      await notifyDelivery("created", delivery, { courierName });
+    } else if (delivery.courierId && existing.courierId !== delivery.courierId) {
+      await notifyDelivery("assigned", delivery, { courierName });
+    }
+  } catch {
+    /* notifications are best-effort */
+  }
+
   return NextResponse.json({ ok: true, delivery });
 }
 

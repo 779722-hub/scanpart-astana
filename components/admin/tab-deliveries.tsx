@@ -37,6 +37,7 @@ interface OrderItem {
   source: string;
 }
 interface Office { address: string; lat: number | null; lng: number | null }
+interface Suggestion { courierId: string; courierName: string; activeCount: number; addedMinutes: number; addedKm: number; totalMinutes: number }
 interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
 interface Route { stops: RouteStop[]; totalKm: number; totalMinutes: number; geometry?: [number, number][] | null }
 interface LiveCourier {
@@ -93,6 +94,9 @@ export function TabDeliveries() {
   const [now, setNow] = useState(() => Date.now());
   const [selected, setSelected] = useState(""); // courier focused on the map
   const [route, setRoute] = useState<Route | null>(null);
+  const [suggestFor, setSuggestFor] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [suggestBusy, setSuggestBusy] = useState(false);
 
   async function refresh() {
     const [d, c, w, o, s] = await Promise.all([
@@ -221,6 +225,44 @@ export function TabDeliveries() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function suggest(deliveryId: string) {
+    if (suggestFor === deliveryId) {
+      setSuggestFor(null);
+      return;
+    }
+    setSuggestFor(deliveryId);
+    setSuggestions(null);
+    setSuggestBusy(true);
+    try {
+      const j = await fetch(`/api/admin/deliveries/suggest?deliveryId=${encodeURIComponent(deliveryId)}`).then((r) => r.json());
+      setSuggestions(j.ok ? j.suggestions : []);
+    } finally {
+      setSuggestBusy(false);
+    }
+  }
+
+  async function assignCourier(d: Delivery, courierId: string) {
+    await fetch("/api/admin/deliveries", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: d.id,
+        customerName: d.customerName,
+        phone: d.phone,
+        whatsapp: d.whatsapp,
+        address: d.address,
+        lat: d.lat,
+        lng: d.lng,
+        items: d.items,
+        warehouseIds: d.warehouseIds,
+        courierId,
+        status: d.status,
+      }),
+    });
+    setSuggestFor(null);
+    await refresh();
   }
 
   async function remove(id: string) {
@@ -411,11 +453,45 @@ export function TabDeliveries() {
             </div>
           </div>
           <div className="text-sm">{d.items}</div>
-          <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-ink-mute dark:text-paper-mute">
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{d.address || "нет адреса"}{d.lat == null && " (нет координат)"}</span>
             <span>курьер: {d.courierId ? courierName(d.courierId) : "не назначен"}</span>
             {d.warehouseIds.length > 0 && <span>склады: {d.warehouseIds.map(whName).join(", ")}</span>}
+            <button
+              onClick={() => suggest(d.id)}
+              className="inline-flex items-center gap-1 rounded-xl border border-brand/40 px-2 py-1 font-semibold text-brand"
+            >
+              <RouteIcon className="h-3.5 w-3.5" /> подобрать курьера
+            </button>
           </div>
+
+          {suggestFor === d.id && (
+            <div className="space-y-1 rounded-2xl bg-paper-soft px-3 py-2 dark:bg-ink-mute">
+              {suggestBusy || !suggestions ? (
+                <div className="flex items-center gap-2 text-xs text-ink-mute dark:text-paper-mute">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Считаю лучший вариант…
+                </div>
+              ) : suggestions.length === 0 ? (
+                <div className="text-xs text-ink-mute dark:text-paper-mute">Нет активных курьеров.</div>
+              ) : (
+                suggestions.map((s, i) => (
+                  <div key={s.courierId} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="flex items-center gap-2">
+                      {i === 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">лучший</span>}
+                      <span className="font-semibold">{s.courierName}</span>
+                      <span className="text-ink-mute dark:text-paper-mute">+{s.addedMinutes} мин · +{s.addedKm} км{s.activeCount > 0 ? ` · сейчас ${s.activeCount}` : ""}</span>
+                    </span>
+                    <button
+                      onClick={() => assignCourier(d, s.courierId)}
+                      className="rounded-xl bg-brand px-3 py-1 font-semibold text-white"
+                    >
+                      Назначить
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       ))}
 
