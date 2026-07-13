@@ -6,13 +6,49 @@ import {
   upsertDelivery,
   deleteDelivery,
   readWarehouses,
+  readCourierLocations,
   ensureSheetStructure,
 } from "@/lib/sheets/client";
 import { buildRoute } from "@/lib/delivery/route";
+import { roadPath, type LatLng } from "@/lib/delivery/roadroute";
 import type { Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type BuiltRoute = ReturnType<typeof buildRoute>;
+type RichRoute = BuiltRoute & { geometry?: [number, number][] };
+
+/**
+ * Upgrade a straight-line route to real road geometry + times. When the
+ * courier's live location is known (start), the road legs line up 1:1 with the
+ * stops and we recompute per-stop ETAs (travel + service time). Without a start,
+ * we still attach the drawable geometry but keep the straight-line ETAs.
+ */
+async function enrichWithRoad(
+  route: BuiltRoute,
+  start: LatLng | null,
+  warehouses: { id: string; pickupMinutes: number }[]
+): Promise<RichRoute> {
+  if (!route.stops.length) return route;
+  const stopCoords = route.stops.map((s) => ({ lat: s.lat, lng: s.lng }));
+  const pts = start ? [start, ...stopCoords] : stopCoords;
+  const road = await roadPath(pts);
+  if (!road) return route;
+
+  if (start && road.legs.length === route.stops.length) {
+    const whMin = new Map(warehouses.map((w) => [w.id, w.pickupMinutes]));
+    let clock = 0;
+    const stops = route.stops.map((s, i) => {
+      clock += road.legs[i].min; // travel to this stop
+      const etaMinutes = Math.round(clock);
+      clock += s.kind === "pickup" ? whMin.get(s.refId) ?? 0 : 5; // service before next leg
+      return { ...s, legKm: road.legs[i].km, etaMinutes };
+    });
+    return { ...route, stops, totalKm: road.totalKm, totalMinutes: Math.round(clock), geometry: road.geometry };
+  }
+  return { ...route, geometry: road.geometry, totalKm: road.totalKm };
+}
 
 export async function GET(req: NextRequest) {
   const guard = await requireAuth();
@@ -25,20 +61,28 @@ export async function GET(req: NextRequest) {
     deliveries = [];
   }
 
-  // Optional: build the route for one courier's active deliveries (preview).
+  // Optional: build the route for one courier's active deliveries (preview),
+  // upgraded to real road geometry + times when possible (falls back to
+  // straight-line if the routing service is unreachable).
   const courierId = req.nextUrl.searchParams.get("courierId");
-  let route = null;
+  let route: RichRoute | null = null;
   if (courierId) {
-    const warehouses = await readWarehouses().catch(() => []);
+    const [warehouses, locations] = await Promise.all([
+      readWarehouses().catch(() => []),
+      readCourierLocations().catch(() => []),
+    ]);
     const active = deliveries.filter(
       (d) =>
         d.courierId === courierId &&
         (d.status === "assigned" || d.status === "picking" || d.status === "en_route")
     );
+    const loc = locations.find((l) => l.courierId === courierId);
+    const start = loc ? { lat: loc.lat, lng: loc.lng } : null;
     route = buildRoute(
       active.map((d) => ({ id: d.id, label: d.customerName || d.address, lat: d.lat, lng: d.lng, warehouseIds: d.warehouseIds })),
       warehouses.map((w) => ({ id: w.id, name: w.name, lat: w.lat, lng: w.lng, pickupMinutes: w.pickupMinutes }))
     );
+    route = await enrichWithRoad(route, start, warehouses);
   }
   return NextResponse.json({ ok: true, deliveries, route });
 }

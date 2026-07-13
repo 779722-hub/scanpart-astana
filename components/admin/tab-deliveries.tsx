@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio } from "lucide-react";
+import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, CheckCircle2 } from "lucide-react";
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 import { agoLabel, isStale } from "@/lib/delivery/live";
+import { DeliveryMap, type MapCourier, type MapPoint } from "@/components/admin/delivery-map";
 
 interface Delivery {
   id: string;
+  createdAt: string;
   customerName: string;
   phone: string;
   whatsapp: string;
@@ -18,17 +20,37 @@ interface Delivery {
   warehouseIds: string[];
   courierId: string;
   status: DeliveryStatus;
+  deliveredAt: string;
 }
 interface Courier { id: string; name: string }
-interface Warehouse { id: string; name: string }
+interface Warehouse { id: string; name: string; lat: number | null; lng: number | null }
 interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
+interface Route { stops: RouteStop[]; totalKm: number; totalMinutes: number; geometry?: [number, number][] | null }
+interface LiveCourier {
+  id: string;
+  name: string;
+  phone: string;
+  activeCount: number;
+  enRoute: number;
+  location: { lat: number; lng: number; updatedAt: string } | null;
+  destination: string | null;
+  destinationKind: "pickup" | "dropoff" | null;
+  totalKm: number;
+  totalMinutes: number;
+  warehouseNames: string[];
+}
 
-type Draft = Omit<Delivery, "lat" | "lng" | "status"> & { latlng: string; status?: DeliveryStatus };
+type Draft = Omit<Delivery, "lat" | "lng" | "status" | "createdAt" | "deliveredAt"> & {
+  latlng: string;
+  status?: DeliveryStatus;
+};
 
 const emptyDraft: Draft = {
   id: "", customerName: "", phone: "", whatsapp: "", address: "", latlng: "",
   items: "", warehouseIds: [], courierId: "",
 };
+
+const ACTIVE_STATUSES = new Set<DeliveryStatus>(["new", "assigned", "picking", "en_route"]);
 
 const STATUS_COLOR: Record<DeliveryStatus, string> = {
   new: "bg-paper-soft text-ink-mute dark:bg-ink-mute",
@@ -39,14 +61,22 @@ const STATUS_COLOR: Record<DeliveryStatus, string> = {
   canceled: "bg-paper-soft text-ink-mute line-through dark:bg-ink-mute",
 };
 
+function etaClock(min: number): string {
+  const d = new Date(Date.now() + min * 60000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function TabDeliveries() {
   const [rows, setRows] = useState<Delivery[] | null>(null);
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
-  const [routeCourier, setRouteCourier] = useState("");
-  const [route, setRoute] = useState<{ stops: RouteStop[]; totalKm: number; totalMinutes: number } | null>(null);
+
+  const [live, setLive] = useState<LiveCourier[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  const [selected, setSelected] = useState(""); // courier focused on the map
+  const [route, setRoute] = useState<Route | null>(null);
 
   async function refresh() {
     const [d, c, w] = await Promise.all([
@@ -62,10 +92,50 @@ export function TabDeliveries() {
     refresh();
   }, []);
 
+  // Poll live courier positions; refresh the focused route alongside so its
+  // road line follows the courier as they move.
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const j = await fetch("/api/admin/live").then((r) => r.json()).catch(() => null);
+      if (!alive) return;
+      setLive(j?.ok ? j.couriers : []);
+      setNow(Date.now());
+      if (selected) {
+        const r = await fetch(`/api/admin/deliveries?courierId=${encodeURIComponent(selected)}`)
+          .then((x) => x.json())
+          .catch(() => null);
+        if (alive) setRoute(r?.route ?? null);
+      }
+    };
+    load();
+    const t = setInterval(load, 15000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [selected]);
+
   const courierName = useMemo(() => {
     const m = new Map(couriers.map((c) => [c.id, c.name]));
     return (id: string) => m.get(id) || "—";
   }, [couriers]);
+
+  const whName = useMemo(() => {
+    const m = new Map(warehouses.map((w) => [w.id, w.name]));
+    return (id: string) => m.get(id) || id;
+  }, [warehouses]);
+
+  // Map data derived from live + deliveries + warehouses.
+  const mapCouriers: MapCourier[] = live
+    .filter((c) => c.location)
+    .map((c) => ({ id: c.id, name: c.name, lat: c.location!.lat, lng: c.location!.lng, stale: isStale(c.location!.updatedAt, now) }));
+  const mapWarehouses: MapPoint[] = warehouses
+    .filter((w) => w.lat != null && w.lng != null)
+    .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number }));
+  const mapDrops: MapPoint[] = (rows ?? [])
+    .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null)
+    .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number }));
 
   async function save() {
     if (!draft) return;
@@ -108,12 +178,10 @@ export function TabDeliveries() {
     refresh();
   }
 
-  async function previewRoute(courierId: string) {
-    setRouteCourier(courierId);
+  function toggleSelect(courierId: string) {
+    const next = selected === courierId ? "" : courierId;
+    setSelected(next);
     setRoute(null);
-    if (!courierId) return;
-    const j = await fetch(`/api/admin/deliveries?courierId=${encodeURIComponent(courierId)}`).then((r) => r.json());
-    setRoute(j.route ?? null);
   }
 
   function editFrom(d: Delivery) {
@@ -128,10 +196,8 @@ export function TabDeliveries() {
     return <div className="card flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   }
 
-  const etaClock = (min: number) => {
-    const d = new Date(Date.now() + min * 60000);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
+  const active = rows.filter((d) => ACTIVE_STATUSES.has(d.status));
+  const done = rows.filter((d) => d.status === "delivered");
 
   return (
     <div className="space-y-4">
@@ -139,44 +205,105 @@ export function TabDeliveries() {
         <Truck className="h-5 w-5 text-brand" /> Доставки
       </div>
 
-      <LiveCouriers />
-
-      {/* Route preview */}
-      <div className="card space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <RouteIcon className="h-4 w-4 text-brand" />
-          <span className="text-sm font-semibold">Маршрут курьера:</span>
-          <select className="input max-w-[16rem]" value={routeCourier} onChange={(e) => previewRoute(e.target.value)}>
-            <option value="">— выберите курьера —</option>
-            {couriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+      {/* Live map */}
+      <div className="card space-y-2">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <MapPin className="h-4 w-4 text-brand" /> Карта
+          {selected && (
+            <button className="ml-auto text-xs font-semibold text-brand" onClick={() => toggleSelect(selected)}>
+              сбросить маршрут
+            </button>
+          )}
         </div>
-        {route && (
-          route.stops.length === 0 ? (
-            <p className="text-sm text-ink-mute dark:text-paper-mute">Нет активных доставок с координатами у этого курьера.</p>
-          ) : (
-            <div className="space-y-1">
-              {route.stops.map((s, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
-                  <span className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.kind === "pickup" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200" : "bg-brand/10 text-brand"}`}>
-                      {s.kind === "pickup" ? "Склад" : "Клиент"}
-                    </span>
-                    {s.label}
-                  </span>
-                  <span className="whitespace-nowrap text-ink-mute dark:text-paper-mute">~{etaClock(s.etaMinutes)} · {s.legKm} км</span>
-                </div>
-              ))}
-              <div className="pt-1 text-right text-sm font-semibold">
-                Итого ≈ {route.totalKm} км · {route.totalMinutes} мин
-              </div>
-            </div>
-          )
-        )}
+        <DeliveryMap
+          couriers={mapCouriers}
+          warehouses={mapWarehouses}
+          drops={mapDrops}
+          routeGeometry={selected ? route?.geometry ?? null : null}
+          className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
+        />
+        <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
+          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#E10600" }} /> курьер</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#F59E0B" }} /> склад</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#2563EB" }} /> клиент</span>
+        </div>
       </div>
 
-      {/* List */}
-      {rows.map((d) => (
+      {/* Live couriers */}
+      {live.length > 0 && (
+        <div className="card space-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Radio className="h-4 w-4 text-brand" /> Курьеры на линии
+          </div>
+          {live.map((c) => (
+            <div
+              key={c.id}
+              className={`rounded-2xl px-3 py-2 text-sm ${selected === c.id ? "bg-brand/10 ring-1 ring-brand" : "bg-paper-soft dark:bg-ink-mute"}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold">{c.name}</span>
+                  {c.enRoute > 0 && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">в пути: {c.enRoute}</span>}
+                  <span className="text-ink-mute dark:text-paper-mute">доставок: {c.activeCount}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  {c.location ? (
+                    <span className={isStale(c.location.updatedAt, now) ? "text-ink-mute dark:text-paper-mute" : "text-emerald-600"}>
+                      {agoLabel(c.location.updatedAt, now)}
+                    </span>
+                  ) : (
+                    <span className="text-ink-mute dark:text-paper-mute">нет геопозиции</span>
+                  )}
+                  <button
+                    onClick={() => toggleSelect(c.id)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-brand/40 px-2 py-1 text-xs font-semibold text-brand"
+                  >
+                    <RouteIcon className="h-3.5 w-3.5" /> {selected === c.id ? "скрыть" : "маршрут"}
+                  </button>
+                </span>
+              </div>
+              {c.activeCount > 0 && (
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-mute dark:text-paper-mute">
+                  {c.destination && (
+                    <span>
+                      едет: <strong className="text-ink dark:text-paper">{c.destinationKind === "pickup" ? "склад " : ""}{c.destination}</strong>
+                    </span>
+                  )}
+                  <span>маршрут ≈ {c.totalKm} км · {c.totalMinutes} мин</span>
+                  {c.warehouseNames.length > 0 && <span>склады: {c.warehouseNames.join(", ")}</span>}
+                </div>
+              )}
+
+              {/* Stop-by-stop route for the focused courier */}
+              {selected === c.id && route && (
+                route.stops.length === 0 ? (
+                  <p className="mt-2 text-xs text-ink-mute dark:text-paper-mute">Нет активных доставок с координатами.</p>
+                ) : (
+                  <div className="mt-2 space-y-1 border-t border-paper-mute/60 pt-2 dark:border-ink/60">
+                    {route.stops.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 font-semibold ${s.kind === "pickup" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200" : "bg-brand/10 text-brand"}`}>
+                            {s.kind === "pickup" ? "Склад" : "Клиент"}
+                          </span>
+                          {s.label}
+                        </span>
+                        <span className="whitespace-nowrap text-ink-mute dark:text-paper-mute">~{etaClock(s.etaMinutes)} · +{s.legKm} км</span>
+                      </div>
+                    ))}
+                    <div className="pt-1 text-right text-xs font-semibold">
+                      Итого ≈ {route.totalKm} км · {route.totalMinutes} мин
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Active deliveries */}
+      {active.map((d) => (
         <div key={d.id} className="card space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -193,10 +320,33 @@ export function TabDeliveries() {
           <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{d.address || "нет адреса"}{d.lat == null && " (нет координат)"}</span>
             <span>курьер: {d.courierId ? courierName(d.courierId) : "не назначен"}</span>
-            {d.warehouseIds.length > 0 && <span>склады: {d.warehouseIds.length}</span>}
+            {d.warehouseIds.length > 0 && <span>склады: {d.warehouseIds.map(whName).join(", ")}</span>}
           </div>
         </div>
       ))}
+
+      {/* Completed deliveries */}
+      {done.length > 0 && (
+        <details className="card">
+          <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Выполненные ({done.length})
+          </summary>
+          <div className="mt-3 space-y-2">
+            {done.slice().reverse().map((d) => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold">{d.customerName || d.address || "—"}</span>
+                  <span className="text-ink-mute dark:text-paper-mute">{d.items}</span>
+                </span>
+                <span className="whitespace-nowrap text-xs text-ink-mute dark:text-paper-mute">
+                  {d.courierId ? courierName(d.courierId) : "—"}
+                  {d.deliveredAt ? ` · ${new Date(d.deliveredAt).toLocaleString("ru")}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {/* Create / edit */}
       {draft ? (
@@ -245,78 +395,6 @@ export function TabDeliveries() {
           <Plus className="h-4 w-4" /> Добавить доставку
         </button>
       )}
-    </div>
-  );
-}
-
-interface LiveCourier {
-  id: string;
-  name: string;
-  phone: string;
-  activeCount: number;
-  enRoute: number;
-  location: { lat: number; lng: number; updatedAt: string } | null;
-}
-
-function LiveCouriers() {
-  const [rows, setRows] = useState<LiveCourier[] | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      fetch("/api/admin/live")
-        .then((r) => r.json())
-        .then((j) => {
-          if (alive) {
-            setRows(j.ok ? j.couriers : []);
-            setNow(Date.now());
-          }
-        })
-        .catch(() => {});
-    load();
-    const t = setInterval(load, 20000); // refresh every 20s
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
-
-  if (!rows || rows.length === 0) return null;
-
-  return (
-    <div className="card space-y-2">
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        <Radio className="h-4 w-4 text-brand" /> Курьеры на линии
-      </div>
-      {rows.map((c) => (
-        <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
-          <span className="flex items-center gap-2">
-            <span className="font-semibold">{c.name}</span>
-            {c.enRoute > 0 && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">в пути: {c.enRoute}</span>}
-            <span className="text-ink-mute dark:text-paper-mute">доставок: {c.activeCount}</span>
-          </span>
-          <span className="flex items-center gap-2">
-            {c.location ? (
-              <>
-                <span className={isStale(c.location.updatedAt, now) ? "text-ink-mute dark:text-paper-mute" : "text-emerald-600"}>
-                  {agoLabel(c.location.updatedAt, now)}
-                </span>
-                <a
-                  href={`https://2gis.kz/geo/${c.location.lng},${c.location.lat}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold text-brand"
-                >
-                  <MapPin className="h-3.5 w-3.5" /> на карте
-                </a>
-              </>
-            ) : (
-              <span className="text-ink-mute dark:text-paper-mute">нет геопозиции</span>
-            )}
-          </span>
-        </div>
-      ))}
     </div>
   );
 }
