@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X } from "lucide-react";
+import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
 
 const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
@@ -98,6 +98,33 @@ export function TabOrders() {
           null
       );
       setEditing(null);
+    } finally {
+      setSavingRow(null);
+    }
+  }
+
+  async function createDelivery(o: Order) {
+    if (!confirm(`Создать доставку для «${o.clientName || o.phone}»? Курьера и координаты назначьте во вкладке «Доставки».`)) return;
+    setSavingRow(o.rowNumber);
+    try {
+      const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
+      const res = await fetch("/api/admin/deliveries", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customerName: o.clientName,
+          phone: o.phone,
+          whatsapp: o.whatsapp,
+          address: o.address,
+          items,
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        alert(`Ошибка: ${j.error}`);
+        return;
+      }
+      alert("Доставка создана. Откройте вкладку «Доставки», задайте координаты и назначьте курьера.");
     } finally {
       setSavingRow(null);
     }
@@ -250,6 +277,16 @@ export function TabOrders() {
                   </span>
                 )}
                 <div className="flex items-center gap-2">
+                  {o.orderType !== "Самовывоз" && (
+                    <button
+                      onClick={() => createDelivery(o)}
+                      disabled={savingRow === o.rowNumber}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                    >
+                      <Truck className="h-4 w-4" />
+                      Создать доставку
+                    </button>
+                  )}
                   <button
                     onClick={() => (editing === o.rowNumber ? setEditing(null) : startEdit(o))}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-semibold transition hover:border-ink-mute dark:border-ink-mute"

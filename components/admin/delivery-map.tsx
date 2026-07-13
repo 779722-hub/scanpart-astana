@@ -1,0 +1,232 @@
+"use client";
+
+import "leaflet/dist/leaflet.css";
+import { useEffect, useRef } from "react";
+import type * as L from "leaflet";
+
+declare global {
+  interface Window {
+    mapgl?: any;
+  }
+}
+
+export interface MapCourier {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  stale: boolean;
+}
+export interface MapPoint {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+export interface DeliveryMapProps {
+  couriers: MapCourier[];
+  warehouses: MapPoint[];
+  drops: MapPoint[];
+  routeGeometry?: [number, number][] | null;
+  className?: string;
+}
+
+const RED = "#E10600";
+const AMBER = "#F59E0B";
+const BLUE = "#2563EB";
+const GRAY = "#9CA3AF";
+const ASTANA = { lat: 51.13, lng: 71.43, zoom: 11 };
+const MAPGL_SRC = "https://mapgl.2gis.com/api/js/v1";
+
+interface Pin {
+  lat: number;
+  lng: number;
+  name: string;
+  color: string;
+  hint: string;
+}
+
+function buildPins(props: DeliveryMapProps): Pin[] {
+  const pins: Pin[] = [];
+  for (const c of props.couriers) {
+    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : RED, hint: "Курьер" });
+  }
+  for (const w of props.warehouses) {
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: AMBER, hint: "Склад" });
+  }
+  for (const d of props.drops) {
+    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: BLUE, hint: "Клиент" });
+  }
+  return pins;
+}
+
+function loadMapgl(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (window.mapgl) {
+      resolve(window.mapgl);
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${MAPGL_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.mapgl));
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = MAPGL_SRC;
+    script.async = true;
+    script.onload = () => resolve(window.mapgl);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
+  const twogisKey = process.env.NEXT_PUBLIC_TWOGIS_KEY;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const initedRef = useRef(false);
+  const fittedRef = useRef(false); // fit bounds only once, so polling doesn't reset the manager's pan/zoom
+
+  // Latest props for the async init effect, without re-running it.
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
+  // Leaflet handles
+  const leafletRef = useRef<typeof L | null>(null);
+  const lMapRef = useRef<L.Map | null>(null);
+  const lLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // 2GIS handles
+  const gisMapRef = useRef<any>(null);
+  const gisObjectsRef = useRef<any[]>([]);
+
+  // Create map once (guarded against StrictMode double-invoke).
+  useEffect(() => {
+    if (initedRef.current) return;
+    initedRef.current = true;
+    let cancelled = false;
+
+    if (twogisKey) {
+      loadMapgl().then((mapgl) => {
+        if (cancelled || !containerRef.current) return;
+        gisMapRef.current = new mapgl.Map(containerRef.current, {
+          center: [ASTANA.lng, ASTANA.lat],
+          zoom: ASTANA.zoom,
+          key: twogisKey,
+        });
+        drawGis(propsRef.current);
+      }).catch(() => {});
+    } else {
+      import("leaflet").then((mod) => {
+        if (cancelled || !containerRef.current) return;
+        const leaflet = mod.default;
+        leafletRef.current = leaflet;
+        const map = leaflet.map(containerRef.current).setView([ASTANA.lat, ASTANA.lng], ASTANA.zoom);
+        leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap",
+          maxZoom: 19,
+        }).addTo(map);
+        lMapRef.current = map;
+        lLayerRef.current = leaflet.layerGroup().addTo(map);
+        drawLeaflet(propsRef.current);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      if (lMapRef.current) {
+        lMapRef.current.remove();
+        lMapRef.current = null;
+      }
+      if (gisMapRef.current) {
+        gisMapRef.current.destroy();
+        gisMapRef.current = null;
+      }
+      initedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [twogisKey]);
+
+  // Redraw on data change.
+  useEffect(() => {
+    if (twogisKey) drawGis(props);
+    else drawLeaflet(props);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.couriers, props.warehouses, props.drops, props.routeGeometry]);
+
+  function drawLeaflet(data: DeliveryMapProps) {
+    const leaflet = leafletRef.current;
+    const map = lMapRef.current;
+    const layer = lLayerRef.current;
+    if (!leaflet || !map || !layer) return;
+    layer.clearLayers();
+
+    const pins = buildPins(data);
+    for (const p of pins) {
+      const icon = leaflet.divIcon({
+        className: "",
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+        html: `<div style="background:${p.color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3)"></div>`,
+      });
+      leaflet.marker([p.lat, p.lng], { icon }).bindTooltip(p.name).addTo(layer);
+    }
+
+    if (data.routeGeometry && data.routeGeometry.length > 1) {
+      const latlngs = data.routeGeometry.map(([lng, lat]) => [lat, lng] as [number, number]);
+      leaflet.polyline(latlngs, { color: RED, weight: 4 }).addTo(layer);
+    }
+
+    if (pins.length > 0 && !fittedRef.current) {
+      const bounds = leaflet.latLngBounds(pins.map((p) => [p.lat, p.lng] as [number, number]));
+      map.fitBounds(bounds, { padding: [40, 40] });
+      fittedRef.current = true;
+    }
+  }
+
+  function drawGis(data: DeliveryMapProps) {
+    const map = gisMapRef.current;
+    const mapgl = window.mapgl;
+    if (!map || !mapgl) return;
+    for (const obj of gisObjectsRef.current) obj.destroy();
+    gisObjectsRef.current = [];
+
+    const pins = buildPins(data);
+    for (const p of pins) {
+      const marker = new mapgl.Marker(map, {
+        coordinates: [p.lng, p.lat],
+        label: { text: `${p.hint}: ${p.name}` },
+      });
+      gisObjectsRef.current.push(marker);
+    }
+
+    if (data.routeGeometry && data.routeGeometry.length > 1) {
+      const line = new mapgl.Polyline(map, {
+        coordinates: data.routeGeometry,
+        width: 4,
+        color: RED,
+      });
+      gisObjectsRef.current.push(line);
+    }
+
+    if (pins.length > 0 && !fittedRef.current) {
+      map.fitBounds({
+        southWest: [
+          Math.min(...pins.map((p) => p.lng)),
+          Math.min(...pins.map((p) => p.lat)),
+        ],
+        northEast: [
+          Math.max(...pins.map((p) => p.lng)),
+          Math.max(...pins.map((p) => p.lat)),
+        ],
+      });
+      fittedRef.current = true;
+    }
+  }
+
+  return (
+    <div className={props.className ?? "h-80 w-full overflow-hidden rounded-2xl"}>
+      <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
+    </div>
+  );
+}
