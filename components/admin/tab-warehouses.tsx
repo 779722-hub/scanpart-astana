@@ -30,6 +30,26 @@ export function TabWarehouses() {
   const [rows, setRows] = useState<Warehouse[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [geo, setGeo] = useState(false);
+
+  async function geocode() {
+    if (!draft?.address.trim()) return;
+    setGeo(true);
+    try {
+      const j = await fetch(`/api/admin/geocode?q=${encodeURIComponent(draft.address)}`).then((r) => r.json());
+      if (j.ok) {
+        setDraft((d) => (d ? { ...d, lat: String(j.lat), lng: String(j.lng) } : d));
+      } else {
+        alert(
+          j.error === "not_found"
+            ? "Адрес не найден — уточните его или впишите координаты вручную из 2ГИС."
+            : "Геокодер недоступен, впишите координаты вручную."
+        );
+      }
+    } finally {
+      setGeo(false);
+    }
+  }
 
   async function refresh() {
     const j = await fetch("/api/admin/warehouses").then((r) => r.json());
@@ -177,15 +197,30 @@ export function TabWarehouses() {
           </div>
           <div>
             <label className="label">Координаты (широта, долгота)</label>
-            <input
-              className="input"
-              placeholder="51.1605, 71.4704"
-              value={draft.lat && draft.lng ? `${draft.lat}, ${draft.lng}` : draft.lat || draft.lng || ""}
-              onChange={(e) => {
-                const { lat, lng } = parseLatLngPair(e.target.value);
-                setDraft({ ...draft, lat: lat?.toString() ?? "", lng: lng?.toString() ?? "" });
-              }}
-            />
+            <div className="flex gap-2">
+              <input
+                className="input flex-1"
+                placeholder="51.1605, 71.4704"
+                value={draft.lat && draft.lng ? `${draft.lat}, ${draft.lng}` : draft.lat || draft.lng || ""}
+                onChange={(e) => {
+                  const { lat, lng } = parseLatLngPair(e.target.value);
+                  setDraft({ ...draft, lat: lat?.toString() ?? "", lng: lng?.toString() ?? "" });
+                }}
+              />
+              <button
+                type="button"
+                className="btn-secondary !px-3 !py-2 text-sm whitespace-nowrap"
+                onClick={geocode}
+                disabled={geo || !draft.address.trim()}
+                title="Определить координаты по адресу"
+              >
+                {geo ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                По адресу
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+              Заполните адрес выше и нажмите «По адресу», либо вставьте координаты из 2ГИС вручную.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />

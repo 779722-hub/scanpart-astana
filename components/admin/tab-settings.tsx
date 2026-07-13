@@ -28,6 +28,30 @@ export function TabSettings() {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [tgBusy, setTgBusy] = useState<"" | "detect" | "test">("");
   const [tgMsg, setTgMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+
+  async function geocodeOffice() {
+    const addr = (draft.pickup_address ?? "").trim();
+    if (!addr) {
+      alert("Сначала впишите «Адрес самовывоза / офиса».");
+      return;
+    }
+    setGeoBusy(true);
+    try {
+      const j = await fetch(`/api/admin/geocode?q=${encodeURIComponent(addr)}`).then((r) => r.json());
+      if (j.ok) {
+        setDraft((d) => ({ ...d, office_lat: String(j.lat), office_lng: String(j.lng) }));
+      } else {
+        alert(
+          j.error === "not_found"
+            ? "Адрес не найден — уточните его или впишите координаты вручную из 2ГИС."
+            : "Геокодер недоступен, впишите координаты вручную."
+        );
+      }
+    } finally {
+      setGeoBusy(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -168,6 +192,15 @@ export function TabSettings() {
             </div>
           ))}
         </div>
+        <button
+          type="button"
+          className="btn-secondary !px-3 !py-2 text-sm"
+          onClick={geocodeOffice}
+          disabled={geoBusy}
+        >
+          {geoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />}
+          Определить координаты офиса по адресу
+        </button>
       </div>
       <div className="flex justify-end">
         <button
