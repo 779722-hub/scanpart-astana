@@ -72,4 +72,6 @@ export const api = {
       `/api/courier/deliveries/${id}`,
       { method: "PATCH", body: JSON.stringify({ action, code }) }
     ),
+  postLocation: (lat: number, lng: number) =>
+    req("/api/courier/location", { method: "POST", body: JSON.stringify({ lat, lng }) }),
 };

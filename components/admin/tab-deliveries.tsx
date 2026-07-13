@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon } from "lucide-react";
+import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio } from "lucide-react";
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
+import { agoLabel, isStale } from "@/lib/delivery/live";
 
 interface Delivery {
   id: string;
@@ -138,6 +139,8 @@ export function TabDeliveries() {
         <Truck className="h-5 w-5 text-brand" /> Доставки
       </div>
 
+      <LiveCouriers />
+
       {/* Route preview */}
       <div className="card space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -242,6 +245,78 @@ export function TabDeliveries() {
           <Plus className="h-4 w-4" /> Добавить доставку
         </button>
       )}
+    </div>
+  );
+}
+
+interface LiveCourier {
+  id: string;
+  name: string;
+  phone: string;
+  activeCount: number;
+  enRoute: number;
+  location: { lat: number; lng: number; updatedAt: string } | null;
+}
+
+function LiveCouriers() {
+  const [rows, setRows] = useState<LiveCourier[] | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetch("/api/admin/live")
+        .then((r) => r.json())
+        .then((j) => {
+          if (alive) {
+            setRows(j.ok ? j.couriers : []);
+            setNow(Date.now());
+          }
+        })
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 20000); // refresh every 20s
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <div className="card space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Radio className="h-4 w-4 text-brand" /> Курьеры на линии
+      </div>
+      {rows.map((c) => (
+        <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
+          <span className="flex items-center gap-2">
+            <span className="font-semibold">{c.name}</span>
+            {c.enRoute > 0 && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">в пути: {c.enRoute}</span>}
+            <span className="text-ink-mute dark:text-paper-mute">доставок: {c.activeCount}</span>
+          </span>
+          <span className="flex items-center gap-2">
+            {c.location ? (
+              <>
+                <span className={isStale(c.location.updatedAt, now) ? "text-ink-mute dark:text-paper-mute" : "text-emerald-600"}>
+                  {agoLabel(c.location.updatedAt, now)}
+                </span>
+                <a
+                  href={`https://2gis.kz/geo/${c.location.lng},${c.location.lat}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-brand"
+                >
+                  <MapPin className="h-3.5 w-3.5" /> на карте
+                </a>
+              </>
+            ) : (
+              <span className="text-ink-mute dark:text-paper-mute">нет геопозиции</span>
+            )}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
