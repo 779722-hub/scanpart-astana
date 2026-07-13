@@ -95,6 +95,19 @@ export function TabDeliveries() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
+
+  async function regeocode() {
+    if (!confirm("Пересчитать координаты доставок по адресам (только Астана)? Точки вне Астаны будут исправлены или убраны с карты.")) return;
+    setGeoBusy(true);
+    try {
+      const j = await fetch("/api/admin/deliveries/regeocode", { method: "POST" }).then((r) => r.json());
+      alert(j.ok ? `Готово: исправлено ${j.fixed}, убрано вне Астаны ${j.cleared} (проверено ${j.checked}).` : "Не удалось.");
+      await refresh();
+    } finally {
+      setGeoBusy(false);
+    }
+  }
 
   const [live, setLive] = useState<LiveCourier[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -322,6 +335,9 @@ export function TabDeliveries() {
                 сбросить маршрут
               </button>
             )}
+            <button className="inline-flex items-center gap-1 text-xs font-semibold text-brand" onClick={regeocode} disabled={geoBusy} title="Пересчитать координаты доставок по адресам, только Астана">
+              {geoBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />} только Астана
+            </button>
             <button className="inline-flex items-center gap-1 text-xs font-semibold text-brand" onClick={() => setFullscreen(true)}>
               <Maximize2 className="h-3.5 w-3.5" /> на весь экран
             </button>

@@ -8,6 +8,12 @@
 const ASTANA_VIEWBOX = "71.20,51.35,71.70,51.00"; // lon1,lat1,lon2,lat2
 const ASTANA_RE = /астан|astana|нур-?султан|nur-?sultan|целиноград/i;
 
+/** True when a coordinate is within (a slightly padded) Astana bounding box. */
+export function isInAstana(lat: number | null, lng: number | null): boolean {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  return lat >= 50.95 && lat <= 51.40 && lng >= 71.10 && lng <= 71.80;
+}
+
 export async function geocodeAddress(
   q: string
 ): Promise<{ lat: number; lng: number; display: string } | null> {
