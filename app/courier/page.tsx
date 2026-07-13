@@ -146,27 +146,34 @@ export default function CourierPage() {
     })();
   }, []);
 
-  const loadRoute = useCallback(async () => {
-    setLoading(true);
-    sendLocation(); // report position on every load / action
-    try {
-      const loc = await getCoords();
-      const qs = loc ? `?lat=${loc.lat}&lng=${loc.lng}` : "";
-      const r = await apiFetch<{ deliveries: Delivery[]; route: RoutePlan }>(
-        `/api/courier/route${qs}`
-      );
-      setDeliveries(r.deliveries);
-      setRoute(r.route);
-    } catch (e) {
-      alert(`Ошибка: ${(e as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [sendLocation]);
+  const loadRoute = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      sendLocation(); // report position on every load / action
+      try {
+        const loc = await getCoords();
+        const qs = loc ? `?lat=${loc.lat}&lng=${loc.lng}` : "";
+        const r = await apiFetch<{ deliveries: Delivery[]; route: RoutePlan }>(
+          `/api/courier/route${qs}`
+        );
+        setDeliveries(r.deliveries);
+        setRoute(r.route);
+      } catch (e) {
+        if (!silent) alert(`Ошибка: ${(e as Error).message}`);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [sendLocation]
+  );
 
-  // Load the route once we have a courier.
+  // Load the route once we have a courier, then keep it fresh (so deliveries
+  // deleted/reassigned by the manager disappear on their own).
   useEffect(() => {
-    if (courier) loadRoute();
+    if (!courier) return;
+    loadRoute();
+    const t = setInterval(() => loadRoute(true), 25000);
+    return () => clearInterval(t);
   }, [courier, loadRoute]);
 
   // Stream the courier's position to the backend (throttled to ~30s) while the
@@ -371,7 +378,7 @@ export default function CourierPage() {
 
       <button
         className="btn-secondary mb-4 w-full"
-        onClick={loadRoute}
+        onClick={() => loadRoute()}
         disabled={loading}
       >
         {loading ? "Обновление…" : "Обновить"}
