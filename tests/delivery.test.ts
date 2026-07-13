@@ -28,7 +28,7 @@ test("haversineKm: ~111km per degree of longitude at equator", () => {
   assert.ok(Math.abs(km - 111.19) < 0.5, `got ${km}`);
 });
 
-test("buildRoute: pickups before dropoffs, nearest-neighbour, ETA, skipped", () => {
+test("buildRoute: optimal INTERLEAVED order, precedence, ETA, skipped", () => {
   const warehouses = [
     { id: "a", name: "WH A", lat: 51.11, lng: 71.41, pickupMinutes: 10 },
     { id: "b", name: "WH B", lat: 51.2, lng: 71.5, pickupMinutes: 15 },
@@ -44,15 +44,18 @@ test("buildRoute: pickups before dropoffs, nearest-neighbour, ETA, skipped", () 
     dropoffMinutes: 5,
   });
 
-  // Order: nearest pickups from start (a, then b), then nearest dropoffs from b (d2, then d1).
-  assert.deepEqual(r.stops.map((s) => s.refId), ["a", "b", "d2", "d1"]);
-  assert.deepEqual(
-    r.stops.map((s) => s.kind),
-    ["pickup", "pickup", "dropoff", "dropoff"]
-  );
+  const ids = r.stops.map((s) => s.refId);
+  // Optimal: collect a, drop d1 nearby, then head to b, drop d2 — interleaved,
+  // far cheaper than visiting both warehouses first.
+  assert.deepEqual(ids, ["a", "d1", "b", "d2"]);
+
+  // Precedence: each dropoff comes after all its required pickups.
+  assert.ok(ids.indexOf("d1") > ids.indexOf("a"), "d1 after a");
+  assert.ok(ids.indexOf("d2") > ids.indexOf("b"), "d2 after b");
+
   assert.deepEqual(r.skipped, ["d3"]); // dropped for missing coords
 
-  // ETA strictly increases along the route.
+  // ETA increases along the route.
   for (let i = 1; i < r.stops.length; i++) {
     assert.ok(r.stops[i].etaMinutes >= r.stops[i - 1].etaMinutes, "eta monotonic");
   }
