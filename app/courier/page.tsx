@@ -103,6 +103,29 @@ export default function CourierPage() {
   const [route, setRoute] = useState<RoutePlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [codes, setCodes] = useState<Record<string, string>>({});
+  const [geo, setGeo] = useState<{ status: "idle" | "ok" | "denied" | "error"; at: string }>({ status: "idle", at: "" });
+
+  const nowHm = () => new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+
+  // Post the current position immediately (on load, on each action, manually).
+  const sendLocation = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeo({ status: "error", at: "" });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        apiFetch("/api/courier/location", {
+          method: "POST",
+          body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        })
+          .then(() => setGeo({ status: "ok", at: nowHm() }))
+          .catch(() => setGeo({ status: "error", at: "" }));
+      },
+      (err) => setGeo({ status: err.code === 1 ? "denied" : "error", at: "" }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+  }, []);
 
   // Auth gate.
   useEffect(() => {
@@ -120,6 +143,7 @@ export default function CourierPage() {
 
   const loadRoute = useCallback(async () => {
     setLoading(true);
+    sendLocation(); // report position on every load / action
     try {
       const loc = await getCoords();
       const qs = loc ? `?lat=${loc.lat}&lng=${loc.lng}` : "";
@@ -133,7 +157,7 @@ export default function CourierPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sendLocation]);
 
   // Load the route once we have a courier.
   useEffect(() => {
@@ -159,10 +183,12 @@ export default function CourierPage() {
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
             }),
-          }).catch(() => {});
+          })
+            .then(() => setGeo({ status: "ok", at: nowHm() }))
+            .catch(() => {});
         },
-        () => {},
-        { enableHighAccuracy: false, maximumAge: 30000 }
+        (err) => setGeo((g) => (g.status === "ok" ? g : { status: err.code === 1 ? "denied" : "error", at: "" })),
+        { enableHighAccuracy: true, maximumAge: 30000 }
       );
     } catch {
       /* geolocation denied — ignore */
@@ -285,10 +311,34 @@ export default function CourierPage() {
   // Route view
   return (
     <main className="mx-auto max-w-md p-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <h1 className="text-base font-bold">Курьер: {courier.name}</h1>
         <button className="text-brand" onClick={logout}>
           Выйти
+        </button>
+      </div>
+
+      {/* Geolocation status — so the courier knows the manager can see them. */}
+      <div
+        className={`mb-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs ${
+          geo.status === "ok"
+            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+            : geo.status === "denied" || geo.status === "error"
+              ? "bg-brand/10 text-brand"
+              : "bg-paper-soft text-ink-mute dark:bg-ink-mute dark:text-paper-mute"
+        }`}
+      >
+        <span>
+          {geo.status === "ok"
+            ? `📍 Вы на карте · отправлено ${geo.at}`
+            : geo.status === "denied"
+              ? "⚠ Геолокация запрещена — разрешите доступ к местоположению для этого сайта, иначе вас не видно на карте."
+              : geo.status === "error"
+                ? "⚠ Не удалось определить позицию. Включите геолокацию и нажмите «обновить»."
+                : "Определяю геопозицию…"}
+        </span>
+        <button className="flex-none font-semibold underline" onClick={sendLocation}>
+          обновить
         </button>
       </div>
 
