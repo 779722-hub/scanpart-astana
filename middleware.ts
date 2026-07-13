@@ -36,6 +36,11 @@ export default function middleware(req: NextRequest) {
   // Other API routes pass through (next-intl skips /api by matcher anyway).
   if (pathname.startsWith("/api")) return NextResponse.next();
 
+  // Courier web app lives outside the [locale] tree — skip i18n routing.
+  if (pathname === "/courier" || pathname.startsWith("/courier/")) {
+    return NextResponse.next();
+  }
+
   // Admin pages — redirect to login when no session cookie.
   if (ADMIN_PAGE_RE.test(pathname) && !ADMIN_LOGIN_RE.test(pathname)) {
     if (!hasSessionCookie(req)) {
