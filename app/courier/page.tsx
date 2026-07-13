@@ -418,6 +418,12 @@ export default function CourierPage() {
         />
       )}
 
+      {deliveries.length > 0 && (!route || route.stops.length === 0) && (
+        <div className="card mb-4 border border-amber-300 bg-amber-50 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100">
+          У доставок не заданы координаты — маршрут построить нельзя. Попросите руководителя указать адрес/координаты доставки.
+        </div>
+      )}
+
       {loading && deliveries.length === 0 && (
         <p className="mt-10 text-center text-ink-mute dark:text-paper-mute">
           Загрузка…

@@ -13,6 +13,7 @@ import {
 import { buildRoute } from "@/lib/delivery/route";
 import { roadPath, type LatLng } from "@/lib/delivery/roadroute";
 import { notifyDelivery } from "@/lib/delivery/notify-telegram";
+import { geocodeAddress } from "@/lib/geocode";
 import type { Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 export const runtime = "nodejs";
@@ -125,6 +126,18 @@ export async function PUT(req: NextRequest) {
   if (p.courierId && (status === "new")) status = "assigned";
   if (!p.courierId && status === "assigned") status = "new";
 
+  // Resolve coordinates: use what was sent, else geocode the address so the
+  // delivery is routable without the manager pasting coordinates by hand.
+  let lat = toNum(p.lat);
+  let lng = toNum(p.lng);
+  if ((lat === null || lng === null) && p.address.trim()) {
+    const g = await geocodeAddress(p.address).catch(() => null);
+    if (g) {
+      lat = g.lat;
+      lng = g.lng;
+    }
+  }
+
   const delivery: Delivery = {
     id: p.id || `d-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`,
     createdAt: existing?.createdAt || new Date().toISOString(),
@@ -132,8 +145,8 @@ export async function PUT(req: NextRequest) {
     phone: p.phone,
     whatsapp: p.whatsapp,
     address: p.address,
-    lat: toNum(p.lat),
-    lng: toNum(p.lng),
+    lat,
+    lng,
     items: p.items,
     warehouseIds: p.warehouseIds,
     courierId: p.courierId,
