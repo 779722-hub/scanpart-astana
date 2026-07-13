@@ -13,7 +13,7 @@ import {
 import { buildRoute } from "@/lib/delivery/route";
 import { roadPath, type LatLng } from "@/lib/delivery/roadroute";
 import { notifyDelivery } from "@/lib/delivery/notify-telegram";
-import { geocodeAddress } from "@/lib/geocode";
+import { geocodeAddress, isInAstana } from "@/lib/geocode";
 import type { Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 export const runtime = "nodejs";
@@ -128,13 +128,19 @@ export async function PUT(req: NextRequest) {
 
   // Resolve coordinates: use what was sent, else geocode the address so the
   // delivery is routable without the manager pasting coordinates by hand.
+  // We only work in Astana — any coordinate outside the city (stale or
+  // mis-geocoded) is discarded and re-derived from the address.
   let lat = toNum(p.lat);
   let lng = toNum(p.lng);
-  if ((lat === null || lng === null) && p.address.trim()) {
-    const g = await geocodeAddress(p.address).catch(() => null);
-    if (g) {
-      lat = g.lat;
-      lng = g.lng;
+  if (!isInAstana(lat, lng)) {
+    lat = null;
+    lng = null;
+    if (p.address.trim()) {
+      const g = await geocodeAddress(p.address).catch(() => null);
+      if (g && isInAstana(g.lat, g.lng)) {
+        lat = g.lat;
+        lng = g.lng;
+      }
     }
   }
 
