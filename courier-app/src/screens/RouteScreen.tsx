@@ -19,7 +19,7 @@ import { api, type Delivery, type RoutePlan } from "../api";
 
 const STATUS_RU: Record<Delivery["status"], string> = {
   assigned: "Назначена",
-  picking: "Забор со склада",
+  picking: "Забираю со склада",
   en_route: "В пути к клиенту",
   delivered: "Вручена",
   canceled: "Отменена",
@@ -158,7 +158,7 @@ export function RouteScreen({ navigation }: NativeStackScreenProps<Stack, "Route
 
             {d.status === "assigned" && (
               <TouchableOpacity style={s.primary} onPress={() => act(d, "start")}>
-                <Text style={s.primaryText}>Начать забор</Text>
+                <Text style={s.primaryText}>Забрать со склада</Text>
               </TouchableOpacity>
             )}
             {d.status === "picking" && (

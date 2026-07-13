@@ -54,6 +54,20 @@ export function TabCouriers() {
     }
   }
 
+  // Drop a test position near central Astana so the courier shows on the map
+  // right away (spread by index so several don't overlap).
+  async function testLocation(id: string, index: number) {
+    const lat = 51.13 + ((index % 3) - 1) * 0.012;
+    const lng = 71.43 + (Math.floor(index / 3) - 1) * 0.016;
+    const res = await fetch("/api/admin/couriers/location", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courierId: id, lat, lng }),
+    });
+    const j = await res.json().catch(() => ({}));
+    alert(j.ok ? "Тестовая точка поставлена — курьер появится на карте во вкладке «Доставки»." : "Не удалось поставить точку.");
+  }
+
   async function remove(id: string) {
     if (!confirm("Удалить курьера?")) return;
     await fetch("/api/admin/couriers", {
@@ -78,7 +92,7 @@ export function TabCouriers() {
         <Bike className="h-5 w-5 text-brand" /> Курьеры
       </div>
 
-      {rows.map((c) => (
+      {rows.map((c, i) => (
         <div key={c.id} className="card flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 font-bold">
@@ -101,6 +115,13 @@ export function TabCouriers() {
                 WhatsApp
               </a>
             )}
+            <button
+              className="btn-secondary !px-3 !py-2 text-sm"
+              onClick={() => testLocation(c.id, i)}
+              title="Поставить тестовую точку на карте"
+            >
+              На карту (тест)
+            </button>
             <button
               className="btn-secondary !px-3 !py-2 text-sm"
               onClick={() => setDraft({ id: c.id, name: c.name, phone: c.phone, login: c.login, password: "", active: c.active })}
