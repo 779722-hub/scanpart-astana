@@ -233,6 +233,25 @@ export async function setOrderStatus(rowNumber: number, status: string): Promise
   });
 }
 
+/** Update the fulfilment type (col K) and/or delivery address (col L). */
+export async function updateOrderFulfilment(
+  rowNumber: number,
+  patch: { orderType?: string; address?: string }
+): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const updates: { range: string; values: string[][] }[] = [];
+  if (patch.orderType !== undefined)
+    updates.push({ range: `${ORDERS_SHEET}!K${rowNumber}`, values: [[patch.orderType]] });
+  if (patch.address !== undefined)
+    updates.push({ range: `${ORDERS_SHEET}!L${rowNumber}`, values: [[patch.address]] });
+  if (!updates.length) return;
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: id,
+    requestBody: { valueInputOption: "USER_ENTERED", data: updates },
+  });
+}
+
 export async function deleteOrder(rowNumber: number): Promise<void> {
   await deleteSheetRow(ORDERS_SHEET, rowNumber);
 }

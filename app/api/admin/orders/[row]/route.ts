@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/guards";
-import { setOrderStatus, deleteOrder } from "@/lib/sheets/client";
+import { setOrderStatus, deleteOrder, updateOrderFulfilment } from "@/lib/sheets/client";
 
 export const runtime = "nodejs";
 
 const STATUSES = ["Новый", "В работе", "Выполнен", "Отменён"] as const;
-const schema = z.object({
-  status: z.enum(STATUSES),
-});
+const schema = z
+  .object({
+    status: z.enum(STATUSES).optional(),
+    orderType: z.enum(["Экспресс", "Самовывоз"]).optional(),
+    address: z.string().max(300).optional(),
+  })
+  .refine(
+    (d) => d.status !== undefined || d.orderType !== undefined || d.address !== undefined,
+    { message: "empty" }
+  );
 
 export async function PATCH(
   req: NextRequest,
@@ -24,7 +31,15 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "invalid" }, { status: 400 });
   }
-  await setOrderStatus(rowNumber, parsed.data.status);
+  if (parsed.data.status !== undefined) {
+    await setOrderStatus(rowNumber, parsed.data.status);
+  }
+  if (parsed.data.orderType !== undefined || parsed.data.address !== undefined) {
+    await updateOrderFulfilment(rowNumber, {
+      orderType: parsed.data.orderType,
+      address: parsed.data.address,
+    });
+  }
   return NextResponse.json({ ok: true });
 }
 
