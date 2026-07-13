@@ -26,6 +26,8 @@ interface Delivery {
   warehouseIds: string[];
   status: DeliveryStatus;
   waLink?: string;
+  seq?: number;
+  locked?: boolean;
 }
 interface RouteStop {
   kind: "pickup" | "dropoff";
@@ -252,9 +254,25 @@ export default function CourierPage() {
       await loadRoute();
     } catch (e) {
       const msg = (e as Error).message;
-      alert(msg === "bad_code" ? "Неверный код от клиента" : `Ошибка: ${msg}`);
+      alert(
+        msg === "bad_code"
+          ? "Неверный код от клиента"
+          : msg === "finish_current_first"
+            ? "Сначала завершите текущую доставку — заказы выполняются по очереди."
+            : `Ошибка: ${msg}`
+      );
     }
   }
+
+  // Open a driving route from the courier's position to the delivery in 2GIS.
+  const navLink = (d: Delivery) => {
+    if (d.lat && d.lng) {
+      return myPos
+        ? `https://2gis.kz/directions/points/${myPos.lng},${myPos.lat};${d.lng},${d.lat}`
+        : `https://2gis.kz/geo/${d.lng},${d.lat}`;
+    }
+    return `https://2gis.kz/search/${encodeURIComponent(d.address || "Астана")}`;
+  };
 
   if (checking) {
     return (
@@ -437,13 +455,27 @@ export default function CourierPage() {
 
       <div className="space-y-4">
         {deliveries.map((d) => (
-          <div key={d.id} className="card">
-            <div className="text-xs font-bold text-brand">
-              {STATUS_RU[d.status]}
+          <div key={d.id} className={`card ${d.locked ? "opacity-60" : ""}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-bold text-brand">
+                {STATUS_RU[d.status]}
+              </div>
+              {d.seq ? (
+                <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs font-semibold text-ink-mute dark:bg-ink-mute dark:text-paper-mute">
+                  #{d.seq} в очереди
+                </span>
+              ) : null}
             </div>
             <div className="text-lg font-extrabold">{d.customerName}</div>
             <div className="text-base">{d.items}</div>
-            <div className="text-ink-mute dark:text-paper-mute">{d.address}</div>
+            <a
+              href={navLink(d)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-1 font-semibold text-brand underline"
+            >
+              📍 {d.address || "Открыть маршрут"}
+            </a>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {d.phone && (
@@ -455,6 +487,12 @@ export default function CourierPage() {
                 </a>
               )}
 
+              {d.locked ? (
+                <span className="text-sm text-ink-mute dark:text-paper-mute">
+                  🔒 Ожидает — сначала завершите текущую доставку
+                </span>
+              ) : (
+                <>
               {d.status === "assigned" && (
                 <button
                   className="btn-primary grow !px-4 !py-2 text-sm"
@@ -503,6 +541,8 @@ export default function CourierPage() {
                     Подтвердить выдачу
                   </button>
                 </div>
+              )}
+                </>
               )}
             </div>
           </div>

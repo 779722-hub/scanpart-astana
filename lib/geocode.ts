@@ -3,15 +3,24 @@
  * Server-side only. Returns null on any failure (caller decides the fallback).
  * Biased to Kazakhstan.
  */
+// We only operate in Astana — pin geocoding to the city so ambiguous addresses
+// don't resolve to Almaty or elsewhere.
+const ASTANA_VIEWBOX = "71.20,51.35,71.70,51.00"; // lon1,lat1,lon2,lat2
+const ASTANA_RE = /астан|astana|нур-?султан|nur-?sultan|целиноград/i;
+
 export async function geocodeAddress(
   q: string
 ): Promise<{ lat: number; lng: number; display: string } | null> {
-  const query = (q ?? "").trim();
+  let query = (q ?? "").trim();
   if (query.length < 3) return null;
+  // Force the city into the query if the manager didn't include it.
+  if (!ASTANA_RE.test(query)) query = `Астана, ${query}`;
 
   const url =
     `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1` +
-    `&countrycodes=kz&accept-language=ru&q=${encodeURIComponent(query)}`;
+    `&countrycodes=kz&accept-language=ru` +
+    `&viewbox=${ASTANA_VIEWBOX}&bounded=1` +
+    `&q=${encodeURIComponent(query)}`;
 
   try {
     const ctrl = new AbortController();
