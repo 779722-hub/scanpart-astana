@@ -86,6 +86,8 @@ export interface PartOffer {
   fromCatalog?: boolean;
   /** Which supplier this offer came from. Defaults to phaeton when unset. */
   source?: "phaeton" | "shatem";
+  /** Opaque supplier code (Р1/М2) exposed to the client; stored on the order. */
+  sourceCode?: string;
 }
 
 export type RelaxLevel =

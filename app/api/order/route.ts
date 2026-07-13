@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         phone: d.phone,
         whatsapp: d.whatsapp ?? "",
         status: "Новый",
+        source: item.sourceCode ?? "",
       });
       sheetRows.push(row);
     } catch (err) {

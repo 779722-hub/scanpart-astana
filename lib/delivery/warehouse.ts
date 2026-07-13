@@ -11,6 +11,8 @@ export interface Warehouse {
   lng: number | null;
   pickupMinutes: number; // service time at the warehouse, minutes
   active: boolean;
+  /** Supplier code this warehouse fulfils (Р1/М2/Т3); "" if not a supplier point. */
+  sourceCode: string;
 }
 
 export const PICKUP_MINUTES_DEFAULT = 15;
@@ -52,6 +54,7 @@ export interface WarehouseInput {
   lng?: string | number | null;
   pickupMinutes?: string | number | null;
   active?: boolean;
+  sourceCode?: string;
 }
 
 export type ValidateResult =
@@ -88,6 +91,7 @@ export function validateWarehouse(
       lng,
       pickupMinutes,
       active: input.active ?? true,
+      sourceCode: (input.sourceCode ?? "").trim(),
     },
   };
 }

@@ -396,6 +396,7 @@ function OfferCard({
       price: offer.priceFinal,
       quantity: 1,
       availableQty: offer.quantity,
+      sourceCode: offer.sourceCode,
     });
   };
 

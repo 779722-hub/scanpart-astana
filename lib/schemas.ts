@@ -21,6 +21,7 @@ export const cartItemSchema = z.object({
   partName: z.string().min(1).max(300),
   price: z.coerce.number().int().positive(),
   quantity: z.coerce.number().int().positive().max(999),
+  sourceCode: z.string().max(8).optional(),
 });
 export type CartItemInput = z.infer<typeof cartItemSchema>;
 

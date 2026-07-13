@@ -152,7 +152,7 @@ function GuestView({
         повторить покупку в один клик.
       </p>
       <AppearanceCard />
-      <Link href={`/${locale}`} className="text-sm underline text-ink-mute">
+      <Link href={`/${locale}`} className="text-sm underline text-ink-mute dark:text-paper-mute">
         ← На главную
       </Link>
     </div>
@@ -482,9 +482,9 @@ function Dashboard({
                   {g.items.map((it, idx) => (
                     <li key={idx} className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 flex-1 truncate">
-                        {it.partName} <span className="text-ink-mute">· {it.brand} {it.partArticle}</span>
+                        {it.partName} <span className="text-ink-mute dark:text-paper-mute">· {it.brand} {it.partArticle}</span>
                       </span>
-                      <span className="flex-none whitespace-nowrap text-ink-mute">
+                      <span className="flex-none whitespace-nowrap text-ink-mute dark:text-paper-mute">
                         {fmt(it.price)} ₸ × {it.quantity}
                       </span>
                     </li>
@@ -692,7 +692,7 @@ function VinRow({
               setDraft(vin);
               setEditing(false);
             }}
-            className="rounded-xl p-2 text-ink-mute hover:bg-paper dark:hover:bg-ink"
+            className="rounded-xl p-2 text-ink-mute dark:text-paper-mute hover:bg-paper dark:hover:bg-ink"
             aria-label="Отмена"
           >
             <X className="h-4 w-4" />

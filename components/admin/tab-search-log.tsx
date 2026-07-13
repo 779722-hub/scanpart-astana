@@ -96,7 +96,7 @@ export function TabSearchLog() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="card text-center text-sm text-ink-mute">
+        <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
           {rows.length === 0
             ? "Журнал пуст. Здесь будут появляться запросы клиентов с момента деплоя."
             : "Все поиски находили результаты. Отлично!"}

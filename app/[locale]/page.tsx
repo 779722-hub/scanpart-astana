@@ -242,7 +242,7 @@ export default async function HomePage({
             </p>
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute" />
+                <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
                 Время заказа: {settings?.expressHours ?? "Пн–Сб 09:00–16:30"}
               </li>
               <li className="flex items-start gap-2">
@@ -259,16 +259,16 @@ export default async function HomePage({
             </div>
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 flex-none text-ink-mute" />
+                <MapPin className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
                 {settings?.pickupAddress ?? "г. Астана, пр. Республики, 68"}
               </li>
               <li className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute" />
+                <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
                 Заберёте {settings?.pickupHours ?? "завтра 14:00–18:00"}
               </li>
               {settings?.managerPhoneDisplay && (
                 <li className="flex items-start gap-2">
-                  <Phone className="mt-0.5 h-4 w-4 flex-none text-ink-mute" />
+                  <Phone className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
                   <a
                     href={`tel:${settings.managerPhoneDisplay.replace(/\D/g, "")}`}
                     className="font-semibold underline"

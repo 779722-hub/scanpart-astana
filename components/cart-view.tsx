@@ -57,7 +57,7 @@ export function CartView({ locale }: { locale: string }) {
   if (cart.items.length === 0) {
     return (
       <div className="card space-y-4 text-center">
-        <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute" />
+        <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute dark:text-paper-mute" />
         <h1 className="text-2xl font-bold">{t("empty")}</h1>
         <p className="text-ink-mute dark:text-paper-mute">{t("emptyHint")}</p>
         <Link href={`/${locale}`} className="btn-primary inline-flex">

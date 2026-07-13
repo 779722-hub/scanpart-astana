@@ -16,6 +16,8 @@ export interface CartItem {
   price: number;
   quantity: number;
   availableQty: number;
+  /** Opaque supplier code (Р1/М2) — passed through to the order for routing. */
+  sourceCode?: string;
 }
 
 function safeParse(raw: string | null): CartItem[] {

@@ -22,6 +22,7 @@ interface Order {
   phone: string;
   whatsapp: string;
   status: string;
+  source: string;
 }
 
 const STATUSES = ["Новый", "В работе", "Выполнен", "Отменён"];
@@ -34,9 +35,16 @@ export function TabOrders() {
   const [editType, setEditType] = useState<string>("Экспресс");
   const [editAddr, setEditAddr] = useState<string>("");
   const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
+  const [warehouses, setWarehouses] = useState<{ id: string; sourceCode: string }[]>([]);
 
   useEffect(() => {
     refresh();
+    fetch("/api/admin/warehouses")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setWarehouses(j.warehouses);
+      })
+      .catch(() => {});
     fetch("/api/admin/settings")
       .then((r) => r.json())
       .then((j) => {
@@ -121,6 +129,9 @@ export function TabOrders() {
     setSavingRow(o.rowNumber);
     try {
       const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
+      // Auto-pick the warehouse tied to the order's source code (Р1/М2/…).
+      const bySource = o.source ? warehouses.find((w) => w.sourceCode === o.source) : undefined;
+      const warehouseIds = bySource ? [bySource.id] : warehouses.length === 1 ? [warehouses[0].id] : [];
       const res = await fetch("/api/admin/deliveries", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -132,6 +143,7 @@ export function TabOrders() {
           lat: isPickup ? office.lat : undefined,
           lng: isPickup ? office.lng : undefined,
           items,
+          warehouseIds,
         }),
       });
       const j = await res.json();
@@ -227,6 +239,12 @@ export function TabOrders() {
                   <strong>{new Intl.NumberFormat("ru-RU").format(o.price)} ₸</strong>{" "}
                   × {o.quantity}
                 </div>
+                {o.source && (
+                  <div>
+                    <span className="text-ink-mute dark:text-paper-mute">Склад:</span>{" "}
+                    <span className="rounded bg-brand/10 px-1.5 py-0.5 text-xs font-semibold text-brand">{o.source}</span>
+                  </div>
+                )}
                 {o.vin && (
                   <div className="sm:col-span-3 text-xs text-ink-mute dark:text-paper-mute">
                     Авто: {o.vehicle} · VIN{" "}
