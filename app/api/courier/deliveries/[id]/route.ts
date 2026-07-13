@@ -53,8 +53,10 @@ export async function PATCH(
   let waLink: string | undefined;
 
   if (parsed.data.action === "enroute") {
-    // Issue a fresh 4-digit code and send it to the customer.
-    const code = String(randomInt(0, 10000)).padStart(4, "0");
+    // Issue a fresh 4-digit code and send it to the customer. Range 1000–9999
+    // (never a leading zero): Google Sheets stores the code as a number and
+    // would strip a leading zero ("0123" → 123), breaking the later match.
+    const code = String(randomInt(1000, 10000));
     d.handoverCode = code;
     const sent = await sendHandoverCode(d, code);
     codeSent = sent.sent;
