@@ -179,18 +179,22 @@ export function TabDeliveries() {
     return (id: string) => m.get(id) || id;
   }, [warehouses]);
 
+  // We only operate in Astana — never plot a point outside the city, even if a
+  // stale coordinate lingers in the sheet.
+  const inAstana = (lat: number, lng: number) => lat >= 50.95 && lat <= 51.4 && lng >= 71.1 && lng <= 71.8;
+
   // Map data derived from live + deliveries + warehouses.
   const mapCouriers: MapCourier[] = live
-    .filter((c) => c.location)
+    .filter((c) => c.location && inAstana(c.location.lat, c.location.lng))
     .map((c) => ({ id: c.id, name: c.name, lat: c.location!.lat, lng: c.location!.lng, stale: isStale(c.location!.updatedAt, now) }));
   const mapWarehouses: MapPoint[] = warehouses
-    .filter((w) => w.lat != null && w.lng != null)
+    .filter((w) => w.lat != null && w.lng != null && inAstana(w.lat, w.lng))
     .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number, color: w.color }));
   const mapDrops: MapPoint[] = (rows ?? [])
-    .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null)
+    .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null && inAstana(d.lat as number, d.lng as number))
     .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number }));
   const officePoint: MapPoint | null =
-    office && office.lat != null && office.lng != null
+    office && office.lat != null && office.lng != null && inAstana(office.lat, office.lng)
       ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng, color: office.color }
       : null;
 
@@ -354,7 +358,7 @@ export function TabDeliveries() {
             courierShape={markers.courierShape}
             clientColor={markers.clientColor}
             clientShape={markers.clientShape}
-            className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
+            className="h-[26rem] w-full overflow-hidden rounded-2xl sm:h-[31rem]"
           />
         )}
         <MapLegend warehouses={mapWarehouses} office={officePoint} />
