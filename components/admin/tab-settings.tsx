@@ -7,7 +7,7 @@ import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 const ANALOGS_MIN = 0;
 const ANALOGS_MAX = 10;
 
-const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "text" }[] = [
+const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "text" | "color" }[] = [
   { key: "markup_percent", label: "Наценка, %", hint: `${MARKUP_MIN}–${MARKUP_MAX}`, kind: "number" },
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
@@ -16,6 +16,7 @@ const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "te
   { key: "pickup_hours", label: "Часы самовывоза" },
   { key: "office_lat", label: "Офис: широта (для метки на карте)", hint: "скопируйте из 2ГИС, напр. 51.1605" },
   { key: "office_lng", label: "Офис: долгота", hint: "напр. 71.4704" },
+  { key: "office_color", label: "Цвет офиса на карте", kind: "color" },
   { key: "manager_phone_display", label: "Телефон менеджера (как показывать)" },
   { key: "manager_whatsapp_e164", label: "WhatsApp менеджера (E.164 без +, напр. 77000000000)" },
   { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)" },
@@ -180,12 +181,21 @@ export function TabSettings() {
           {FIELDS.map((f) => (
             <div key={f.key} className={f.kind === "text" || !f.kind ? "sm:col-span-2" : ""}>
               <label className="label">{f.label}</label>
-              <input
-                className="input"
-                type={f.kind === "number" ? "number" : "text"}
-                value={draft[f.key] ?? ""}
-                onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-              />
+              {f.kind === "color" ? (
+                <input
+                  type="color"
+                  className="h-10 w-16 cursor-pointer rounded-lg border border-paper-mute bg-transparent dark:border-ink-mute"
+                  value={draft[f.key] || "#16A34A"}
+                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                />
+              ) : (
+                <input
+                  className="input"
+                  type={f.kind === "number" ? "number" : "text"}
+                  value={draft[f.key] ?? ""}
+                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                />
+              )}
               {f.hint && (
                 <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">{f.hint}</p>
               )}

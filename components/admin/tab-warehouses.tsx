@@ -13,6 +13,7 @@ interface Warehouse {
   pickupMinutes: number;
   active: boolean;
   sourceCode: string;
+  color: string;
 }
 
 type Draft = {
@@ -24,11 +25,13 @@ type Draft = {
   pickupMinutes: string;
   active: boolean;
   sourceCode: string;
+  color: string;
 };
 
-const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true, sourceCode: "" };
-const SOURCE_CODES = ["", "Р1", "М2", "Т3"];
-const SOURCE_LABEL: Record<string, string> = { "": "—", "Р1": "Р1 (поставщик 1)", "М2": "М2 (поставщик 2)", "Т3": "Т3 (поставщик 3)" };
+const DEFAULT_COLOR = "#F59E0B";
+const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true, sourceCode: "", color: DEFAULT_COLOR };
+// Quick-pick palette (manager can also open the native picker for any colour).
+const COLOR_PRESETS = ["#F59E0B", "#EA580C", "#2563EB", "#16A34A", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
 
 export function TabWarehouses() {
   const [rows, setRows] = useState<Warehouse[] | null>(null);
@@ -79,6 +82,7 @@ export function TabWarehouses() {
           pickupMinutes: draft.pickupMinutes,
           active: draft.active,
           sourceCode: draft.sourceCode,
+          color: draft.color,
         }),
       });
       const j = await res.json();
@@ -134,6 +138,7 @@ export function TabWarehouses() {
         <div key={w.id} className="card flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 font-bold">
+              <span className="inline-block h-3 w-3 flex-none rounded-full ring-1 ring-black/20" style={{ background: w.color || DEFAULT_COLOR }} />
               {w.name}
               {w.sourceCode && (
                 <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
@@ -168,6 +173,7 @@ export function TabWarehouses() {
                   pickupMinutes: String(w.pickupMinutes),
                   active: w.active,
                   sourceCode: w.sourceCode ?? "",
+                  color: w.color ?? DEFAULT_COLOR,
                 })
               }
             >
@@ -203,18 +209,36 @@ export function TabWarehouses() {
             </div>
             <div>
               <label className="label">Источник (код склада в заказе)</label>
-              <select
+              <input
                 className="input"
+                placeholder="Р1, М2, Т4…"
                 value={draft.sourceCode}
                 onChange={(e) => setDraft({ ...draft, sourceCode: e.target.value })}
-              >
-                {SOURCE_CODES.map((c) => (
-                  <option key={c} value={c}>{SOURCE_LABEL[c]}</option>
-                ))}
-              </select>
+              />
               <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
-                Свяжите склад с кодом из заказа (Р1/М2/Т3) — тогда доставка из заказа сама подставит этот склад.
+                Любой код из заказа (Р1, М2, Т4, Т5…) — тогда доставка из заказа сама подставит этот склад.
               </p>
+            </div>
+          </div>
+          <div>
+            <label className="label">Цвет точки на карте</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="color"
+                className="h-9 w-12 cursor-pointer rounded-lg border border-paper-mute bg-transparent dark:border-ink"
+                value={draft.color}
+                onChange={(e) => setDraft({ ...draft, color: e.target.value })}
+              />
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, color: c })}
+                  className={`h-7 w-7 rounded-full ring-1 ring-black/20 ${draft.color.toLowerCase() === c.toLowerCase() ? "ring-2 ring-offset-2 ring-brand" : ""}`}
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
             </div>
           </div>
           <div>

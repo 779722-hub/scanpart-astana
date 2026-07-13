@@ -22,6 +22,7 @@ export interface MapPoint {
   name: string;
   lat: number;
   lng: number;
+  color?: string; // custom marker colour (hex); falls back to the kind default
 }
 export interface DeliveryMapProps {
   couriers: MapCourier[];
@@ -56,10 +57,10 @@ function buildPins(props: DeliveryMapProps): Pin[] {
     pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : RED, hint: "Курьер", size: 18, permanent: false });
   }
   for (const w of props.warehouses) {
-    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: AMBER, hint: "Склад", size: 22, permanent: true });
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true });
   }
   if (props.office) {
-    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: GREEN, hint: "Офис", size: 24, permanent: true });
+    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true });
   }
   for (const d of props.drops) {
     pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: BLUE, hint: "Клиент", size: 15, permanent: false });

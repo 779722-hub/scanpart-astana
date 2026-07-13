@@ -11,8 +11,18 @@ export interface Warehouse {
   lng: number | null;
   pickupMinutes: number; // service time at the warehouse, minutes
   active: boolean;
-  /** Supplier code this warehouse fulfils (Р1/М2/Т3); "" if not a supplier point. */
+  /** Supplier code this warehouse fulfils (Р1/М2/Т4…); "" if not a supplier point. */
   sourceCode: string;
+  /** Marker colour on the map (hex #RRGGBB). */
+  color: string;
+}
+
+export const WAREHOUSE_COLOR_DEFAULT = "#F59E0B"; // amber
+
+/** Validate a hex colour; fall back to the amber default. */
+export function normalizeColor(v: string | null | undefined, fallback = WAREHOUSE_COLOR_DEFAULT): string {
+  const s = (v ?? "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(s) ? s : fallback;
 }
 
 export const PICKUP_MINUTES_DEFAULT = 15;
@@ -55,6 +65,7 @@ export interface WarehouseInput {
   pickupMinutes?: string | number | null;
   active?: boolean;
   sourceCode?: string;
+  color?: string;
 }
 
 export type ValidateResult =
@@ -92,6 +103,7 @@ export function validateWarehouse(
       pickupMinutes,
       active: input.active ?? true,
       sourceCode: (input.sourceCode ?? "").trim(),
+      color: normalizeColor(input.color),
     },
   };
 }
