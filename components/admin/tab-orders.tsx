@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search, Trash2, MessageCircle } from "lucide-react";
+import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
+
+const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
 
 interface Order {
   rowNumber: number;
@@ -28,6 +30,9 @@ export function TabOrders() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [q, setQ] = useState("");
   const [savingRow, setSavingRow] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editType, setEditType] = useState<string>("Экспресс");
+  const [editAddr, setEditAddr] = useState<string>("");
 
   useEffect(() => {
     refresh();
@@ -67,6 +72,32 @@ export function TabOrders() {
       setOrders(
         (cur) => cur?.map((o) => (o.rowNumber === row ? { ...o, status } : o)) ?? null
       );
+    } finally {
+      setSavingRow(null);
+    }
+  }
+
+  function startEdit(o: Order) {
+    setEditing(o.rowNumber);
+    setEditType(ORDER_TYPES.includes(o.orderType as (typeof ORDER_TYPES)[number]) ? o.orderType : "Экспресс");
+    setEditAddr(o.address);
+  }
+
+  async function saveEdit(row: number) {
+    setSavingRow(row);
+    try {
+      const address = editType === "Самовывоз" ? "" : editAddr.trim();
+      await fetch(`/api/admin/orders/${row}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ orderType: editType, address }),
+      });
+      setOrders(
+        (cur) =>
+          cur?.map((o) => (o.rowNumber === row ? { ...o, orderType: editType, address } : o)) ??
+          null
+      );
+      setEditing(null);
     } finally {
       setSavingRow(null);
     }
@@ -161,7 +192,48 @@ export function TabOrders() {
                 )}
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2 border-t border-paper-mute/50 pt-3 dark:border-ink-mute/50">
+              {editing === o.rowNumber && (
+                <div className="mt-3 space-y-3 rounded-2xl border border-paper-mute p-3 dark:border-ink-mute">
+                  <div className="text-sm font-semibold">Тип получения и адрес</div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="label">Тип получения</label>
+                      <select className="input" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                        {ORDER_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t === "Экспресс" ? "Доставка (Экспресс)" : "Самовывоз"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="label">Адрес доставки</label>
+                      <input
+                        className="input"
+                        value={editAddr}
+                        onChange={(e) => setEditAddr(e.target.value)}
+                        placeholder={editType === "Самовывоз" ? "Не нужен при самовывозе" : "г. Астана, ул. …"}
+                        disabled={editType === "Самовывоз"}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button className="btn-secondary !px-3 !py-2 text-sm" onClick={() => setEditing(null)}>
+                      <X className="h-4 w-4" /> Отмена
+                    </button>
+                    <button
+                      className="btn-primary !px-3 !py-2 text-sm"
+                      onClick={() => saveEdit(o.rowNumber)}
+                      disabled={savingRow === o.rowNumber}
+                    >
+                      {savingRow === o.rowNumber ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-paper-mute/50 pt-3 dark:border-ink-mute/50">
                 {o.whatsapp ? (
                   <a
                     href={`https://wa.me/${normalizePhoneE164(o.whatsapp)}`}
@@ -177,14 +249,23 @@ export function TabOrders() {
                     WhatsApp не указан
                   </span>
                 )}
-                <button
-                  onClick={() => removeOrder(o.rowNumber)}
-                  disabled={savingRow === o.rowNumber}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Удалить
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => (editing === o.rowNumber ? setEditing(null) : startEdit(o))}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-semibold transition hover:border-ink-mute dark:border-ink-mute"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Тип/адрес
+                  </button>
+                  <button
+                    onClick={() => removeOrder(o.rowNumber)}
+                    disabled={savingRow === o.rowNumber}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Удалить
+                  </button>
+                </div>
               </div>
             </article>
           ))}
