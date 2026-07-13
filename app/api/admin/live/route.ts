@@ -41,17 +41,23 @@ export async function GET() {
       const loc = locById.get(c.id) ?? null;
 
       // Cheap straight-line plan (no external call — this endpoint polls often).
-      const route = buildRoute(
-        active.map((d) => ({
-          id: d.id,
-          label: d.customerName || d.address,
-          lat: d.lat,
-          lng: d.lng,
-          warehouseIds: d.warehouseIds,
-        })),
-        warehouses.map((w) => ({ id: w.id, name: w.name, lat: w.lat, lng: w.lng, pickupMinutes: w.pickupMinutes })),
-        { start: loc ? { lat: loc.lat, lng: loc.lng } : null }
-      );
+      // Defensive: a bad row must never blank out the whole live view.
+      let route = { stops: [] as { kind: "pickup" | "dropoff"; label: string }[], totalKm: 0, totalMinutes: 0 };
+      try {
+        route = buildRoute(
+          active.map((d) => ({
+            id: d.id,
+            label: d.customerName || d.address,
+            lat: d.lat,
+            lng: d.lng,
+            warehouseIds: d.warehouseIds,
+          })),
+          warehouses.map((w) => ({ id: w.id, name: w.name, lat: w.lat, lng: w.lng, pickupMinutes: w.pickupMinutes })),
+          { start: loc ? { lat: loc.lat, lng: loc.lng } : null }
+        );
+      } catch {
+        /* keep the empty default */
+      }
 
       // "Where is he heading now": once en route → the customer; else the next stop.
       const hasEnroute = active.some((d) => d.status === "en_route");
