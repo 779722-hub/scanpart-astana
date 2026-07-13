@@ -1,18 +1,24 @@
-import { getSetting } from "@/lib/sheets/settings";
+import { readSetting } from "@/lib/sheets/client";
 
 /**
  * Telegram notifications. The bot token comes from the admin Settings
  * (`telegram_bot_token`) or, as a fallback, the TELEGRAM_BOT_TOKEN env var.
- * The destination chat is `telegram_chat_id` in Settings. Raw Bot API (fetch)
- * so a token changed in the admin takes effect immediately.
+ * The destination chat is `telegram_chat_id` in Settings. Settings are read
+ * FRESH (not the 60s cache) so a token just saved in the panel works
+ * immediately. Raw Bot API via fetch.
  */
-export async function getTelegramToken(): Promise<string> {
-  const fromSettings = await getSetting("telegram_bot_token").catch(() => "");
-  return ((fromSettings || process.env.TELEGRAM_BOT_TOKEN) ?? "").trim();
+async function creds(): Promise<{ token: string; chatId: string }> {
+  const s = await readSetting().catch(() => ({}) as Record<string, string>);
+  const token = ((s.telegram_bot_token || process.env.TELEGRAM_BOT_TOKEN) ?? "").trim();
+  const chatId = (s.telegram_chat_id ?? "").trim();
+  return { token, chatId };
 }
 
+export async function getTelegramToken(): Promise<string> {
+  return (await creds()).token;
+}
 export async function getTelegramChatId(): Promise<string> {
-  return ((await getSetting("telegram_chat_id").catch(() => "")) ?? "").trim();
+  return (await creds()).chatId;
 }
 
 export interface TelegramSendResult {
@@ -24,8 +30,8 @@ export async function sendTelegramHtml(
   html: string,
   chatId?: string
 ): Promise<TelegramSendResult> {
-  const token = await getTelegramToken();
-  const chat = (chatId || (await getTelegramChatId())).trim();
+  const { token, chatId: cfgChat } = await creds();
+  const chat = (chatId || cfgChat).trim();
   if (!token) return { ok: false, error: "no_token" };
   if (!chat) return { ok: false, error: "no_chat" };
   try {
@@ -53,21 +59,24 @@ export async function detectTelegramChatId(): Promise<{
   title?: string;
   error?: string;
 }> {
-  const token = await getTelegramToken();
+  const { token } = await creds();
   if (!token) return { error: "no_token" };
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
-    const j = (await res.json()) as {
+    const j = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
       description?: string;
       result?: Array<Record<string, { chat?: { id?: number; title?: string; first_name?: string; username?: string } }>>;
     };
-    if (!j.ok) return { error: j.description || "getUpdates_failed" };
+    if (!j.ok) {
+      // 401/404 from Telegram means the token itself is wrong.
+      const bad = /not found|unauthorized/i.test(j.description ?? "");
+      return { error: bad ? "bad_token" : j.description || "getUpdates_failed" };
+    }
     const updates = j.result ?? [];
     for (let i = updates.length - 1; i >= 0; i--) {
       const u = updates[i];
-      const chat =
-        u.message?.chat ?? u.channel_post?.chat ?? u.my_chat_member?.chat;
+      const chat = u.message?.chat ?? u.channel_post?.chat ?? u.my_chat_member?.chat;
       if (chat?.id != null) {
         return {
           chatId: String(chat.id),
