@@ -95,7 +95,7 @@ export function CartView({ locale }: { locale: string }) {
           <li key={item.id} className="card">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-bold leading-tight sm:text-lg">
+                <h3 className="text-base font-bold leading-tight [overflow-wrap:anywhere] sm:text-lg">
                   {item.name}
                 </h3>
                 <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
