@@ -94,6 +94,7 @@ function getCoords(): Promise<{ lat: number; lng: number } | undefined> {
 export default function CourierPage() {
   const [courier, setCourier] = useState<Courier | null>(null);
   const [checking, setChecking] = useState(true);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // Login form
   const [login, setLogin] = useState("");
@@ -144,7 +145,23 @@ export default function CourierPage() {
         setChecking(false);
       }
     })();
+    fetch("/api/public/logo")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setLogoUrl(j.url);
+      })
+      .catch(() => {});
   }, []);
+
+  // eslint-disable-next-line @next/next/no-img-element
+  const brand = (
+    <div className="flex items-center justify-center gap-2">
+      {logoUrl ? <img src={logoUrl} alt="SCANPART" className="h-8 w-auto" /> : null}
+      <span className="text-xl font-extrabold tracking-tight">
+        <span className="text-brand">SCANPART</span> · Доставка
+      </span>
+    </div>
+  );
 
   const loadRoute = useCallback(
     async (silent = false) => {
@@ -294,8 +311,8 @@ export default function CourierPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-extrabold">SCANPART · Курьер</h1>
-          <p className="mt-1 text-ink-mute dark:text-paper-mute">
+          {brand}
+          <p className="mt-2 text-ink-mute dark:text-paper-mute">
             Вход для курьеров
           </p>
         </div>
@@ -345,11 +362,20 @@ export default function CourierPage() {
   // Route view
   return (
     <main className="mx-auto max-w-md p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-base font-bold">Курьер: {courier.name}</h1>
-        <button className="text-brand" onClick={logout}>
+      <div className="mb-3 flex items-center justify-between border-b border-paper-mute pb-3 dark:border-ink-mute">
+        <div className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {logoUrl ? <img src={logoUrl} alt="SCANPART" className="h-7 w-auto" /> : null}
+          <span className="font-extrabold">
+            <span className="text-brand">SCANPART</span> · Доставка
+          </span>
+        </div>
+        <button className="text-sm font-semibold text-brand" onClick={logout}>
           Выйти
         </button>
+      </div>
+      <div className="mb-3 text-sm text-ink-mute dark:text-paper-mute">
+        Курьер: <b className="text-ink dark:text-paper">{courier.name}</b>
       </div>
 
       {/* Geolocation status — so the courier knows the manager can see them. */}
