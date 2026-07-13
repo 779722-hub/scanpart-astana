@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { readDeliveries, readWarehouses } from "@/lib/sheets/client";
 import { buildRoute } from "@/lib/delivery/route";
+import { roadPath } from "@/lib/delivery/roadroute";
 import { handoverWaLink } from "@/lib/delivery/notify";
 
 export const runtime = "nodejs";
@@ -52,6 +53,12 @@ export async function GET(req: NextRequest) {
     { start }
   );
 
+  // Road geometry for the in-app map (falls back to no line if unreachable).
+  const stopCoords = route.stops.map((s) => ({ lat: s.lat, lng: s.lng }));
+  const geoPts = start ? [start, ...stopCoords] : stopCoords;
+  const road = geoPts.length >= 2 ? await roadPath(geoPts) : null;
+  const routeWithGeo = { ...route, geometry: road?.geometry ?? null };
+
   // Never leak the handover code to the courier before it is issued/needed.
   // For deliveries already en route, hand back a ready wa.me link so the courier
   // can (re)send the code to the customer with one tap — reliably, even after a
@@ -70,5 +77,5 @@ export async function GET(req: NextRequest) {
     waLink: d.status === "en_route" && d.handoverCode ? handoverWaLink(d, d.handoverCode) : undefined,
   }));
 
-  return NextResponse.json({ ok: true, deliveries, route });
+  return NextResponse.json({ ok: true, deliveries, route: routeWithGeo });
 }
