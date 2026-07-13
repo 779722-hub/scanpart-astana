@@ -23,7 +23,7 @@ interface Delivery {
   deliveredAt: string;
 }
 interface Courier { id: string; name: string }
-interface Warehouse { id: string; name: string; lat: number | null; lng: number | null; sourceCode: string }
+interface Warehouse { id: string; name: string; lat: number | null; lng: number | null; sourceCode: string; color: string }
 interface OrderItem {
   rowNumber: number;
   clientName: string;
@@ -36,7 +36,7 @@ interface OrderItem {
   status: string;
   source: string;
 }
-interface Office { address: string; lat: number | null; lng: number | null }
+interface Office { address: string; lat: number | null; lng: number | null; color: string }
 interface Suggestion { courierId: string; courierName: string; activeCount: number; addedMinutes: number; addedKm: number; totalMinutes: number }
 interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
 interface Route { stops: RouteStop[]; totalKm: number; totalMinutes: number; geometry?: [number, number][] | null }
@@ -113,7 +113,7 @@ export function TabDeliveries() {
     if (s.ok && s.settings) {
       const g = s.settings as Record<string, string>;
       const num = (v: string) => (v && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
-      setOffice({ address: g.pickup_address ?? "", lat: num(g.office_lat ?? ""), lng: num(g.office_lng ?? "") });
+      setOffice({ address: g.pickup_address ?? "", lat: num(g.office_lat ?? ""), lng: num(g.office_lng ?? ""), color: g.office_color || "#16A34A" });
     }
   }
   useEffect(() => {
@@ -160,13 +160,13 @@ export function TabDeliveries() {
     .map((c) => ({ id: c.id, name: c.name, lat: c.location!.lat, lng: c.location!.lng, stale: isStale(c.location!.updatedAt, now) }));
   const mapWarehouses: MapPoint[] = warehouses
     .filter((w) => w.lat != null && w.lng != null)
-    .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number }));
+    .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number, color: w.color }));
   const mapDrops: MapPoint[] = (rows ?? [])
     .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null)
     .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number }));
   const officePoint: MapPoint | null =
     office && office.lat != null && office.lng != null
-      ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng }
+      ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng, color: office.color }
       : null;
 
   // Prefill the delivery draft from an existing order. Самовывоз → the office
@@ -325,7 +325,7 @@ export function TabDeliveries() {
             className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
           />
         )}
-        <MapLegend hasOffice={!!officePoint} />
+        <MapLegend warehouses={mapWarehouses} office={officePoint} />
         {(() => {
           const noCoords = [
             ...warehouses.filter((w) => w.lat == null || w.lng == null).map((w) => w.name),
@@ -592,13 +592,16 @@ export function TabDeliveries() {
   );
 }
 
-function MapLegend({ hasOffice }: { hasOffice: boolean }) {
+function MapLegend({ warehouses, office }: { warehouses: MapPoint[]; office: MapPoint | null }) {
+  const swatch = (color: string) => <span className="h-2.5 w-2.5 flex-none rounded-full ring-1 ring-black/20" style={{ background: color }} />;
   return (
-    <div className="flex flex-wrap gap-3 text-xs text-ink-mute dark:text-paper-mute">
-      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#E10600" }} /> курьер</span>
-      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#F59E0B" }} /> склад</span>
-      <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#2563EB" }} /> клиент</span>
-      {hasOffice && <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#16A34A" }} /> офис</span>}
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-mute dark:text-paper-mute">
+      <span className="inline-flex items-center gap-1">{swatch("#E10600")} курьер</span>
+      <span className="inline-flex items-center gap-1">{swatch("#2563EB")} клиент</span>
+      {warehouses.map((w) => (
+        <span key={w.id} className="inline-flex items-center gap-1">{swatch(w.color || "#F59E0B")} {w.name}</span>
+      ))}
+      {office && <span className="inline-flex items-center gap-1">{swatch(office.color || "#16A34A")} офис</span>}
     </div>
   );
 }
