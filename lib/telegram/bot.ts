@@ -1,14 +1,4 @@
-import { Bot } from "grammy";
-
-let _bot: Bot | null = null;
-
-function getBot(): Bot | null {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return null;
-  if (_bot) return _bot;
-  _bot = new Bot(token);
-  return _bot;
-}
+import { sendTelegramHtml } from "./notify";
 
 export interface TelegramOrderItem {
   brand: string;
@@ -43,9 +33,6 @@ function escapeHtml(str: string): string {
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
 export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<boolean> {
-  const bot = getBot();
-  if (!bot || !m.chatId) return false;
-
   const itemsBlock = m.items
     .map(
       (it, idx) =>
@@ -88,14 +75,7 @@ export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<bool
       : null,
   ];
 
-  try {
-    await bot.api.sendMessage(m.chatId, lines.filter(Boolean).join("\n"), {
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
-    });
-    return true;
-  } catch (err) {
-    console.error("[telegram] send failed", (err as Error).message);
-    return false;
-  }
+  const res = await sendTelegramHtml(lines.filter(Boolean).join("\n"), m.chatId);
+  if (!res.ok) console.error("[telegram] send failed:", res.error);
+  return res.ok;
 }
