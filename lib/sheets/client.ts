@@ -1,5 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
-import type { Warehouse } from "@/lib/delivery/warehouse";
+import { parseCoord, type Warehouse } from "@/lib/delivery/warehouse";
 import type { Courier, Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -601,8 +601,8 @@ export async function readWarehouses(): Promise<Warehouse[]> {
       id: String(r[0] ?? "").trim(),
       name: String(r[1] ?? "").trim(),
       address: String(r[2] ?? ""),
-      lat: r[3] === "" || r[3] == null ? null : Number(r[3]),
-      lng: r[4] === "" || r[4] == null ? null : Number(r[4]),
+      lat: parseCoord(r[3] as string | number | null),
+      lng: parseCoord(r[4] as string | number | null),
       pickupMinutes: Number(r[5] ?? 0) || 0,
       active: String(r[6] ?? "").toLowerCase() !== "false",
     }))
@@ -795,8 +795,8 @@ function rowToDelivery(r: unknown[]): Delivery {
     phone: String(r[3] ?? ""),
     whatsapp: String(r[4] ?? ""),
     address: String(r[5] ?? ""),
-    lat: r[6] === "" || r[6] == null ? null : Number(r[6]),
-    lng: r[7] === "" || r[7] == null ? null : Number(r[7]),
+    lat: parseCoord(r[6] as string | number | null),
+    lng: parseCoord(r[7] as string | number | null),
     items: String(r[8] ?? ""),
     warehouseIds: String(r[9] ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     courierId: String(r[10] ?? "").trim(),

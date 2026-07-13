@@ -228,8 +228,11 @@ export function TabOrders() {
                   × {o.quantity}
                 </div>
                 {o.vin && (
-                  <div className="sm:col-span-3 text-xs text-ink-mute">
-                    Авто: {o.vehicle} · VIN <code>{o.vin}</code>
+                  <div className="sm:col-span-3 text-xs text-ink-mute dark:text-paper-mute">
+                    Авто: {o.vehicle} · VIN{" "}
+                    <code className="rounded bg-paper-soft px-1 font-mono text-ink dark:bg-ink dark:text-paper">
+                      {o.vin}
+                    </code>
                   </div>
                 )}
               </div>

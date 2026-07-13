@@ -275,6 +275,18 @@ export function TabDeliveries() {
           />
         )}
         <MapLegend hasOffice={!!officePoint} />
+        {(() => {
+          const noCoords = [
+            ...warehouses.filter((w) => w.lat == null || w.lng == null).map((w) => w.name),
+            ...(office && (office.lat == null || office.lng == null) ? ["офис"] : []),
+          ];
+          return noCoords.length > 0 ? (
+            <div className="rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+              Не видно на карте (нет координат): {noCoords.join(", ")}. Добавьте координаты в «Складах»/«Настройках»
+              (кнопка «По адресу» определит их автоматически).
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {/* Fullscreen map overlay */}
