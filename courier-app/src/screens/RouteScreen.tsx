@@ -56,6 +56,22 @@ export function RouteScreen({ navigation }: NativeStackScreenProps<Stack, "Route
     }
   }, []);
 
+  // Stream the courier's position to the backend so the manager sees them live.
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    (async () => {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== "granted") return;
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 30000, distanceInterval: 50 },
+        (pos) => {
+          api.postLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
+        }
+      );
+    })();
+    return () => sub?.remove();
+  }, []);
+
   useEffect(() => {
     load();
     navigation.setOptions({

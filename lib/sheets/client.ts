@@ -15,6 +15,7 @@ const SEARCH_LOG_SHEET = "SearchLog";
 const WAREHOUSES_SHEET = "Warehouses";
 const COURIERS_SHEET = "Couriers";
 const DELIVERIES_SHEET = "Deliveries";
+const COURIER_LOC_SHEET = "CourierLocations";
 
 export interface OrderRow {
   date: string;
@@ -710,6 +711,61 @@ export async function deleteCourier(courierId: string): Promise<void> {
   await deleteSheetRow(COURIERS_SHEET, rowIdx + 1);
 }
 
+// --- Courier live locations (latest position per courier) --------------------
+
+export interface CourierLocation {
+  courierId: string;
+  lat: number;
+  lng: number;
+  updatedAt: string;
+}
+
+export async function readCourierLocations(): Promise<CourierLocation[]> {
+  const sheets = sheetsClient();
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId(),
+    range: `${COURIER_LOC_SHEET}!A2:D`,
+  });
+  return (data.values ?? [])
+    .map((r) => ({
+      courierId: String(r[0] ?? "").trim(),
+      lat: Number(r[1]),
+      lng: Number(r[2]),
+      updatedAt: String(r[3] ?? ""),
+    }))
+    .filter((l) => l.courierId && Number.isFinite(l.lat) && Number.isFinite(l.lng));
+}
+
+export async function upsertCourierLocation(
+  courierId: string,
+  lat: number,
+  lng: number
+): Promise<void> {
+  const sheets = sheetsClient();
+  const id = spreadsheetId();
+  const row = [courierId, lat, lng, new Date().toISOString()];
+  const { data } = await sheets.spreadsheets.values.get({
+    spreadsheetId: id,
+    range: `${COURIER_LOC_SHEET}!A:A`,
+  });
+  const rowIdx = (data.values ?? []).findIndex((r) => r[0] === courierId);
+  if (rowIdx === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: id,
+      range: `${COURIER_LOC_SHEET}!A:D`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+    return;
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: id,
+    range: `${COURIER_LOC_SHEET}!A${rowIdx + 1}:D${rowIdx + 1}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [row] },
+  });
+}
+
 // --- Deliveries --------------------------------------------------------------
 
 function rowToDelivery(r: unknown[]): Delivery {
@@ -853,6 +909,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "updated_at",
   ],
   Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at"],
+  CourierLocations: ["courier_id", "lat", "lng", "updated_at"],
   Deliveries: [
     "id",
     "created_at",
