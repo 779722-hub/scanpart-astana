@@ -29,7 +29,7 @@ export const DELIVERY_STATUSES: DeliveryStatus[] = [
 export const STATUS_LABEL_RU: Record<DeliveryStatus, string> = {
   new: "Новая",
   assigned: "Назначена",
-  picking: "Забор со склада",
+  picking: "Забирает со склада",
   en_route: "В пути к клиенту",
   delivered: "Вручена",
   canceled: "Отменена",

@@ -25,6 +25,7 @@ interface Delivery {
   items: string;
   warehouseIds: string[];
   status: DeliveryStatus;
+  waLink?: string;
 }
 interface RouteStop {
   kind: "pickup" | "dropoff";
@@ -44,7 +45,7 @@ interface RoutePlan {
 
 const STATUS_RU: Record<DeliveryStatus, string> = {
   assigned: "Назначена",
-  picking: "Забор со склада",
+  picking: "Забираю со склада",
   en_route: "В пути к клиенту",
   delivered: "Вручена",
   canceled: "Отменена",
@@ -213,15 +214,10 @@ export default function CourierPage() {
         method: "PATCH",
         body: JSON.stringify({ action, code: codes[d.id] }),
       });
-      if (action === "enroute" && res.waLink && !res.codeSent) {
-        if (
-          window.confirm("Код готов. Отправить код клиенту в WhatsApp?")
-        ) {
-          window.open(res.waLink, "_blank");
-        }
-      }
       if (action === "enroute" && res.codeSent) {
         alert("Код получения отправлен клиенту в WhatsApp.");
+      } else if (action === "enroute") {
+        alert("Код готов. Нажмите зелёную кнопку «Отправить код клиенту в WhatsApp».");
       }
       await loadRoute();
     } catch (e) {
@@ -376,7 +372,7 @@ export default function CourierPage() {
                   className="btn-primary grow !px-4 !py-2 text-sm"
                   onClick={() => act(d, "start")}
                 >
-                  Начать забор
+                  Забрать со склада
                 </button>
               )}
               {d.status === "picking" && (
@@ -389,6 +385,16 @@ export default function CourierPage() {
               )}
               {d.status === "en_route" && (
                 <div className="flex w-full flex-col gap-2">
+                  {d.waLink && (
+                    <a
+                      href={d.waLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
+                    >
+                      📲 Отправить код клиенту в WhatsApp
+                    </a>
+                  )}
                   <input
                     className="input text-center tracking-[0.4em]"
                     inputMode="numeric"

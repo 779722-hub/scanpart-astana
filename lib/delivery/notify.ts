@@ -27,13 +27,20 @@ export function handoverMessage(name: string, code: string): string[] {
   ];
 }
 
+/** wa.me deep link that opens the customer chat with the code pre-filled. */
+export function handoverWaLink(d: Delivery, code: string): string {
+  const phone = toE164Digits(d.whatsapp || d.phone);
+  const lines = handoverMessage(d.customerName, code);
+  return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
 export async function sendHandoverCode(
   d: Delivery,
   code: string
 ): Promise<HandoverSendResult> {
   const phone = toE164Digits(d.whatsapp || d.phone);
   const lines = handoverMessage(d.customerName, code);
-  const link = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
+  const link = handoverWaLink(d, code);
 
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;

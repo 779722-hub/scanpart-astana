@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { readDeliveries, readWarehouses } from "@/lib/sheets/client";
 import { buildRoute } from "@/lib/delivery/route";
+import { handoverWaLink } from "@/lib/delivery/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
   );
 
   // Never leak the handover code to the courier before it is issued/needed.
+  // For deliveries already en route, hand back a ready wa.me link so the courier
+  // can (re)send the code to the customer with one tap — reliably, even after a
+  // page reload.
   const deliveries = active.map((d) => ({
     id: d.id,
     customerName: d.customerName,
@@ -63,6 +67,7 @@ export async function GET(req: NextRequest) {
     items: d.items,
     warehouseIds: d.warehouseIds,
     status: d.status,
+    waLink: d.status === "en_route" && d.handoverCode ? handoverWaLink(d, d.handoverCode) : undefined,
   }));
 
   return NextResponse.json({ ok: true, deliveries, route });
