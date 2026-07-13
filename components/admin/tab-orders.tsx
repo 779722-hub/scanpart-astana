@@ -25,13 +25,29 @@ interface Order {
   source: string;
 }
 
+interface OrderGroup {
+  key: string;
+  date: string;
+  clientName: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  orderType: string;
+  status: string;
+  vin: string;
+  vehicle: string;
+  rows: Order[];
+  total: number;
+}
+
 const STATUSES = ["Новый", "В работе", "Выполнен", "Отменён"];
+const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
 export function TabOrders() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [q, setQ] = useState("");
-  const [savingRow, setSavingRow] = useState<number | null>(null);
-  const [editing, setEditing] = useState<number | null>(null);
+  const [saving, setSaving] = useState<string | null>(null); // group key
+  const [editing, setEditing] = useState<string | null>(null);
   const [editType, setEditType] = useState<string>("Экспресс");
   const [editAddr, setEditAddr] = useState<string>("");
   const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
@@ -62,84 +78,118 @@ export function TabOrders() {
     setOrders(j.ok ? (j.orders as Order[]) : []);
   }
 
-  const filtered = useMemo(() => {
+  const headers = { "content-type": "application/json" };
+
+  // Group the individual item-rows into one order per checkout (same timestamp
+  // + phone), so a multi-part order is one block and one delivery.
+  const groups = useMemo<OrderGroup[]>(() => {
     if (!orders) return [];
+    const map = new Map<string, Order[]>();
+    for (const o of orders) {
+      const key = `${o.date}__${o.phone}`;
+      const arr = map.get(key);
+      if (arr) arr.push(o);
+      else map.set(key, [o]);
+    }
+    let list: OrderGroup[] = Array.from(map.entries()).map(([key, rows]) => {
+      const f = rows[0];
+      return {
+        key,
+        date: f.date,
+        clientName: f.clientName,
+        phone: f.phone,
+        whatsapp: f.whatsapp,
+        address: f.address,
+        orderType: f.orderType,
+        status: f.status,
+        vin: f.vin,
+        vehicle: f.vehicle,
+        rows,
+        total: rows.reduce((s, r) => s + r.price * r.quantity, 0),
+      };
+    });
     const needle = q.trim().toLowerCase();
-    if (!needle) return orders.slice().reverse();
-    return orders
-      .filter(
-        (o) =>
-          o.partName.toLowerCase().includes(needle) ||
-          o.brand.toLowerCase().includes(needle) ||
-          o.partArticle.toLowerCase().includes(needle) ||
-          o.clientName.toLowerCase().includes(needle) ||
-          o.phone.toLowerCase().includes(needle) ||
-          o.vin.toLowerCase().includes(needle) ||
-          o.vehicle.toLowerCase().includes(needle)
-      )
-      .reverse();
+    if (needle) {
+      list = list.filter((g) =>
+        g.rows.some((o) =>
+          [o.partName, o.brand, o.partArticle, o.clientName, o.phone, o.vin, o.vehicle].some((fld) =>
+            (fld || "").toLowerCase().includes(needle)
+          )
+        )
+      );
+    }
+    list.sort((a, b) => b.date.localeCompare(a.date));
+    return list;
   }, [orders, q]);
 
-  async function setStatus(row: number, status: string) {
-    setSavingRow(row);
+  const inGroup = (g: OrderGroup, o: Order) => g.rows.some((r) => r.rowNumber === o.rowNumber);
+
+  async function setGroupStatus(g: OrderGroup, status: string) {
+    setSaving(g.key);
     try {
-      await fetch(`/api/admin/orders/${row}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      setOrders(
-        (cur) => cur?.map((o) => (o.rowNumber === row ? { ...o, status } : o)) ?? null
+      await Promise.all(
+        g.rows.map((r) => fetch(`/api/admin/orders/${r.rowNumber}`, { method: "PATCH", headers, body: JSON.stringify({ status }) }))
       );
+      setOrders((cur) => cur?.map((o) => (inGroup(g, o) ? { ...o, status } : o)) ?? null);
     } finally {
-      setSavingRow(null);
+      setSaving(null);
     }
   }
 
-  function startEdit(o: Order) {
-    setEditing(o.rowNumber);
-    setEditType(ORDER_TYPES.includes(o.orderType as (typeof ORDER_TYPES)[number]) ? o.orderType : "Экспресс");
-    setEditAddr(o.address);
+  function startEdit(g: OrderGroup) {
+    setEditing(g.key);
+    setEditType(ORDER_TYPES.includes(g.orderType as (typeof ORDER_TYPES)[number]) ? g.orderType : "Экспресс");
+    setEditAddr(g.address);
   }
 
-  async function saveEdit(row: number) {
-    setSavingRow(row);
+  async function saveEdit(g: OrderGroup) {
+    setSaving(g.key);
     try {
       const address = editType === "Самовывоз" ? "" : editAddr.trim();
-      await fetch(`/api/admin/orders/${row}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ orderType: editType, address }),
-      });
-      setOrders(
-        (cur) =>
-          cur?.map((o) => (o.rowNumber === row ? { ...o, orderType: editType, address } : o)) ??
-          null
+      await Promise.all(
+        g.rows.map((r) =>
+          fetch(`/api/admin/orders/${r.rowNumber}`, { method: "PATCH", headers, body: JSON.stringify({ orderType: editType, address }) })
+        )
       );
+      setOrders((cur) => cur?.map((o) => (inGroup(g, o) ? { ...o, orderType: editType, address } : o)) ?? null);
       setEditing(null);
     } finally {
-      setSavingRow(null);
+      setSaving(null);
     }
   }
 
-  async function createDelivery(o: Order) {
-    const isPickup = o.orderType === "Самовывоз";
-    const dest = isPickup ? office.address || "офис (задайте адрес самовывоза в Настройках)" : o.address || "адрес не указан";
-    if (!confirm(`Создать доставку для «${o.clientName || o.phone}»?\nКуда везти: ${dest}${isPickup ? "\n(самовывоз — курьер привозит в офис)" : ""}\nСклад и курьера назначьте во вкладке «Доставки».`)) return;
-    setSavingRow(o.rowNumber);
+  // One delivery for the whole order: the courier collects every part from the
+  // needed warehouses and delivers the set to a single address.
+  async function createDelivery(g: OrderGroup) {
+    const isPickup = g.orderType === "Самовывоз";
+    const dest = isPickup ? office.address || "офис (задайте адрес в Настройках)" : g.address || "адрес не указан";
+    if (
+      !confirm(
+        `Создать ОДНУ доставку на весь заказ (${g.rows.length} поз.) для «${g.clientName || g.phone}»?\nКуда: ${dest}${
+          isPickup ? "\n(самовывоз — курьер привозит в офис)" : ""
+        }\nКурьер соберёт по нужным складам и привезёт комплект. Курьера назначьте во вкладке «Доставки».`
+      )
+    )
+      return;
+    setSaving(g.key);
     try {
-      const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
-      // Auto-pick the warehouse tied to the order's source code (Р1/М2/…).
-      const bySource = o.source ? warehouses.find((w) => w.sourceCode === o.source) : undefined;
-      const warehouseIds = bySource ? [bySource.id] : warehouses.length === 1 ? [warehouses[0].id] : [];
+      const items = g.rows.map((r) => `${r.partName}${r.quantity > 1 ? ` ×${r.quantity}` : ""}`).join(", ");
+      // Union of the warehouses tied to each item's source code.
+      const ids = new Set<string>();
+      for (const r of g.rows) {
+        const w = r.source ? warehouses.find((x) => x.sourceCode === r.source) : undefined;
+        if (w) ids.add(w.id);
+      }
+      let warehouseIds = Array.from(ids);
+      if (!warehouseIds.length && warehouses.length === 1) warehouseIds = [warehouses[0].id];
       const res = await fetch("/api/admin/deliveries", {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers,
         body: JSON.stringify({
-          customerName: o.clientName,
-          phone: o.phone,
-          whatsapp: o.whatsapp,
-          address: isPickup ? office.address : o.address,
+          customerName: g.clientName,
+          phone: g.phone,
+          whatsapp: g.whatsapp,
+          address: isPickup ? office.address : g.address,
           lat: isPickup ? office.lat : undefined,
           lng: isPickup ? office.lng : undefined,
           items,
@@ -151,21 +201,24 @@ export function TabOrders() {
         alert(`Ошибка: ${j.error}`);
         return;
       }
-      alert("Доставка создана. Откройте вкладку «Доставки»: проверьте склад, задайте координаты (если нужно) и назначьте курьера.");
+      alert("Доставка на весь заказ создана. Откройте «Доставки»: проверьте склады, координаты и назначьте курьера.");
     } finally {
-      setSavingRow(null);
+      setSaving(null);
     }
   }
 
-  async function removeOrder(row: number) {
-    if (!confirm("Удалить этот заказ безвозвратно?")) return;
-    setSavingRow(row);
+  async function removeOrder(g: OrderGroup) {
+    if (!confirm(`Удалить заказ (${g.rows.length} поз.) безвозвратно?`)) return;
+    setSaving(g.key);
     try {
-      await fetch(`/api/admin/orders/${row}`, { method: "DELETE" });
-      // Row numbers shift after a delete — re-read to stay in sync.
+      // Delete from the highest row down so earlier row numbers don't shift.
+      const rowsDesc = [...g.rows].sort((a, b) => b.rowNumber - a.rowNumber);
+      for (const r of rowsDesc) {
+        await fetch(`/api/admin/orders/${r.rowNumber}`, { method: "DELETE" });
+      }
       await refresh();
     } finally {
-      setSavingRow(null);
+      setSaving(null);
     }
   }
 
@@ -188,35 +241,35 @@ export function TabOrders() {
           onChange={(e) => setQ(e.target.value)}
         />
         <p className="text-xs text-ink-mute dark:text-paper-mute">
-          {filtered.length}/{orders.length}
+          заказов: {groups.length}
         </p>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="card text-center text-sm text-ink-mute">
+      {groups.length === 0 ? (
+        <div className="card text-center text-sm text-ink-mute dark:text-paper-mute">
           <Package className="mx-auto mb-2 h-8 w-8" />
           Заказов нет.
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((o) => (
-            <article key={o.rowNumber} className="card">
+          {groups.map((g) => (
+            <article key={g.key} className="card">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs text-ink-mute dark:text-paper-mute">
-                    {new Date(o.date).toLocaleString("ru")} · #{o.rowNumber}
+                    {new Date(g.date).toLocaleString("ru")} · {g.rows.length} поз. · итого {fmt(g.total)} ₸
                   </div>
-                  <div className="text-lg font-bold">{o.clientName || "—"}</div>
+                  <div className="text-lg font-bold">{g.clientName || "—"}</div>
                   <div className="text-sm text-ink-mute dark:text-paper-mute">
-                    {o.phone} · {o.orderType}
-                    {o.address ? ` · ${o.address}` : ""}
+                    {g.phone} · {g.orderType}
+                    {g.address ? ` · ${g.address}` : ""}
                   </div>
                 </div>
                 <select
                   className="input !w-auto !py-2 text-sm"
-                  value={o.status}
-                  onChange={(e) => setStatus(o.rowNumber, e.target.value)}
-                  disabled={savingRow === o.rowNumber}
+                  value={g.status}
+                  onChange={(e) => setGroupStatus(g, e.target.value)}
+                  disabled={saving === g.key}
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -225,39 +278,37 @@ export function TabOrders() {
                   ))}
                 </select>
               </div>
-              <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
-                <div>
-                  <span className="text-ink-mute dark:text-paper-mute">Запчасть:</span>{" "}
-                  <strong>{o.partName}</strong>
-                </div>
-                <div>
-                  <span className="text-ink-mute dark:text-paper-mute">Бренд:</span>{" "}
-                  {o.brand} · <code className="font-mono">{o.partArticle}</code>
-                </div>
-                <div>
-                  <span className="text-ink-mute dark:text-paper-mute">Цена:</span>{" "}
-                  <strong>{new Intl.NumberFormat("ru-RU").format(o.price)} ₸</strong>{" "}
-                  × {o.quantity}
-                </div>
-                {o.source && (
-                  <div>
-                    <span className="text-ink-mute dark:text-paper-mute">Склад:</span>{" "}
-                    <span className="rounded bg-brand/10 px-1.5 py-0.5 text-xs font-semibold text-brand">{o.source}</span>
+
+              {/* Items of this order */}
+              <div className="mt-3 divide-y divide-paper-mute/50 dark:divide-ink-mute/50">
+                {g.rows.map((o) => (
+                  <div key={o.rowNumber} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold [overflow-wrap:anywhere]">{o.partName}</div>
+                      <div className="text-xs text-ink-mute dark:text-paper-mute [overflow-wrap:anywhere]">
+                        {o.brand} · <code className="font-mono">{o.partArticle}</code>
+                        {o.source && (
+                          <span className="ml-2 rounded bg-brand/10 px-1.5 py-0.5 font-semibold text-brand">склад {o.source}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="whitespace-nowrap font-semibold">
+                      {fmt(o.price)} ₸ × {o.quantity}
+                    </div>
                   </div>
-                )}
-                {o.vin && (
-                  <div className="sm:col-span-3 text-xs text-ink-mute dark:text-paper-mute">
-                    Авто: {o.vehicle} · VIN{" "}
-                    <code className="rounded bg-paper-soft px-1 font-mono text-ink dark:bg-ink dark:text-paper">
-                      {o.vin}
-                    </code>
-                  </div>
-                )}
+                ))}
               </div>
 
-              {editing === o.rowNumber && (
+              {g.vin && (
+                <div className="mt-2 text-xs text-ink-mute dark:text-paper-mute [overflow-wrap:anywhere]">
+                  Авто: {g.vehicle} · VIN{" "}
+                  <code className="rounded bg-paper-soft px-1 font-mono text-ink dark:bg-ink dark:text-paper">{g.vin}</code>
+                </div>
+              )}
+
+              {editing === g.key && (
                 <div className="mt-3 space-y-3 rounded-2xl border border-paper-mute p-3 dark:border-ink-mute">
-                  <div className="text-sm font-semibold">Тип получения и адрес</div>
+                  <div className="text-sm font-semibold">Тип получения и адрес (для всего заказа)</div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                       <label className="label">Тип получения</label>
@@ -284,12 +335,8 @@ export function TabOrders() {
                     <button className="btn-secondary !px-3 !py-2 text-sm" onClick={() => setEditing(null)}>
                       <X className="h-4 w-4" /> Отмена
                     </button>
-                    <button
-                      className="btn-primary !px-3 !py-2 text-sm"
-                      onClick={() => saveEdit(o.rowNumber)}
-                      disabled={savingRow === o.rowNumber}
-                    >
-                      {savingRow === o.rowNumber ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    <button className="btn-primary !px-3 !py-2 text-sm" onClick={() => saveEdit(g)} disabled={saving === g.key}>
+                      {saving === g.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       Сохранить
                     </button>
                   </div>
@@ -297,9 +344,9 @@ export function TabOrders() {
               )}
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-paper-mute/50 pt-3 dark:border-ink-mute/50">
-                {o.whatsapp ? (
+                {g.whatsapp ? (
                   <a
-                    href={`https://wa.me/${normalizePhoneE164(o.whatsapp)}`}
+                    href={`https://wa.me/${normalizePhoneE164(g.whatsapp)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
@@ -308,29 +355,27 @@ export function TabOrders() {
                     WhatsApp
                   </a>
                 ) : (
-                  <span className="text-xs text-ink-mute dark:text-paper-mute">
-                    WhatsApp не указан
-                  </span>
+                  <span className="text-xs text-ink-mute dark:text-paper-mute">WhatsApp не указан</span>
                 )}
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => createDelivery(o)}
-                    disabled={savingRow === o.rowNumber}
+                    onClick={() => createDelivery(g)}
+                    disabled={saving === g.key}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
                   >
                     <Truck className="h-4 w-4" />
                     Создать доставку
                   </button>
                   <button
-                    onClick={() => (editing === o.rowNumber ? setEditing(null) : startEdit(o))}
+                    onClick={() => (editing === g.key ? setEditing(null) : startEdit(g))}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-semibold transition hover:border-ink-mute dark:border-ink-mute"
                   >
                     <Pencil className="h-4 w-4" />
                     Тип/адрес
                   </button>
                   <button
-                    onClick={() => removeOrder(o.rowNumber)}
-                    disabled={savingRow === o.rowNumber}
+                    onClick={() => removeOrder(g)}
+                    disabled={saving === g.key}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 px-3 py-1.5 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" />
