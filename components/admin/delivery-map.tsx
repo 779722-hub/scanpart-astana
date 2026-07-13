@@ -24,12 +24,18 @@ export interface MapPoint {
   lng: number;
   color?: string; // custom marker colour (hex); falls back to the kind default
 }
+export type MarkerShape = "circle" | "square" | "triangle" | "diamond";
+
 export interface DeliveryMapProps {
   couriers: MapCourier[];
   warehouses: MapPoint[];
   drops: MapPoint[];
   office?: MapPoint | null; // pickup/office point (Республика 68), shown green
   routeGeometry?: [number, number][] | null;
+  courierColor?: string;
+  courierShape?: MarkerShape;
+  clientColor?: string;
+  clientShape?: MarkerShape;
   className?: string;
 }
 
@@ -49,23 +55,41 @@ interface Pin {
   hint: string;
   size: number;
   permanent: boolean; // keep the label always visible (warehouses / office)
+  shape: MarkerShape;
 }
 
 function buildPins(props: DeliveryMapProps): Pin[] {
+  const courierColor = props.courierColor || RED;
+  const courierShape = props.courierShape || "circle";
+  const clientColor = props.clientColor || BLUE;
+  const clientShape = props.clientShape || "circle";
   const pins: Pin[] = [];
   for (const c of props.couriers) {
-    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : RED, hint: "Курьер", size: 18, permanent: false });
+    // Courier is the point managers look for → big, always labelled.
+    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : courierColor, hint: "Курьер", size: 22, permanent: true, shape: courierShape });
   }
   for (const w of props.warehouses) {
-    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true });
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true, shape: "circle" });
   }
   if (props.office) {
-    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true });
+    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true, shape: "circle" });
   }
   for (const d of props.drops) {
-    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: BLUE, hint: "Клиент", size: 15, permanent: false });
+    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: d.color || clientColor, hint: "Клиент", size: 16, permanent: false, shape: clientShape });
   }
   return pins;
+}
+
+/** Inline HTML for a coloured marker of the given shape. */
+function markerHtml(color: string, size: number, shape: MarkerShape): string {
+  const border = "border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)";
+  if (shape === "triangle") {
+    // clip-path triangle; drop-shadow gives the outline.
+    return `<div style="width:${size}px;height:${size}px;background:${color};clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px rgba(0,0,0,.4))"></div>`;
+  }
+  const radius = shape === "circle" ? "50%" : "3px";
+  const transform = shape === "diamond" ? "transform:rotate(45deg);" : "";
+  return `<div style="width:${size}px;height:${size}px;background:${color};border-radius:${radius};${transform}${border}"></div>`;
 }
 
 function loadMapgl(): Promise<any> {
@@ -188,7 +212,7 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
         className: "",
         iconSize: [p.size, p.size],
         iconAnchor: [half, half],
-        html: `<div style="background:${p.color};width:${p.size}px;height:${p.size}px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)"></div>`,
+        html: markerHtml(p.color, p.size, p.shape),
       });
       const marker = leaflet.marker([p.lat, p.lng], { icon });
       if (p.permanent) {

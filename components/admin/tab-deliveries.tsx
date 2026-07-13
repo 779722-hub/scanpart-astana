@@ -5,7 +5,7 @@ import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, 
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 import { agoLabel, isStale } from "@/lib/delivery/live";
-import { DeliveryMap, type MapCourier, type MapPoint } from "@/components/admin/delivery-map";
+import { DeliveryMap, type MapCourier, type MapPoint, type MarkerShape } from "@/components/admin/delivery-map";
 
 interface Delivery {
   id: string;
@@ -86,6 +86,12 @@ export function TabDeliveries() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [office, setOffice] = useState<Office | null>(null);
+  const [markers, setMarkers] = useState<{ courierColor: string; courierShape: MarkerShape; clientColor: string; clientShape: MarkerShape }>({
+    courierColor: "#E10600",
+    courierShape: "circle",
+    clientColor: "#2563EB",
+    clientShape: "circle",
+  });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -114,6 +120,12 @@ export function TabDeliveries() {
       const g = s.settings as Record<string, string>;
       const num = (v: string) => (v && Number.isFinite(Number(v.replace(",", "."))) ? Number(v.replace(",", ".")) : null);
       setOffice({ address: g.pickup_address ?? "", lat: num(g.office_lat ?? ""), lng: num(g.office_lng ?? ""), color: g.office_color || "#16A34A" });
+      setMarkers({
+        courierColor: g.courier_color || "#E10600",
+        courierShape: (g.courier_shape || "circle") as MarkerShape,
+        clientColor: g.client_color || "#2563EB",
+        clientShape: (g.client_shape || "circle") as MarkerShape,
+      });
     }
   }
   useEffect(() => {
@@ -322,6 +334,10 @@ export function TabDeliveries() {
             drops={mapDrops}
             office={officePoint}
             routeGeometry={selected ? route?.geometry ?? null : null}
+            courierColor={markers.courierColor}
+            courierShape={markers.courierShape}
+            clientColor={markers.clientColor}
+            clientShape={markers.clientShape}
             className="h-80 w-full overflow-hidden rounded-2xl sm:h-96"
           />
         )}
@@ -360,8 +376,19 @@ export function TabDeliveries() {
             drops={mapDrops}
             office={officePoint}
             routeGeometry={selected ? route?.geometry ?? null : null}
+            courierColor={markers.courierColor}
+            courierShape={markers.courierShape}
+            clientColor={markers.clientColor}
+            clientShape={markers.clientShape}
             className="w-full flex-1"
           />
+        </div>
+      )}
+
+      {live.length === 0 && (
+        <div className="card text-sm text-ink-mute dark:text-paper-mute">
+          Нет курьеров на связи. Курьер появляется, когда войдёт в приложение (scanpart.kz/courier) с включённой геолокацией,
+          либо нажмите «На карту (тест)» во вкладке «Курьеры».
         </div>
       )}
 
@@ -385,7 +412,7 @@ export function TabDeliveries() {
                 <span className="flex items-center gap-2">
                   {c.location ? (
                     <span className={isStale(c.location.updatedAt, now) ? "text-ink-mute dark:text-paper-mute" : "text-emerald-600"}>
-                      {agoLabel(c.location.updatedAt, now)}
+                      {agoLabel(c.location.updatedAt, now)} · {c.location.lat.toFixed(4)}, {c.location.lng.toFixed(4)}
                     </span>
                   ) : (
                     <span className="text-ink-mute dark:text-paper-mute">нет геопозиции</span>
