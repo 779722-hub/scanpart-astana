@@ -41,6 +41,7 @@ interface RoutePlan {
   totalKm: number;
   totalMinutes: number;
   skipped: string[];
+  geometry?: [number, number][] | null;
 }
 
 const STATUS_RU: Record<DeliveryStatus, string> = {
@@ -104,6 +105,7 @@ export default function CourierPage() {
   const [loading, setLoading] = useState(false);
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [geo, setGeo] = useState<{ status: "idle" | "ok" | "denied" | "error"; at: string }>({ status: "idle", at: "" });
+  const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const nowHm = () => new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
@@ -115,6 +117,7 @@ export default function CourierPage() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         apiFetch("/api/courier/location", {
           method: "POST",
           body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
@@ -174,6 +177,7 @@ export default function CourierPage() {
     try {
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
+          setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           const now = Date.now();
           if (now - last < 30000) return;
           last = now;
@@ -302,11 +306,16 @@ export default function CourierPage() {
     );
   }
 
-  const mapDrops = route
-    ? route.stops
-        .filter((s) => s.kind === "dropoff" && s.lat && s.lng)
-        .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }))
-    : [];
+  const stopsWithGeo = route ? route.stops.filter((s) => s.lat && s.lng) : [];
+  const mapPickups = stopsWithGeo
+    .filter((s) => s.kind === "pickup")
+    .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }));
+  const mapDrops = stopsWithGeo
+    .filter((s) => s.kind === "dropoff")
+    .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }));
+  const mapMe = myPos ? [{ id: "me", name: "Вы", lat: myPos.lat, lng: myPos.lng, stale: false }] : [];
+  const nextStop = route && route.stops.length > 0 ? route.stops[0] : null;
+  const showMap = mapMe.length + mapPickups.length + mapDrops.length > 0;
 
   // Route view
   return (
@@ -377,12 +386,35 @@ export default function CourierPage() {
         </div>
       )}
 
-      {mapDrops.length > 0 && (
+      {nextStop && (
+        <div className="card mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-ink-mute dark:text-paper-mute">Следующая точка</div>
+            <div className="truncate font-bold">
+              {nextStop.kind === "pickup" ? "🟠 Склад" : "🔵 Клиент"}: {nextStop.label}
+            </div>
+            <div className="text-xs text-ink-mute dark:text-paper-mute">
+              ~{etaClock(nextStop.etaMinutes)} · {nextStop.legKm} км
+            </div>
+          </div>
+          <a
+            href={`https://2gis.kz/geo/${nextStop.lng},${nextStop.lat}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary flex-none !px-4 !py-2 text-sm"
+          >
+            В 2ГИС
+          </a>
+        </div>
+      )}
+
+      {showMap && (
         <DeliveryMap
-          couriers={[]}
-          warehouses={[]}
+          couriers={mapMe}
+          warehouses={mapPickups}
           drops={mapDrops}
-          className="mb-4 h-64 w-full overflow-hidden rounded-2xl"
+          routeGeometry={route?.geometry ?? null}
+          className="mb-4 h-72 w-full overflow-hidden rounded-2xl"
         />
       )}
 
