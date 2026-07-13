@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "node:crypto";
 import { z } from "zod";
 import { getSession } from "@/lib/session";
-import { getDelivery, upsertDelivery } from "@/lib/sheets/client";
+import { getDelivery, upsertDelivery, readDeliveries } from "@/lib/sheets/client";
 import { canTransition, type DeliveryStatus } from "@/lib/delivery/types";
 import { codesMatch } from "@/lib/delivery/handover";
 import { sendHandoverCode } from "@/lib/delivery/notify";
@@ -39,6 +39,20 @@ export async function PATCH(
   const d = await getDelivery(params.id);
   if (!d || d.courierId !== courier.id) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  // One order at a time: can't start the next while another is being handled.
+  if (parsed.data.action === "start") {
+    const all = await readDeliveries().catch(() => []);
+    const busy = all.some(
+      (x) =>
+        x.courierId === courier.id &&
+        x.id !== d.id &&
+        (x.status === "picking" || x.status === "en_route")
+    );
+    if (busy) {
+      return NextResponse.json({ ok: false, error: "finish_current_first" }, { status: 409 });
+    }
   }
 
   const target = TARGET[parsed.data.action];
