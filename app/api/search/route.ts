@@ -14,6 +14,8 @@ import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 import { findAliasMatches } from "@/lib/aliases";
 import { appendSearchLog } from "@/lib/sheets/client";
 import { searchShatemOffers } from "@/lib/shatem/search";
+import { searchAutotradeOffers } from "@/lib/autotrade/search";
+import { autotradeConfigured } from "@/lib/autotrade/session";
 import { articlesByVinAndName, articlesByVehicleAndName } from "@/lib/shatem/catalog";
 import { pickPerSource } from "@/lib/search/pick";
 
@@ -140,6 +142,22 @@ export async function GET(req: NextRequest) {
           ).then((lists) => lists.flat())
         : Promise.resolve([]);
 
+    // Third supplier — Autotrade (sklad.autotrade.kz, code Т3). Article search
+    // prices the query (+ crosses/analogs); name search prices the catalog OEMs
+    // (capped for latency — two API calls per target). Astana-only, fail-safe.
+    const autotradeTargets = kind === "article" ? [raw] : catalogOems.slice(0, 3);
+    const autotradePromise: Promise<PartOffer[]> =
+      autotradeConfigured() && autotradeTargets.length
+        ? Promise.all(
+            autotradeTargets.map((code) =>
+              searchAutotradeOffers(code, { markupPct }).catch((err) => {
+                console.warn("[api/search] autotrade lookup failed:", (err as Error).message);
+                return [] as PartOffer[];
+              })
+            )
+          ).then((lists) => lists.flat())
+        : Promise.resolve([]);
+
     // Step A — brands. For name search with a known vehicle we run several
     // text variants in parallel ("колодки", "колодки Nissan", "колодки
     // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
@@ -226,13 +244,17 @@ export async function GET(req: NextRequest) {
 
     // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
     // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
-    const shatemOffers = await shatemPromise;
-    // Classify Shate-M offers against the vehicle too (they arrive as
-    // "unknown"), so the fit check below sees their make hints as well.
+    const [shatemOffers, autotradeOffers] = await Promise.all([
+      shatemPromise,
+      autotradePromise,
+    ]);
+    // Classify Shate-M / Autotrade offers against the vehicle too (they arrive
+    // as "unknown"), so the fit check below sees their make hints as well.
     if (kind === "article" && vehicle?.make) {
       for (const o of shatemOffers) o.compat = classifyCompat(o.name, vehicle).compat;
+      for (const o of autotradeOffers) o.compat = classifyCompat(o.name, vehicle).compat;
     }
-    if (!brandsItems.length && !shatemOffers.length) {
+    if (!brandsItems.length && !shatemOffers.length && !autotradeOffers.length) {
       logSearch(0);
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
@@ -306,8 +328,9 @@ export async function GET(req: NextRequest) {
         };
       });
 
-    // Merge Shate-M offers (already normalized + Astana/in-stock filtered).
+    // Merge Shate-M + Autotrade offers (already normalized + Astana/in-stock).
     if (shatemOffers.length) allOffers.push(...shatemOffers);
+    if (autotradeOffers.length) allOffers.push(...autotradeOffers);
 
     // Show ONLY what the customer asked for: Astana warehouses, in stock now.
     // No relaxation to delivery/other cities. Word-match applies to name
@@ -333,7 +356,7 @@ export async function GET(req: NextRequest) {
 
     // Coded supplier label — never expose the real supplier name to customers.
     // Each source gets an opaque code shown in parentheses after the city.
-    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2" };
+    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
     // Strip `source` from the payload so the real supplier never reaches the
     // client — only the opaque code survives, embedded in the warehouse label.
     const offers = picked.map(({ source, ...o }) => ({
