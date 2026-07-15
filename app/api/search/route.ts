@@ -14,10 +14,10 @@ import { findArticles as autodocFindArticles } from "@/lib/autodoc/client";
 import { findAliasMatches } from "@/lib/aliases";
 import { appendSearchLog } from "@/lib/sheets/client";
 import { searchShatemOffers } from "@/lib/shatem/search";
-import { searchAutotradeOffers } from "@/lib/autotrade/search";
+import { searchAutotradeOffers, searchAutotradeRelated } from "@/lib/autotrade/search";
 import { autotradeConfigured } from "@/lib/autotrade/session";
 import { articlesByVinAndName, articlesByVehicleAndName } from "@/lib/shatem/catalog";
-import { pickPerSource } from "@/lib/search/pick";
+import { pickPerSource, partKey } from "@/lib/search/pick";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -166,6 +166,16 @@ export async function GET(req: NextRequest) {
           ).then((lists) => lists.flat())
         : Promise.resolve([]);
 
+    // «Сопутствующие товары» — Autotrade's own related products (mounting kits,
+    // caliper grease…) for an article search. Shown in a separate section.
+    const autotradeRelatedPromise: Promise<PartOffer[]> =
+      kind === "article" && autotradeConfigured()
+        ? searchAutotradeRelated(raw, { markupPct }).catch((err) => {
+            console.warn("[api/search] autotrade related failed:", (err as Error).message);
+            return [] as PartOffer[];
+          })
+        : Promise.resolve([]);
+
     // Step A — brands. For name search with a known vehicle we run several
     // text variants in parallel ("колодки", "колодки Nissan", "колодки
     // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
@@ -252,9 +262,10 @@ export async function GET(req: NextRequest) {
 
     // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
     // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
-    const [shatemOffers, autotradeOffers] = await Promise.all([
+    const [shatemOffers, autotradeOffers, autotradeRelated] = await Promise.all([
       shatemPromise,
       autotradePromise,
+      autotradeRelatedPromise,
     ]);
     // Classify Shate-M / Autotrade offers against the vehicle too (they arrive
     // as "unknown"), so the fit check below sees their make hints as well.
@@ -391,6 +402,29 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // «Сопутствующие товары» — re-price by warehouse markup, drop anything
+    // already shown in the main results, cap and code like the main offers.
+    const RELATED_MAX = 8;
+    const pickedKeys = new Set(picked.map(partKey));
+    const relatedSeen = new Set<string>();
+    const relatedPayload = autotradeRelated
+      .map((o) => {
+        o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+        return o;
+      })
+      .filter((o) => {
+        const k = partKey(o);
+        if (pickedKeys.has(k) || relatedSeen.has(k)) return false;
+        relatedSeen.add(k);
+        return true;
+      })
+      .sort((a, b) => a.priceFinal - b.priceFinal)
+      .slice(0, RELATED_MAX)
+      .map(({ source, ...o }) => {
+        const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
+        return { ...o, warehouse: `Астана (${code})`, sourceCode: code === "?" ? "" : code };
+      });
+
     // Part-number search for a KNOWN vehicle: warn whenever NO result is a
     // confirmed fit. "mismatch" = the description names a different car (loud,
     // hidden). "unconfirmed" = we can't confirm fit from the description (loud
@@ -424,6 +458,7 @@ export async function GET(req: NextRequest) {
       empty: false,
       query: raw,
       offers,
+      related: relatedPayload,
       level: "exact",
       relaxed: false,
       fitWarning,

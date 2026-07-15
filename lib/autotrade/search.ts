@@ -19,6 +19,7 @@ interface QueryItem {
   name?: string;
   original_name?: string;
   part_type?: string;
+  part_type_id?: string | number;
 }
 
 interface StockRow {
@@ -33,40 +34,18 @@ interface StockInfo {
   stocks?: Record<string, StockRow>;
 }
 
-/**
- * Search Autotrade (sklad.autotrade.kz) by article via its JSON API and return
- * PartOffer[] normalized to Astana warehouses that are in stock.
- *
- * Two calls: getItemsByQuery (original + crosses/analogs, related=1) then
- * getStocksAndPrices scoped to the 3 Astana storages. Fail-safe by contract:
- * callers wrap in try/catch; an empty/blocked result returns [].
- */
-export async function searchAutotradeOffers(
+/** Price a list of items via getStocksAndPrices (Astana only) → PartOffer[]. */
+async function pricedOffers(
+  items: QueryItem[],
   query: string,
-  opts: { markupPct: number }
+  markupPct: number
 ): Promise<PartOffer[]> {
-  if (!autotradeConfigured()) return [];
-
-  const q = await autotradeApi("getItemsByQuery", {
-    q: query,
-    brand: "",
-    mode: 1,
-    strict: 1,
-    page: 1,
-    limit: 50,
-    cross: 1, // кроссы/аналоги (той же детали)
-    replace: 1, // замены
-    bycross: 0,
-    related: 0, // НЕ сопутствующие товары (смазки, монтажные комплекты)
-  });
-  const items = (q.items as QueryItem[] | undefined) ?? [];
   if (!items.length) return [];
 
   // The stocks endpoint wants a nested map { article: { brand: qty } }.
   const map: Record<string, Record<string, number>> = {};
   for (const it of items) {
-    const art = String(it.article);
-    (map[art] ||= {})[it.brand_name] = 1;
+    (map[String(it.article)] ||= {})[it.brand_name] = 1;
   }
 
   const sp = await autotradeApi("getStocksAndPrices", {
@@ -115,7 +94,7 @@ export async function searchAutotradeOffers(
       article: art,
       name: it.name || it.original_name || it.part_type || "",
       priceRaw: price,
-      priceFinal: applyMarkup(price, opts.markupPct),
+      priceFinal: applyMarkup(price, markupPct),
       quantity: qty,
       // Raw label only — the coded source label is applied centrally in /api/search.
       warehouse: "Астана",
@@ -131,4 +110,66 @@ export async function searchAutotradeOffers(
     });
   }
   return offers;
+}
+
+/**
+ * Search Autotrade by article and return the part + its crosses/analogs (same
+ * part type), priced for Astana. Fail-safe: callers wrap in try/catch.
+ */
+export async function searchAutotradeOffers(
+  query: string,
+  opts: { markupPct: number }
+): Promise<PartOffer[]> {
+  if (!autotradeConfigured()) return [];
+  const q = await autotradeApi("getItemsByQuery", {
+    q: query,
+    brand: "",
+    mode: 1,
+    strict: 1,
+    page: 1,
+    limit: 50,
+    cross: 1, // кроссы/аналоги (той же детали)
+    replace: 1, // замены
+    bycross: 0,
+    related: 0, // НЕ сопутствующие товары
+  });
+  const items = (q.items as QueryItem[] | undefined) ?? [];
+  return pricedOffers(items, query, opts.markupPct);
+}
+
+/**
+ * Related/accessory products for the queried part ("сопутствующие товары" —
+ * e.g. mounting kits, caliper grease for brake pads). Uses Autotrade's own
+ * related-products data (related=1) — no AI guessing needed — and keeps only
+ * items of a DIFFERENT part type than the queried part (so it's accessories,
+ * not the part itself or its analogs).
+ */
+export async function searchAutotradeRelated(
+  query: string,
+  opts: { markupPct: number }
+): Promise<PartOffer[]> {
+  if (!autotradeConfigured()) return [];
+  const q = await autotradeApi("getItemsByQuery", {
+    q: query,
+    brand: "",
+    mode: 1,
+    strict: 1,
+    page: 1,
+    limit: 50,
+    cross: 0,
+    replace: 0,
+    bycross: 0,
+    related: 1, // сопутствующие товары
+  });
+  const items = (q.items as QueryItem[] | undefined) ?? [];
+  if (!items.length) return [];
+
+  // The queried part's own type — everything of that type is the part/analogs,
+  // NOT an accessory. Take it from the exact-article item (else the first).
+  const normQuery = clean(query);
+  const main = items.find((it) => clean(String(it.article)) === normQuery) ?? items[0];
+  const mainType = String(main?.part_type_id ?? "");
+  const accessories = items.filter((it) => String(it.part_type_id ?? "") !== mainType);
+
+  return pricedOffers(accessories, query, opts.markupPct);
 }
