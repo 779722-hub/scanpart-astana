@@ -169,24 +169,14 @@ export function ResultsList({
     <div className="space-y-4">
       {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
-      {((kind === "article" && q) || state.oem.length > 0) && (
-        <div className="space-y-1 rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
-          {kind === "article" && q && (
-            <div>
-              <span className="text-ink-mute dark:text-paper-mute">Искомый номер: </span>
-              <span className="font-mono font-semibold [overflow-wrap:anywhere]">{q}</span>
-            </div>
-          )}
-          {state.oem.length > 0 && (
-            <div>
-              <span className="text-ink-mute dark:text-paper-mute">
-                Оригинальный номер (OEM):{" "}
-              </span>
-              <span className="font-mono font-semibold [overflow-wrap:anywhere]">
-                {state.oem.join(", ")}
-              </span>
-            </div>
-          )}
+      {state.oem.length > 0 && (
+        <div className="rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
+          <span className="text-ink-mute dark:text-paper-mute">
+            Оригинальный номер (OEM):{" "}
+          </span>
+          <span className="font-mono font-semibold [overflow-wrap:anywhere]">
+            {state.oem.join(", ")}
+          </span>
         </div>
       )}
       {state.offers.length > 1 && <PriceSort sort={sort} onChange={setSort} />}
