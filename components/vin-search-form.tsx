@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
@@ -38,6 +39,7 @@ export function VinSearchForm({
   const tArt = useTranslations("article");
   const tName = useTranslations("name");
   const tRoot = useTranslations();
+  const router = useRouter();
   const [vin, setVin] = useState(initialVin);
   const [status, setStatus] = useState<Status>("idle");
   const [errorKind, setErrorKind] =
@@ -61,6 +63,8 @@ export function VinSearchForm({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ vin: json.vin, vehicle: json.vehicle }),
         });
+        // Refresh server components (header vehicle bar) to show the new car.
+        router.refresh();
       } else {
         setErrorKind(json.error === "invalid_format" ? "invalid" : "notFound");
         setStatus("error");
@@ -96,6 +100,7 @@ export function VinSearchForm({
   function onManualSubmitted(v: Vehicle) {
     setVehicle(v);
     setStatus("ok");
+    router.refresh();
   }
 
   if (status === "wizard") {
@@ -130,7 +135,7 @@ export function VinSearchForm({
   if (status === "ok" && vehicle) {
     return (
       <div className="space-y-6">
-        <div className="card">
+        <div className="card space-y-4">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white">
               <Car className="h-7 w-7" />
@@ -145,6 +150,16 @@ export function VinSearchForm({
               <div className="text-ink-mute dark:text-paper-mute">{vehicle.year}</div>
             </div>
           </div>
+          {vin.length === 17 && !vin.startsWith("MANUAL") && (
+            <div className="border-t border-paper-mute pt-3 dark:border-ink-mute">
+              <div className="text-xs text-ink-mute dark:text-paper-mute">
+                Определён VIN — сверьте с техпаспортом (поле 5):
+              </div>
+              <div className="mt-1 select-all break-all font-mono text-lg font-semibold tracking-[0.15em]">
+                {vin}
+              </div>
+            </div>
+          )}
         </div>
         <div className="card space-y-4">
           <p className="text-pretty text-ink-mute dark:text-paper-mute">
