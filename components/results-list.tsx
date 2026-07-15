@@ -36,6 +36,7 @@ type State =
       kind: "ok";
       offers: PartOffer[];
       related: PartOffer[];
+      oem: string[];
       level: RelaxLevel;
       fit: FitWarning | null;
     };
@@ -91,6 +92,7 @@ export function ResultsList({
           kind: "ok",
           offers: json.offers as PartOffer[],
           related: (json.related as PartOffer[]) ?? [],
+          oem: (json.oem as string[]) ?? [],
           level: (json.level as RelaxLevel) ?? "exact",
           fit: (json.fitWarning as FitWarning | null) ?? null,
         });
@@ -167,15 +169,19 @@ export function ResultsList({
     <div className="space-y-4">
       {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
+      {state.oem.length > 0 && (
+        <div className="rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
+          <span className="text-ink-mute dark:text-paper-mute">
+            Оригинальный номер (OEM):{" "}
+          </span>
+          <span className="font-mono font-semibold [overflow-wrap:anywhere]">
+            {state.oem.join(", ")}
+          </span>
+        </div>
+      )}
       {state.offers.length > 1 && <PriceSort sort={sort} onChange={setSort} />}
       {sortedOffers.map((o, i) => (
-        <OfferCard
-          key={o.id}
-          offer={o}
-          index={i}
-          locale={locale}
-          originalArticle={kind === "article" ? q : ""}
-        />
+        <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
 
       {state.related.length > 0 && (
@@ -398,19 +404,14 @@ function RelaxBanner({ level }: { level: RelaxLevel }) {
   );
 }
 
-const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
-
 function OfferCard({
   offer,
   index,
   locale,
-  originalArticle = "",
 }: {
   offer: PartOffer;
   index: number;
   locale: string;
-  /** The searched part number — shown as the original on analog cards. */
-  originalArticle?: string;
 }) {
   const t = useTranslations("results");
   const cart = useCart();
@@ -489,14 +490,6 @@ function OfferCard({
               {t("article")}
             </dt>
             <dd className="font-mono font-semibold">{offer.article}</dd>
-            {originalArticle &&
-              !offer.isOriginal &&
-              normArt(originalArticle) !== normArt(offer.article) && (
-                <>
-                  <dt className="text-ink-mute dark:text-paper-mute">Оригинал (OEM)</dt>
-                  <dd className="font-mono font-semibold">{originalArticle}</dd>
-                </>
-              )}
             <dt className="text-ink-mute dark:text-paper-mute">{t("stock")}</dt>
             <dd className="font-semibold">
               {offer.quantity} {t("stockSuffix")}
