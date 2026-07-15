@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Car, ChevronRight, ArrowLeft, Check } from "lucide-react";
+import { TechpassScanButton } from "./techpass-scan";
 
 interface Brand {
   code: string;
@@ -37,9 +38,13 @@ const selectCls = "input";
 export function ModelWizard({
   locale,
   onCancel,
+  ocrEnabled = false,
+  onVin,
 }: {
   locale: string;
   onCancel: () => void;
+  ocrEnabled?: boolean;
+  onVin?: (vin: string) => void;
 }) {
   const [brands, setBrands] = useState<Brand[] | null>(null);
   const [catalogId, setCatalogId] = useState("");
@@ -175,6 +180,15 @@ export function ModelWizard({
           <ArrowLeft className="h-4 w-4" /> Назад
         </button>
       </div>
+
+      {ocrEnabled && onVin && (
+        <div className="space-y-1 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
+          <TechpassScanButton onVin={onVin} />
+          <p className="text-center text-xs text-ink-mute dark:text-paper-mute">
+            Знаете VIN? Сфотографируйте техпаспорт — марка определится сама
+          </p>
+        </div>
+      )}
 
       {/* Breadcrumb of chosen parameters */}
       {(catalogId || chosen.length > 0) && (

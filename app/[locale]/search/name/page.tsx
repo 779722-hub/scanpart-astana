@@ -1,8 +1,9 @@
 import { unstable_setRequestLocale } from "next-intl/server";
+import Link from "next/link";
 import { SearchInputForm } from "@/components/search-input-form";
 import { CopyVin } from "@/components/copy-vin";
 import { getSession } from "@/lib/session";
-import { Car } from "lucide-react";
+import { Car, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,41 @@ export default async function NamePage({
   unstable_setRequestLocale(locale);
   const session = await getSession();
   const vehicle = session.vehicle ?? null;
+
+  // Name search only makes sense against a chosen car — otherwise send the
+  // customer to VIN search first.
+  if (!vehicle) {
+    return (
+      <section className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-16">
+        <div className="card space-y-4 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+            <Car className="h-7 w-7" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Ваш автомобиль ещё не определён
+          </h1>
+          <p className="text-ink-mute dark:text-paper-mute">
+            Чтобы подобрать запчасти по названию именно для вашей машины, сначала
+            введите VIN-код.
+          </p>
+          <Link
+            href={`/${locale}/search/vin`}
+            className="btn-primary mx-auto w-full sm:w-auto"
+          >
+            Ввести VIN-код <ChevronRight className="h-4 w-4" />
+          </Link>
+          <p className="text-xs text-ink-mute dark:text-paper-mute">
+            Совет:{" "}
+            <Link href={`/${locale}/account`} className="underline">
+              зарегистрируйтесь
+            </Link>{" "}
+            и добавьте все свои авто — сможете легко переключаться между ними при
+            поиске и видеть историю поисков.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mx-auto max-w-2xl space-y-4 px-4 py-10 sm:px-6 sm:py-16">

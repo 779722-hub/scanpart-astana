@@ -4,6 +4,7 @@ import { LogIn } from "lucide-react";
 import { VinSearchForm } from "@/components/vin-search-form";
 import { getSession } from "@/lib/session";
 import { findCustomer } from "@/lib/sheets/client";
+import { vinOcrEnabled } from "@/lib/vin/ocr";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function VinPage({
     const c = await findCustomer(session.customer.email).catch(() => null);
     savedVins = c?.vins ?? [];
   }
+  const ocrEnabled = await vinOcrEnabled();
   return (
     <section className="mx-auto max-w-2xl space-y-4 px-4 py-10 sm:px-6 sm:py-16">
       {!session.customer && (
@@ -42,6 +44,7 @@ export default async function VinPage({
         locale={locale}
         initialVin={initialVin}
         savedVins={savedVins}
+        ocrEnabled={ocrEnabled}
       />
     </section>
   );
