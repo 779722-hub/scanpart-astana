@@ -453,12 +453,21 @@ export async function GET(req: NextRequest) {
       fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
     }
 
+    // Оригинальный (OEM) номер для «общей картины»: для поиска по названию — это
+    // OEM из VIN-каталога Laximo (Shate-M); для поиска по артикулу — сам искомый
+    // номер (клиент ищет по OEM из техпаспорта/каталога).
+    const oem =
+      kind === "article"
+        ? [raw]
+        : Array.from(new Set(catalogOems.filter(Boolean))).slice(0, 8);
+
     return NextResponse.json({
       ok: true,
       empty: false,
       query: raw,
       offers,
       related: relatedPayload,
+      oem,
       level: "exact",
       relaxed: false,
       fitWarning,
