@@ -76,6 +76,15 @@ test("nameMatchesAll: order-independent, morphology-tolerant", () => {
   assert.equal(nameMatchesAll("что угодно", []), false);
 });
 
+test("nameMatchesAll: category head rejects accessories (reported bug)", () => {
+  // "Крепление масляного фильтра" contains both query words but is a mount.
+  assert.equal(nameMatchesAll("Крепление масляного фильтра", tokens("масляный фильтр")), false);
+  assert.equal(nameMatchesAll("Кронштейн масляного фильтра", tokens("масляный фильтр")), false);
+  assert.equal(nameMatchesAll("Масляный фильтр", tokens("масляный фильтр")), true);
+  // Position qualifiers are skipped when finding the category head.
+  assert.equal(nameMatchesAll("Задний тормозной диск", tokens("тормозной диск")), true);
+});
+
 test("matchingLeafGroups: single noun → all relevant leaves", () => {
   assert.deepEqual(ids(matchingLeafGroups(tree, "колодки")), [15, 16]);
 });
