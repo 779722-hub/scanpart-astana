@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
+import { Loader2, Car, ChevronRight, RotateCcw, Save, Pencil } from "lucide-react";
 import Link from "next/link";
 import { ModelWizard } from "./model-wizard";
 import { TechpassScanButton } from "./techpass-scan";
@@ -45,6 +45,8 @@ export function VinSearchForm({
   const [errorKind, setErrorKind] =
     useState<"invalid" | "notFound" | "generic">("invalid");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [editingVin, setEditingVin] = useState(false);
+  const [vinDraft, setVinDraft] = useState("");
 
   // Resolve a VIN → vehicle, set it as the current car, and show the search
   // chooser (part-number + name). Shared by the form, the saved-car chips and
@@ -155,9 +157,55 @@ export function VinSearchForm({
               <div className="text-xs text-ink-mute dark:text-paper-mute">
                 Определён VIN — сверьте с техпаспортом (поле 5):
               </div>
-              <div className="mt-1 select-all break-all font-mono text-lg font-semibold tracking-[0.15em]">
-                {vin}
-              </div>
+              {editingVin ? (
+                <div className="mt-2 space-y-2">
+                  <input
+                    className="input font-mono uppercase tracking-[0.15em]"
+                    value={vinDraft}
+                    onChange={(e) =>
+                      setVinDraft(e.target.value.toUpperCase().replace(/\s/g, ""))
+                    }
+                    maxLength={17}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="btn-primary !py-2 text-sm"
+                      disabled={vinDraft.length !== 17}
+                      onClick={() => {
+                        setEditingVin(false);
+                        resolve(vinDraft);
+                      }}
+                    >
+                      Проверить
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary !py-2 text-sm"
+                      onClick={() => setEditingVin(false)}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="select-all break-all font-mono text-lg font-semibold tracking-[0.15em]">
+                    {vin}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVinDraft(vin);
+                      setEditingVin(true);
+                    }}
+                    className="inline-flex flex-none items-center gap-1 text-xs font-semibold text-brand underline"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> исправить
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
