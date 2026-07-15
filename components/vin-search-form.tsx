@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Loader2, Car, ChevronRight, RotateCcw, Save } from "lucide-react";
 import Link from "next/link";
 import { ModelWizard } from "./model-wizard";
+import { TechpassScanButton } from "./techpass-scan";
 
 interface Vehicle {
   make: string;
@@ -26,10 +27,12 @@ export function VinSearchForm({
   locale,
   initialVin = "",
   savedVins = [],
+  ocrEnabled = false,
 }: {
   locale: string;
   initialVin?: string;
   savedVins?: string[];
+  ocrEnabled?: boolean;
 }) {
   const t = useTranslations("vin");
   const tArt = useTranslations("article");
@@ -96,7 +99,14 @@ export function VinSearchForm({
   }
 
   if (status === "wizard") {
-    return <ModelWizard locale={locale} onCancel={reset} />;
+    return (
+      <ModelWizard
+        locale={locale}
+        onCancel={reset}
+        ocrEnabled={ocrEnabled}
+        onVin={resolve}
+      />
+    );
   }
 
   if (status === "manual") {
@@ -190,6 +200,21 @@ export function VinSearchForm({
           disabled={status === "loading"}
         />
       </div>
+
+      {ocrEnabled && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 text-xs text-ink-mute dark:text-paper-mute">
+            <span className="h-px flex-1 bg-paper-mute dark:bg-ink-mute" />
+            или
+            <span className="h-px flex-1 bg-paper-mute dark:bg-ink-mute" />
+          </div>
+          <TechpassScanButton onVin={resolve} />
+          <p className="text-center text-xs text-ink-mute dark:text-paper-mute">
+            Сфотографируйте техпаспорт — VIN и марка определятся автоматически
+          </p>
+        </div>
+      )}
+
       {status === "error" && (
         <div className="space-y-3">
           <div className="rounded-2xl bg-brand/10 px-4 py-3 text-sm font-medium text-brand">

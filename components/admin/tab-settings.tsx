@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Settings, Send, Radar } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera } from "lucide-react";
 import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
@@ -33,6 +33,9 @@ const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "te
   { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)" },
   { key: "telegram_chat_id", label: "Telegram chat ID для уведомлений (можно определить кнопкой ниже)" },
 ];
+
+// Keys for the VIN-OCR (техпаспорт по фото) card — saved together with FIELDS.
+const AI_KEYS = ["vin_ocr_provider", "gemini_api_key", "openai_api_key"];
 
 export function TabSettings() {
   const [map, setMap] = useState<Record<string, string> | null>(null);
@@ -87,7 +90,9 @@ export function TabSettings() {
     );
   }
 
-  const dirty = FIELDS.some((f) => (map[f.key] ?? "") !== (draft[f.key] ?? ""));
+  const dirty =
+    FIELDS.some((f) => (map[f.key] ?? "") !== (draft[f.key] ?? "")) ||
+    AI_KEYS.some((k) => (map[k] ?? "") !== (draft[k] ?? ""));
 
   async function save() {
     setStatus("saving");
@@ -96,6 +101,11 @@ export function TabSettings() {
       for (const f of FIELDS) {
         if ((map?.[f.key] ?? "") !== (draft[f.key] ?? "")) {
           patch[f.key] = draft[f.key] ?? "";
+        }
+      }
+      for (const k of AI_KEYS) {
+        if ((map?.[k] ?? "") !== (draft[k] ?? "")) {
+          patch[k] = draft[k] ?? "";
         }
       }
       if (
@@ -233,6 +243,58 @@ export function TabSettings() {
           Определить координаты офиса по адресу
         </button>
       </div>
+
+      {/* VIN-OCR — распознавание техпаспорта по фото */}
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2">
+          <Camera className="h-5 w-5 text-brand" />
+          <h2 className="text-lg font-bold">Распознавание техпаспорта (VIN по фото)</h2>
+        </div>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          Клиент фотографирует техпаспорт — ИИ определяет VIN и сам подставляет его
+          в поиск, дальше подбирается марка и запчасти. Ключ хранится здесь и клиенту
+          не виден. После сохранения кнопка появляется на сайте в течение минуты.
+        </p>
+        <div>
+          <label className="label">ИИ для распознавания</label>
+          <select
+            className="input"
+            value={draft.vin_ocr_provider ?? ""}
+            onChange={(e) => setDraft({ ...draft, vin_ocr_provider: e.target.value })}
+          >
+            <option value="">Выключено</option>
+            <option value="gemini">Google Gemini (дешевле, рекомендуется)</option>
+            <option value="openai">OpenAI GPT</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Ключ Google Gemini (AI Studio, вид «AIza…»)</label>
+          <input
+            className="input"
+            value={draft.gemini_api_key ?? ""}
+            onChange={(e) => setDraft({ ...draft, gemini_api_key: e.target.value })}
+            placeholder="AIza…"
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            Бесплатный ключ: aistudio.google.com → «Get API key».
+          </p>
+        </div>
+        <div>
+          <label className="label">Ключ OpenAI (вид «sk-…»)</label>
+          <input
+            className="input"
+            value={draft.openai_api_key ?? ""}
+            onChange={(e) => setDraft({ ...draft, openai_api_key: e.target.value })}
+            placeholder="sk-…"
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            Ключ: platform.openai.com → API keys.
+          </p>
+        </div>
+      </div>
+
       <div className="flex justify-end">
         <button
           onClick={save}
