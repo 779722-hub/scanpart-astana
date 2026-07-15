@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SearchInputForm } from "@/components/search-input-form";
 import { CopyVin } from "@/components/copy-vin";
 import { getSession } from "@/lib/session";
+import { voiceSearchEnabled, sttServerConfigured } from "@/lib/voice/stt";
 import { Car, ChevronRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ export default async function NamePage({
   unstable_setRequestLocale(locale);
   const session = await getSession();
   const vehicle = session.vehicle ?? null;
+  const [voiceOn, sttServer] = await Promise.all([
+    voiceSearchEnabled(),
+    sttServerConfigured(),
+  ]);
 
   // Name search only makes sense against a chosen car — otherwise send the
   // customer to VIN search first.
@@ -72,7 +77,12 @@ export default async function NamePage({
         </div>
       )}
 
-      <SearchInputForm locale={locale} kind="name" />
+      <SearchInputForm
+        locale={locale}
+        kind="name"
+        voiceEnabled={voiceOn}
+        sttServer={sttServer}
+      />
 
       {vehicle && session.vin && (
         <div className="card space-y-3">

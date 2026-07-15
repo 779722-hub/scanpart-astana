@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, Mic } from "lucide-react";
 import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
@@ -41,6 +41,8 @@ const AI_KEYS = [
   "openai_api_key",
   "openrouter_api_key",
   "openrouter_model",
+  "voice_search_enabled",
+  "voice_stt_provider",
 ];
 
 export function TabSettings() {
@@ -385,6 +387,46 @@ export function TabSettings() {
             {ocrMsg.text}
           </div>
         )}
+      </div>
+
+      {/* Голосовой поиск (микрофон в поиске по названию) */}
+      <div className="card space-y-4">
+        <div className="flex items-center gap-2">
+          <Mic className="h-5 w-5 text-brand" />
+          <h2 className="text-lg font-bold">Голосовой поиск (микрофон в поиске по названию)</h2>
+        </div>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          Клиент нажимает микрофон и говорит название запчасти. Основной способ —
+          бесплатное распознавание прямо в браузере (Chrome/Android). Где браузер
+          не поддерживает (iPhone Safari, Firefox) — используется резерв через ИИ.
+        </p>
+        <div>
+          <label className="label">Голосовой поиск</label>
+          <select
+            className="input"
+            value={draft.voice_search_enabled ?? ""}
+            onChange={(e) => setDraft({ ...draft, voice_search_enabled: e.target.value })}
+          >
+            <option value="">Выключено</option>
+            <option value="on">Включено</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Резервный ИИ (когда браузер не поддерживает)</label>
+          <select
+            className="input"
+            value={draft.voice_stt_provider ?? ""}
+            onChange={(e) => setDraft({ ...draft, voice_stt_provider: e.target.value })}
+          >
+            <option value="">Только браузер (бесплатно)</option>
+            <option value="openai">OpenAI Whisper (надёжнее для iPhone)</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+          <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            Резерв использует ключи Gemini/OpenAI из блока выше — отдельный ключ не
+            нужен. При сбое одного ИИ система пробует второй автоматически.
+          </p>
+        </div>
       </div>
 
       <div className="flex justify-end">
