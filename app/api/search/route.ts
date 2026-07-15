@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup } from "@/lib/markup";
-import { getMarkupPercent, getAnalogsMax, getWarehouseMarkupMap } from "@/lib/sheets/settings";
+import { getMarkupPercent, getAnalogsMax, getWarehouseMarkupMap, getSetting } from "@/lib/sheets/settings";
 import type {
   PartOffer,
   PhaetonBrandItem,
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    const [warehouseIds, markupPct, analogsMax, whMarkup] = await Promise.all([
+    const [warehouseIds, markupPct, analogsMax, whMarkup, showOemSetting] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
         return [] as string[];
@@ -87,7 +87,10 @@ export async function GET(req: NextRequest) {
       getMarkupPercent(),
       getAnalogsMax(),
       getWarehouseMarkupMap().catch(() => ({} as Record<string, number>)),
+      getSetting("show_oem").catch(() => "on"),
     ]);
+    // OEM display is on by default; admin can switch it off (too many variants).
+    const showOem = (showOemSetting ?? "on") !== "off";
 
     // Global markup by default, overridden per warehouse (admin «Склады»).
     const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
@@ -457,7 +460,7 @@ export async function GET(req: NextRequest) {
     // VIN-каталога Laximo (Shate-M) — доступен при поиске по названию. Для
     // поиска по «сырому» артикулу заводского OEM у нас нет, поэтому не выдумываем.
     const oem =
-      kind === "name"
+      kind === "name" && showOem
         ? Array.from(new Set(catalogOems.filter(Boolean))).slice(0, 8)
         : [];
 

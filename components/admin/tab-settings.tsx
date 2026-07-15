@@ -14,9 +14,22 @@ const SHAPE_OPTIONS = [
   { v: "diamond", l: "Ромб" },
 ];
 
-const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "text" | "color" | "shape"; def?: string }[] = [
+const YESNO_OPTIONS = [
+  { v: "on", l: "Да" },
+  { v: "off", l: "Нет" },
+];
+
+const FIELDS: {
+  key: string;
+  label: string;
+  hint?: string;
+  kind?: "number" | "text" | "color" | "shape" | "select";
+  options?: { v: string; l: string }[];
+  def?: string;
+}[] = [
   { key: "markup_percent", label: "Наценка, %", hint: `${MARKUP_MIN}–${MARKUP_MAX}`, kind: "number" },
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
+  { key: "show_oem", label: "Показывать OEM-номер оригинала в результатах", kind: "select", options: YESNO_OPTIONS, def: "on" },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза / офиса (куда курьер везёт самовывоз)" },
@@ -248,6 +261,16 @@ export function TabSettings() {
                   onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
                 >
                   {SHAPE_OPTIONS.map((o) => (
+                    <option key={o.v} value={o.v}>{o.l}</option>
+                  ))}
+                </select>
+              ) : f.kind === "select" ? (
+                <select
+                  className="input"
+                  value={draft[f.key] ?? f.def ?? ""}
+                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                >
+                  {f.options?.map((o) => (
                     <option key={o.v} value={o.v}>{o.l}</option>
                   ))}
                 </select>
