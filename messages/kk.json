@@ -153,7 +153,7 @@
     "fieldPasswordNew": "Құпиясөз (≥ 8 таңба)",
     "fieldName": "Аты",
     "fieldPhone": "Телефон",
-    "fieldWhatsapp": "WhatsApp (міндетті емес)",
+    "fieldWhatsapp": "WhatsApp (қалаулы)",
     "submitLogin": "Кіру",
     "submitRegister": "Аккаунт жасау",
     "errInvalidCreds": "Email немесе құпиясөз қате",

@@ -153,7 +153,7 @@
     "fieldPasswordNew": "Пароль (≥ 8 символов)",
     "fieldName": "Имя",
     "fieldPhone": "Телефон",
-    "fieldWhatsapp": "WhatsApp (необязательно)",
+    "fieldWhatsapp": "WhatsApp (желательно)",
     "submitLogin": "Войти",
     "submitRegister": "Создать аккаунт",
     "errInvalidCreds": "Неверный email или пароль",

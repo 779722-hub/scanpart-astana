@@ -153,7 +153,7 @@
     "fieldPasswordNew": "Password (≥ 8 chars)",
     "fieldName": "Name",
     "fieldPhone": "Phone",
-    "fieldWhatsapp": "WhatsApp (optional)",
+    "fieldWhatsapp": "WhatsApp (recommended)",
     "submitLogin": "Sign in",
     "submitRegister": "Create account",
     "errInvalidCreds": "Wrong email or password",
