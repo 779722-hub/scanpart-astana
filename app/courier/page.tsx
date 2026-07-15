@@ -153,9 +153,9 @@ export default function CourierPage() {
       .catch(() => {});
   }, []);
 
-  // eslint-disable-next-line @next/next/no-img-element
   const brand = (
     <div className="flex items-center justify-center gap-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       {logoUrl ? <img src={logoUrl} alt="SCANPART" className="h-8 w-auto" /> : null}
       <span className="text-xl font-extrabold tracking-tight">
         <span className="text-brand">SCANPART</span> · Доставка
