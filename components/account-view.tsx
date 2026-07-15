@@ -19,7 +19,6 @@ import {
   Plus,
   SunMoon,
 } from "lucide-react";
-import { useCart } from "@/lib/cart";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
 function AppearanceCard() {
@@ -354,7 +353,6 @@ function Dashboard({
   onChange: () => void;
 }) {
   const router = useRouter();
-  const cart = useCart();
 
   async function logout() {
     await fetch("/api/customer/auth/logout", { method: "POST" });
@@ -472,21 +470,36 @@ function Dashboard({
                     </div>
                     <div className="text-sm font-semibold">{g.status}</div>
                   </div>
-                  <RepeatButton
-                    items={g.items}
-                    onLoaded={() => router.push(`/${locale}/cart`)}
-                    cart={cart}
-                  />
+                  <span className="text-xs text-ink-mute dark:text-paper-mute">
+                    Повторить — выберите позицию:
+                  </span>
                 </div>
-                <ul className="mt-2 space-y-1 text-sm">
+                <ul className="mt-2 space-y-2 text-sm">
                   {g.items.map((it, idx) => (
-                    <li key={idx} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 flex-1 truncate">
-                        {it.partName} <span className="text-ink-mute dark:text-paper-mute">· {it.brand} {it.partArticle}</span>
-                      </span>
-                      <span className="flex-none whitespace-nowrap text-ink-mute dark:text-paper-mute">
-                        {fmt(it.price)} ₸ × {it.quantity}
-                      </span>
+                    <li key={idx} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">
+                          {it.partName}{" "}
+                          <span className="text-ink-mute dark:text-paper-mute">
+                            · {it.brand} {it.partArticle}
+                          </span>
+                        </div>
+                        <div className="text-xs text-ink-mute dark:text-paper-mute">
+                          {fmt(it.price)} ₸ × {it.quantity}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/${locale}/results?q=${encodeURIComponent(it.partArticle)}&k=article`
+                          )
+                        }
+                        className="btn-secondary flex-none !px-3 !py-1.5 text-xs"
+                        title="Найти эту позицию: оригинал и аналоги для вашего авто"
+                      >
+                        <RefreshCw className="h-3 w-3" /> Повторить
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -537,83 +550,6 @@ function groupOrders(rows: OrderRow[]): OrderGroup[] {
   }
   return [...groups.values()].sort(
     (a, b) => +new Date(b.date) - +new Date(a.date)
-  );
-}
-
-function RepeatButton({
-  items,
-  onLoaded,
-  cart,
-}: {
-  items: OrderRow[];
-  onLoaded: () => void;
-  cart: ReturnType<typeof useCart>;
-}) {
-  const [busy, setBusy] = useState(false);
-  async function repeat() {
-    setBusy(true);
-    try {
-      const res = await fetch("/api/customer/reorder", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((it) => ({
-            article: it.partArticle,
-            brand: it.brand,
-            partName: it.partName,
-            quantity: it.quantity,
-          })),
-        }),
-      });
-      const j = await res.json();
-      if (!j.ok) {
-        alert("Не удалось получить актуальные цены, попробуйте позже.");
-        return;
-      }
-      const found = (j.items as Array<{
-        brand: string;
-        article: string;
-        name: string;
-        price: number;
-        availableQty: number;
-        found: boolean;
-      }>).filter((i) => i.found);
-      const missing = j.items.length - found.length;
-      if (!found.length) {
-        alert("Ни одна из позиций не доступна сейчас в Астане.");
-        return;
-      }
-      cart.clear();
-      found.forEach((i, idx) => {
-        cart.add({
-          id: `${i.brand}|${i.article}|reorder${idx}`,
-          brand: i.brand,
-          article: i.article,
-          name: i.name,
-          price: i.price,
-          quantity: Math.min(items[idx]?.quantity ?? 1, i.availableQty),
-          availableQty: i.availableQty,
-        });
-      });
-      if (missing > 0) {
-        alert(
-          `Из ${j.items.length} позиций ${missing} сейчас нет в Астане — добавлены только доступные (${found.length}).`
-        );
-      }
-      onLoaded();
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <button onClick={repeat} disabled={busy} className="btn-primary !px-3 !py-2 text-xs">
-      {busy ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        <RefreshCw className="h-3 w-3" />
-      )}
-      Повторить заказ
-    </button>
   );
 }
 
