@@ -35,6 +35,7 @@ type State =
   | {
       kind: "ok";
       offers: PartOffer[];
+      related: PartOffer[];
       level: RelaxLevel;
       fit: FitWarning | null;
     };
@@ -89,6 +90,7 @@ export function ResultsList({
         setState({
           kind: "ok",
           offers: json.offers as PartOffer[],
+          related: (json.related as PartOffer[]) ?? [],
           level: (json.level as RelaxLevel) ?? "exact",
           fit: (json.fitWarning as FitWarning | null) ?? null,
         });
@@ -169,6 +171,21 @@ export function ResultsList({
       {sortedOffers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
+
+      {state.related.length > 0 && (
+        <div className="space-y-3 pt-6">
+          <div className="border-t border-paper-mute pt-4 dark:border-ink-mute">
+            <h2 className="text-xl font-bold">Сопутствующие товары</h2>
+            <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+              Может пригодиться к этому заказу
+            </p>
+          </div>
+          {state.related.map((o, i) => (
+            <OfferCard key={`rel-${o.id}`} offer={o} index={i} locale={locale} />
+          ))}
+        </div>
+      )}
+
       {state.level !== "exact" && <CatalogHint vin={vin} />}
       <div className="pt-2 text-center">
         <Link href={`/${locale}/search/${kind}`} className="btn-secondary inline-flex">
