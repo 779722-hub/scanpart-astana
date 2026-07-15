@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Upload, Loader2 } from "lucide-react";
 
 /**
  * Shrink a phone photo before upload: faster on mobile networks and cheaper for
@@ -36,13 +36,12 @@ export function TechpassScanButton({
   onVin: (vin: string) => void;
   className?: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
+  async function process(file: File | undefined) {
     if (!file) return;
     setBusy(true);
     setMsg("");
@@ -55,9 +54,9 @@ export function TechpassScanButton({
       if (res.ok && j.ok && j.vin) {
         onVin(j.vin);
       } else if (j.error === "no_vin") {
-        setMsg("Не удалось распознать VIN. Сфотографируйте техпаспорт крупно, ровно и без бликов.");
+        setMsg("Не удалось распознать VIN. Снимите/выберите техпаспорт крупно, ровно и без бликов.");
       } else if (j.error === "too_large") {
-        setMsg("Фото слишком большое — попробуйте снять его заново.");
+        setMsg("Фото слишком большое — уменьшите его или снимите заново.");
       } else if (j.error === "disabled") {
         setMsg("Распознавание сейчас недоступно.");
       } else {
@@ -70,25 +69,49 @@ export function TechpassScanButton({
     }
   }
 
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    void process(file);
+  }
+
   return (
     <div className={className}>
+      {/* Camera opens the rear camera on phones; file picker opens gallery/disk. */}
       <input
-        ref={inputRef}
+        ref={cameraRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={onFile}
+        onChange={onPick}
       />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        className="btn-secondary w-full"
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-        {busy ? "Распознаём…" : "Сфотографируйте техпаспорт"}
-      </button>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => cameraRef.current?.click()}
+          disabled={busy}
+          className="btn-secondary flex-1"
+        >
+          <Camera className="h-4 w-4" />
+          Сфотографировать
+        </button>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          className="btn-secondary flex-1"
+        >
+          <Upload className="h-4 w-4" />
+          Выбрать фото
+        </button>
+      </div>
+      {busy && (
+        <p className="mt-2 flex items-center gap-2 text-sm text-ink-mute dark:text-paper-mute">
+          <Loader2 className="h-4 w-4 animate-spin" /> Распознаём…
+        </p>
+      )}
       {msg && <p className="mt-2 text-sm text-brand">{msg}</p>}
     </div>
   );

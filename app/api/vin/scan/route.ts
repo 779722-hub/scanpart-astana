@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const result = await recognizeVin(base64, mime);
   if (result.ok) {
-    return NextResponse.json({ ok: true, vin: result.vin });
+    return NextResponse.json({ ok: true, vin: result.vin, provider: result.provider });
   }
   const status =
     result.error === "disabled" ? 503 : result.error === "no_vin" ? 422 : 502;

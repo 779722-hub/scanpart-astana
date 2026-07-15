@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound } from "lucide-react";
 import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
@@ -44,6 +44,30 @@ export function TabSettings() {
   const [tgBusy, setTgBusy] = useState<"" | "detect" | "test">("");
   const [tgMsg, setTgMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [geoBusy, setGeoBusy] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrMsg, setOcrMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function testOcrKeys() {
+    setOcrBusy(true);
+    setOcrMsg(null);
+    try {
+      const j = await fetch("/api/admin/vin-ocr-test", { method: "POST" }).then((r) => r.json());
+      if (!j.ok) {
+        setOcrMsg({ ok: false, text: "Не удалось выполнить проверку." });
+        return;
+      }
+      const line = (name: string, s: { configured: boolean; ok: boolean }) =>
+        !s.configured ? `${name}: ключ не задан` : s.ok ? `${name}: работает ✓` : `${name}: ключ неверный ✗`;
+      setOcrMsg({
+        ok: Boolean(j.gemini?.ok || j.openai?.ok),
+        text: `${line("Gemini", j.gemini)} · ${line("OpenAI", j.openai)}`,
+      });
+    } catch {
+      setOcrMsg({ ok: false, text: "Ошибка проверки — попробуйте ещё раз." });
+    } finally {
+      setOcrBusy(false);
+    }
+  }
 
   async function geocodeOffice() {
     const addr = (draft.pickup_address ?? "").trim();
@@ -293,6 +317,39 @@ export function TabSettings() {
             Ключ: platform.openai.com → API keys.
           </p>
         </div>
+        <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-ink-mute dark:bg-ink-mute dark:text-paper-mute">
+          Надёжность: если основной ИИ (Gemini) не ответит или вернёт ошибку —
+          система автоматически переключится на OpenAI. Задайте оба ключа, чтобы
+          резерв работал.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn-secondary !px-4 !py-2 text-sm"
+            onClick={testOcrKeys}
+            disabled={ocrBusy || dirty}
+            title={dirty ? "Сначала сохраните изменения" : undefined}
+          >
+            {ocrBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            Проверить ключи
+          </button>
+          {dirty && (
+            <span className="text-xs text-ink-mute dark:text-paper-mute">
+              Сохраните изменения перед проверкой.
+            </span>
+          )}
+        </div>
+        {ocrMsg && (
+          <div
+            className={`rounded-2xl px-4 py-3 text-sm ${
+              ocrMsg.ok
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200"
+                : "bg-brand/10 text-brand"
+            }`}
+          >
+            {ocrMsg.text}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">
