@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Car, ChevronRight, ArrowLeft, Check } from "lucide-react";
 import { TechpassScanButton } from "./techpass-scan";
@@ -56,6 +57,7 @@ export function ModelWizard({
   const [picked, setPicked] = useState<WizVehicle | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/catalog/brands")
@@ -130,6 +132,7 @@ export function ModelWizard({
         }),
       });
       setPicked(v);
+      router.refresh();
     } finally {
       setBusy(false);
     }

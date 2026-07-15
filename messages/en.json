@@ -46,7 +46,7 @@
     "placeholder": "W339055SA",
     "hint": "Enter the part number (e.g. W339055SA)",
     "submit": "Search",
-    "continueHint": "Enter the part number or a part name (e.g. 41060EG090 or \"front brake pads\"). You can also find the exact number in catalogs such as autodoc.ru.",
+    "continueHint": "Enter the part number or a part name (e.g. 41060EG090 or \"front brake pads\").",
     "backHome": "Back to start"
   },
   "name": {
