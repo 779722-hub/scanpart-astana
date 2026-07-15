@@ -4,10 +4,28 @@ import {
   slugifyId,
   parseCoord,
   parseLatLngPair,
+  parseMarkup,
   validateWarehouse,
   hasCoords,
   PICKUP_MINUTES_DEFAULT,
 } from "../lib/delivery/warehouse";
+
+test("parseMarkup: empty → null, clamps, comma decimals", () => {
+  assert.equal(parseMarkup(""), null);
+  assert.equal(parseMarkup(null), null);
+  assert.equal(parseMarkup("abc"), null);
+  assert.equal(parseMarkup("30"), 30);
+  assert.equal(parseMarkup("30,5"), 31); // rounded
+  assert.equal(parseMarkup(5), 10); // clamped to min
+  assert.equal(parseMarkup(999), 200); // clamped to max
+});
+
+test("validateWarehouse: markup optional (null) and clamped when set", () => {
+  const a = validateWarehouse({ name: "W" });
+  if (a.ok) assert.equal(a.warehouse.markup, null);
+  const b = validateWarehouse({ name: "W", markup: "40" });
+  if (b.ok) assert.equal(b.warehouse.markup, 40);
+});
 
 test("parseCoord: comma decimals, blanks, invalid", () => {
   assert.equal(parseCoord("51,1605"), 51.1605);

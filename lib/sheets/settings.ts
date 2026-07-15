@@ -1,8 +1,27 @@
 import { MARKUP_DEFAULT, clampMarkup } from "@/lib/markup";
-import { readSetting, writeSetting } from "./client";
+import { readSetting, writeSetting, readWarehouses } from "./client";
 
 const CACHE_TTL_MS = 60_000;
 let cache: { at: number; map: Record<string, string> } | null = null;
+
+// Per-warehouse markup overrides, keyed by supplier code (Р1/М2/Т3…). Cached
+// like settings; warehouses without an explicit markup are absent (use global).
+let whMarkupCache: { at: number; map: Record<string, number> } | null = null;
+export async function getWarehouseMarkupMap(): Promise<Record<string, number>> {
+  if (whMarkupCache && Date.now() - whMarkupCache.at < CACHE_TTL_MS) {
+    return whMarkupCache.map;
+  }
+  const map: Record<string, number> = {};
+  try {
+    for (const w of await readWarehouses()) {
+      if (w.sourceCode && w.markup != null) map[w.sourceCode] = w.markup;
+    }
+  } catch {
+    /* keep empty → global markup applies everywhere */
+  }
+  whMarkupCache = { at: Date.now(), map };
+  return map;
+}
 
 async function readAll(): Promise<Record<string, string>> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.map;

@@ -15,6 +15,20 @@ export interface Warehouse {
   sourceCode: string;
   /** Marker colour on the map (hex #RRGGBB). */
   color: string;
+  /** Per-warehouse markup %, overrides the global one. null = use global. */
+  markup: number | null;
+}
+
+// Markup bounds (kept in sync with lib/markup MARKUP_MIN/MAX).
+const MARKUP_MIN = 10;
+const MARKUP_MAX = 200;
+
+/** Parse an optional markup %: empty/invalid → null (use global); else clamped. */
+export function parseMarkup(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const n = typeof v === "number" ? v : Number(String(v).trim().replace(",", "."));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(MARKUP_MIN, Math.min(MARKUP_MAX, Math.round(n)));
 }
 
 export const WAREHOUSE_COLOR_DEFAULT = "#F59E0B"; // amber
@@ -66,6 +80,7 @@ export interface WarehouseInput {
   active?: boolean;
   sourceCode?: string;
   color?: string;
+  markup?: string | number | null;
 }
 
 export type ValidateResult =
@@ -104,6 +119,7 @@ export function validateWarehouse(
       active: input.active ?? true,
       sourceCode: (input.sourceCode ?? "").trim(),
       color: normalizeColor(input.color),
+      markup: parseMarkup(input.markup),
     },
   };
 }
