@@ -453,13 +453,13 @@ export async function GET(req: NextRequest) {
       fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
     }
 
-    // Оригинальный (OEM) номер для «общей картины»: для поиска по названию — это
-    // OEM из VIN-каталога Laximo (Shate-M); для поиска по артикулу — сам искомый
-    // номер (клиент ищет по OEM из техпаспорта/каталога).
+    // Оригинальный (OEM) номер = ЗАВОДСКОЙ номер для выбранного авто, из
+    // VIN-каталога Laximo (Shate-M) — доступен при поиске по названию. Для
+    // поиска по «сырому» артикулу заводского OEM у нас нет, поэтому не выдумываем.
     const oem =
-      kind === "article"
-        ? [raw]
-        : Array.from(new Set(catalogOems.filter(Boolean))).slice(0, 8);
+      kind === "name"
+        ? Array.from(new Set(catalogOems.filter(Boolean))).slice(0, 8)
+        : [];
 
     return NextResponse.json({
       ok: true,
