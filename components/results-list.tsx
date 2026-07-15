@@ -493,7 +493,7 @@ function OfferCard({
               !offer.isOriginal &&
               normArt(originalArticle) !== normArt(offer.article) && (
                 <>
-                  <dt className="text-ink-mute dark:text-paper-mute">Оригинальный номер</dt>
+                  <dt className="text-ink-mute dark:text-paper-mute">Оригинал (OEM)</dt>
                   <dd className="font-mono font-semibold">{originalArticle}</dd>
                 </>
               )}
