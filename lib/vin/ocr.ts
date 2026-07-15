@@ -1,3 +1,4 @@
+import { readSetting } from "@/lib/sheets/client";
 import { getSetting } from "@/lib/sheets/settings";
 import { isVinFormatValid, normalizeVin } from "./validator";
 
@@ -9,19 +10,34 @@ export interface OcrConfig {
   openaiKey: string;
 }
 
-/** Read the VIN-OCR settings (provider + API keys) from the admin settings. */
+const REQUEST_TIMEOUT_MS = 25_000;
+
+function parseConfig(map: Record<string, string | undefined>): OcrConfig {
+  const p = (map.vin_ocr_provider ?? "").trim().toLowerCase();
+  return {
+    provider: p === "gemini" || p === "openai" ? p : "",
+    geminiKey: (map.gemini_api_key ?? "").trim(),
+    openaiKey: (map.openai_api_key ?? "").trim(),
+  };
+}
+
+/** Read the VIN-OCR settings (provider + API keys). Cached (~60s) via getSetting. */
 export async function getOcrConfig(): Promise<OcrConfig> {
   const [provider, geminiKey, openaiKey] = await Promise.all([
     getSetting("vin_ocr_provider"),
     getSetting("gemini_api_key"),
     getSetting("openai_api_key"),
   ]);
-  const p = (provider ?? "").trim().toLowerCase();
-  return {
-    provider: p === "gemini" || p === "openai" ? p : "",
-    geminiKey: (geminiKey ?? "").trim(),
-    openaiKey: (openaiKey ?? "").trim(),
-  };
+  return parseConfig({
+    vin_ocr_provider: provider,
+    gemini_api_key: geminiKey,
+    openai_api_key: openaiKey,
+  });
+}
+
+/** Fresh (uncached) config — used by the admin "test keys" check right after saving. */
+async function getOcrConfigFresh(): Promise<OcrConfig> {
+  return parseConfig(await readSetting());
 }
 
 /** True when a provider is selected AND its key is present. */
@@ -32,10 +48,11 @@ export async function vinOcrEnabled(): Promise<boolean> {
 }
 
 const PROMPT =
-  "На изображении — свидетельство о регистрации транспортного средства (техпаспорт). " +
-  "Найди VIN — идентификационный номер транспортного средства, ровно 17 символов " +
-  "(латинские буквы и цифры, без букв I, O, Q). Не путай его с номером двигателя, " +
-  "номером кузова/шасси, госномером или номером самого свидетельства. " +
+  "На изображении — свидетельство о регистрации транспортного средства (техпаспорт), " +
+  "возможно казахстанское, где поля пронумерованы. Найди VIN — идентификационный номер " +
+  "транспортного средства, ровно 17 символов (латинские буквы и цифры, без букв I, O, Q). " +
+  "На казахстанских свидетельствах VIN обычно указан в поле под номером 5 (VIN / номер кузова). " +
+  "Не путай его с номером двигателя, номером шасси, госномером или номером самого свидетельства. " +
   "Верни ТОЛЬКО VIN одной строкой, без пояснений. Если VIN не виден — верни NONE.";
 
 function firstVin(s: string): string | null {
@@ -69,6 +86,7 @@ async function callGemini(base64: string, mime: string, key: string): Promise<st
         ],
         generationConfig: { temperature: 0, maxOutputTokens: 40 },
       }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     }
   );
   if (!res.ok) {
@@ -97,6 +115,7 @@ async function callOpenai(base64: string, mime: string, key: string): Promise<st
         },
       ],
     }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`openai ${res.status}: ${await res.text().catch(() => "")}`);
@@ -108,22 +127,92 @@ async function callOpenai(base64: string, mime: string, key: string): Promise<st
 export interface RecognizeResult {
   ok: boolean;
   vin?: string;
+  provider?: OcrProvider;
   error?: "disabled" | "no_vin" | "provider_error";
 }
 
-/** Recognize a VIN from a base64-encoded image using the configured provider. */
+/**
+ * Recognize a VIN from an image. Tries the selected provider first; if it errors
+ * or times out, automatically falls back to the other provider (when its key is
+ * set). A successful reply with no VIN does NOT fall back — that's an image
+ * problem, not a provider outage, and a second call would only waste money.
+ */
 export async function recognizeVin(base64: string, mime: string): Promise<RecognizeResult> {
   const cfg = await getOcrConfig();
   if (!cfg.provider) return { ok: false, error: "disabled" };
-  try {
-    const text =
-      cfg.provider === "gemini"
-        ? await callGemini(base64, mime, cfg.geminiKey)
-        : await callOpenai(base64, mime, cfg.openaiKey);
-    const vin = extractVin(text);
-    return vin ? { ok: true, vin } : { ok: false, error: "no_vin" };
-  } catch (err) {
-    console.error("[vin/ocr] provider error:", (err as Error).message);
-    return { ok: false, error: "provider_error" };
+
+  const order: OcrProvider[] =
+    cfg.provider === "gemini" ? ["gemini", "openai"] : ["openai", "gemini"];
+  const attempts = order
+    .map((provider) => ({
+      provider,
+      key: provider === "gemini" ? cfg.geminiKey : cfg.openaiKey,
+    }))
+    .filter((a) => a.key);
+
+  if (!attempts.length) return { ok: false, error: "disabled" };
+
+  let lastError: NonNullable<RecognizeResult["error"]> = "provider_error";
+  for (const a of attempts) {
+    try {
+      const text =
+        a.provider === "gemini"
+          ? await callGemini(base64, mime, a.key)
+          : await callOpenai(base64, mime, a.key);
+      const vin = extractVin(text);
+      if (vin) return { ok: true, vin, provider: a.provider };
+      return { ok: false, error: "no_vin", provider: a.provider };
+    } catch (err) {
+      console.error(`[vin/ocr] ${a.provider} failed:`, (err as Error).message);
+      lastError = "provider_error";
+      // fall through to the next provider
+    }
   }
+  return { ok: false, error: lastError };
+}
+
+export interface KeyStatus {
+  configured: boolean;
+  ok: boolean;
+}
+export interface OcrKeysReport {
+  provider: OcrProvider | "";
+  gemini: KeyStatus;
+  openai: KeyStatus;
+}
+
+async function pingGemini(key: string): Promise<KeyStatus> {
+  if (!key) return { configured: false, ok: false };
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
+      { signal: AbortSignal.timeout(15_000) }
+    );
+    return { configured: true, ok: res.ok };
+  } catch {
+    return { configured: true, ok: false };
+  }
+}
+
+async function pingOpenai(key: string): Promise<KeyStatus> {
+  if (!key) return { configured: false, ok: false };
+  try {
+    const res = await fetch("https://api.openai.com/v1/models", {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    return { configured: true, ok: res.ok };
+  } catch {
+    return { configured: true, ok: false };
+  }
+}
+
+/** Ping both providers with the freshly-stored keys — powers the admin test button. */
+export async function verifyOcrKeys(): Promise<OcrKeysReport> {
+  const cfg = await getOcrConfigFresh();
+  const [gemini, openai] = await Promise.all([
+    pingGemini(cfg.geminiKey),
+    pingOpenai(cfg.openaiKey),
+  ]);
+  return { provider: cfg.provider, gemini, openai };
 }

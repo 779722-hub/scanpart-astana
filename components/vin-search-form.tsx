@@ -210,7 +210,8 @@ export function VinSearchForm({
           </div>
           <TechpassScanButton onVin={resolve} />
           <p className="text-center text-xs text-ink-mute dark:text-paper-mute">
-            Сфотографируйте техпаспорт — VIN и марка определятся автоматически
+            Сфотографируйте техпаспорт или загрузите готовое фото — VIN и марка
+            определятся автоматически
           </p>
         </div>
       )}

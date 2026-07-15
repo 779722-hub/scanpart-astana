@@ -185,7 +185,8 @@ export function ModelWizard({
         <div className="space-y-1 rounded-2xl bg-paper-soft p-3 dark:bg-ink-mute">
           <TechpassScanButton onVin={onVin} />
           <p className="text-center text-xs text-ink-mute dark:text-paper-mute">
-            Знаете VIN? Сфотографируйте техпаспорт — марка определится сама
+            Знаете VIN? Сфотографируйте техпаспорт или загрузите готовое фото —
+            марка определится сама
           </p>
         </div>
       )}
