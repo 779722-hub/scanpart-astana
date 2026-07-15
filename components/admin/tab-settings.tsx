@@ -35,7 +35,13 @@ const FIELDS: { key: string; label: string; hint?: string; kind?: "number" | "te
 ];
 
 // Keys for the VIN-OCR (техпаспорт по фото) card — saved together with FIELDS.
-const AI_KEYS = ["vin_ocr_provider", "gemini_api_key", "openai_api_key"];
+const AI_KEYS = [
+  "vin_ocr_provider",
+  "gemini_api_key",
+  "openai_api_key",
+  "openrouter_api_key",
+  "openrouter_model",
+];
 
 export function TabSettings() {
   const [map, setMap] = useState<Record<string, string> | null>(null);
@@ -59,8 +65,8 @@ export function TabSettings() {
       const line = (name: string, s: { configured: boolean; ok: boolean }) =>
         !s.configured ? `${name}: ключ не задан` : s.ok ? `${name}: работает ✓` : `${name}: ключ неверный ✗`;
       setOcrMsg({
-        ok: Boolean(j.gemini?.ok || j.openai?.ok),
-        text: `${line("Gemini", j.gemini)} · ${line("OpenAI", j.openai)}`,
+        ok: Boolean(j.gemini?.ok || j.openai?.ok || j.openrouter?.ok),
+        text: `${line("Gemini", j.gemini)} · ${line("OpenAI", j.openai)} · ${line("OpenRouter", j.openrouter)}`,
       });
     } catch {
       setOcrMsg({ ok: false, text: "Ошибка проверки — попробуйте ещё раз." });
@@ -289,6 +295,7 @@ export function TabSettings() {
             <option value="">Выключено</option>
             <option value="gemini">Google Gemini (дешевле, рекомендуется)</option>
             <option value="openai">OpenAI GPT</option>
+            <option value="openrouter">OpenRouter (резерв, медленнее)</option>
           </select>
         </div>
         <div>
@@ -317,10 +324,38 @@ export function TabSettings() {
             Ключ: platform.openai.com → API keys.
           </p>
         </div>
+        <div>
+          <label className="label">Ключ OpenRouter (вид «sk-or-…»)</label>
+          <input
+            className="input"
+            value={draft.openrouter_api_key ?? ""}
+            onChange={(e) => setDraft({ ...draft, openrouter_api_key: e.target.value })}
+            placeholder="sk-or-…"
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            Резервный шлюз (медленнее). Ключ: openrouter.ai → Keys.
+          </p>
+        </div>
+        <div>
+          <label className="label">Модель OpenRouter (необязательно)</label>
+          <input
+            className="input"
+            value={draft.openrouter_model ?? ""}
+            onChange={(e) => setDraft({ ...draft, openrouter_model: e.target.value })}
+            placeholder="google/gemini-2.0-flash-exp:free"
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+            По умолчанию «google/gemini-2.0-flash-exp:free». Нужна модель с
+            поддержкой изображений (vision).
+          </p>
+        </div>
         <p className="rounded-2xl bg-paper-soft px-4 py-3 text-xs text-ink-mute dark:bg-ink-mute dark:text-paper-mute">
-          Надёжность: если основной ИИ (Gemini) не ответит или вернёт ошибку —
-          система автоматически переключится на OpenAI. Задайте оба ключа, чтобы
-          резерв работал.
+          Надёжность: если основной ИИ не ответит или вернёт ошибку — система
+          автоматически переключается на следующий по цепочке
+          (Gemini → OpenAI → OpenRouter). Задайте несколько ключей, чтобы резерв
+          работал.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
