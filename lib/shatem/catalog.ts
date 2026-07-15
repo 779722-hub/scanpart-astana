@@ -87,11 +87,30 @@ export function stem(t: string): string {
   return base.slice(0, 6);
 }
 
-/** `name` contains the stem of EVERY query token (order-independent). */
+// Leading position qualifiers to skip when finding a part's category head, so
+// "Задний тормозной диск" resolves to "тормозной", not "задний".
+const POSITION_RE = /^(передн|задн|лев|прав|верхн|нижн|наружн|внутрен|средн)/;
+
+/** First significant word that isn't a position qualifier — the part's category. */
+export function categoryHead(name: string): string {
+  const words = name.toLowerCase().match(/[0-9a-zа-яё]{3,}/gi) ?? [];
+  for (const w of words) if (!POSITION_RE.test(w)) return w;
+  return words[0] ?? "";
+}
+
+/**
+ * `name` contains the stem of EVERY query token (order-independent) AND the
+ * part's CATEGORY head is one the query names. The head check rejects
+ * accessories that merely mention the part — e.g. "Крепление масляного фильтра"
+ * for query "масляный фильтр" (head "крепление" ≠ query) — while keeping the
+ * filter itself and position-qualified parts ("Задний тормозной диск").
+ */
 export function nameMatchesAll(name: string, qtokens: string[]): boolean {
   if (!qtokens.length) return false;
   const hay = name.toLowerCase();
-  return qtokens.every((t) => hay.includes(stem(t)));
+  if (!qtokens.every((t) => hay.includes(stem(t)))) return false;
+  const head = categoryHead(name);
+  return !head || qtokens.some((t) => head.includes(stem(t)));
 }
 
 /**
