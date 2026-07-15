@@ -359,21 +359,24 @@ export async function GET(req: NextRequest) {
     const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
     // Strip `source` from the payload so the real supplier never reaches the
     // client — only the opaque code survives, embedded in the warehouse label.
-    const offers = picked.map(({ source, ...o }) => ({
+    const offers = picked.map(({ source, ...o }) => {
+      // Prefer a per-offer code (Autotrade sets its warehouse's own Т3/Т4/Т5);
+      // otherwise fall back to the source default (Phaeton Р1, Shate-M М2).
+      const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
+      return {
       ...o,
-      warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${
-        SOURCE_CODE[source ?? "phaeton"] ?? "?"
-      })`,
-      // Opaque supplier code (Р1/М2) — already shown to the client in the label;
-      // carried explicitly so it can be stored on the order for internal routing.
-      sourceCode: SOURCE_CODE[source ?? "phaeton"] ?? "",
+      warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${code})`,
+      // Opaque supplier code — already shown to the client in the label; carried
+      // explicitly so it can be stored on the order for internal pickup routing.
+      sourceCode: code === "?" ? "" : code,
       // A VIN-scoped search draws every part from the vehicle's own catalog, so
       // they all fit — show them all as confirmed rather than the misleading
       // "совместимость не подтверждена" that name-text heuristics produce.
       ...(vinScoped
         ? { compat: "match" as const, compatReason: "подобрано по каталогу для вашего авто" }
         : {}),
-    }));
+      };
+    });
 
     // Part-number search for a KNOWN vehicle: warn whenever NO result is a
     // confirmed fit. "mismatch" = the description names a different car (loud,
