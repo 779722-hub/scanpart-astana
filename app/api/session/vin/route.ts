@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { isVinFormatValid, normalizeVin } from "@/lib/vin/validator";
+import { isVinAcceptable, normalizeVin } from "@/lib/vin/validator";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const vin = normalizeVin(body.vin ?? "");
   // Accept either a real VIN with valid format, OR a manual entry (make is enough).
   const isManual = vin.startsWith("MANUAL");
-  if (!isManual && (!isVinFormatValid(vin) || !body.vehicle?.model)) {
+  if (!isManual && (!isVinAcceptable(vin) || !body.vehicle?.model)) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   if (!body.vehicle?.make) {
