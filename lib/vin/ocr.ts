@@ -104,10 +104,11 @@ function extractVin(text: string): string | null {
 
 async function callGemini(base64: string, mime: string, key: string): Promise<string> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // Auth via header (works for both AIza… and the newer AQ.… key format).
+      headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [
           { parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: base64 } }] },
@@ -259,11 +260,9 @@ async function pingKey(
 export async function verifyOcrKeys(): Promise<OcrKeysReport> {
   const cfg = await getOcrConfigFresh();
   const [gemini, openai, openrouter] = await Promise.all([
-    pingKey(
-      cfg.geminiKey,
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cfg.geminiKey)}`,
-      {}
-    ),
+    pingKey(cfg.geminiKey, "https://generativelanguage.googleapis.com/v1beta/models", {
+      "x-goog-api-key": cfg.geminiKey,
+    }),
     pingKey(cfg.openaiKey, "https://api.openai.com/v1/models", {
       authorization: `Bearer ${cfg.openaiKey}`,
     }),
