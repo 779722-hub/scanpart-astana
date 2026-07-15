@@ -54,7 +54,10 @@ export async function searchAutotradeOffers(
     strict: 1,
     page: 1,
     limit: 50,
-    related: 1,
+    cross: 1, // кроссы/аналоги (той же детали)
+    replace: 1, // замены
+    bycross: 0,
+    related: 0, // НЕ сопутствующие товары (смазки, монтажные комплекты)
   });
   const items = (q.items as QueryItem[] | undefined) ?? [];
   if (!items.length) return [];

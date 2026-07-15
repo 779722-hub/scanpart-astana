@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup } from "@/lib/markup";
-import { getMarkupPercent } from "@/lib/sheets/settings";
+import { getMarkupPercent, getAnalogsMax } from "@/lib/sheets/settings";
 import type {
   PartOffer,
   PhaetonBrandItem,
@@ -79,12 +79,13 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    const [warehouseIds, markupPct] = await Promise.all([
+    const [warehouseIds, markupPct, analogsMax] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
         return [] as string[];
       }),
       getMarkupPercent(),
+      getAnalogsMax(),
     ]);
 
     // Catalog (Shate-M Laximo) — name search for a known vehicle by VIN turns
@@ -341,8 +342,9 @@ export async function GET(req: NextRequest) {
       (o) => o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords)
     );
 
-    // Up to 3 offers from EACH supplier (Р1/М2/…), deduped within a supplier.
-    const picked = pickPerSource(inAstanaStock, 3);
+    // Up to `analogsMax` (admin setting) distinct parts from EACH warehouse
+    // (Р1/М2/Т3/Т4/Т5), deduped by part number so every warehouse is represented.
+    const picked = pickPerSource(inAstanaStock, analogsMax);
 
     if (!picked.length) {
       logSearch(0);

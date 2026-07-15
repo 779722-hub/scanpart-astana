@@ -21,8 +21,8 @@ export function partKey(o: PartOffer): string {
  * spaces/dashes/case) is ONE part even across suppliers/warehouses — e.g.
  * "OC 90" and "OC90" — so it collapses to the single best offer (cheapest /
  * in-stock / fastest). Then up to `perSourceMax` DISTINCT parts are shown from
- * EACH supplier so every source stays represented. Callers pass offers already
- * filtered to Astana + in-stock.
+ * EACH warehouse so every pickup point (Р1/М2/Т3/Т4/Т5) stays represented.
+ * Callers pass offers already filtered to Astana + in-stock.
  */
 export function pickPerSource(offers: PartOffer[], perSourceMax: number): PartOffer[] {
   // 1) Collapse identical part numbers across everything, keep the best.
@@ -32,10 +32,12 @@ export function pickPerSource(offers: PartOffer[], perSourceMax: number): PartOf
     const cur = best.get(k);
     if (!cur || sortForDisplay(o, cur) < 0) best.set(k, o);
   }
-  // 2) Up to perSourceMax distinct parts from each surviving supplier.
+  // 2) Up to perSourceMax distinct parts from each warehouse. Group by the
+  // warehouse code when present (Autotrade's Т3/Т4/Т5 are separate pickup
+  // points); otherwise by supplier (Phaeton/Shate-M each map to one code).
   const bySource = new Map<string, PartOffer[]>();
   for (const o of best.values()) {
-    const s = o.source ?? "phaeton";
+    const s = o.sourceCode || o.source || "phaeton";
     const list = bySource.get(s);
     if (list) list.push(o);
     else bySource.set(s, [o]);
