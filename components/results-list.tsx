@@ -169,14 +169,24 @@ export function ResultsList({
     <div className="space-y-4">
       {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
-      {state.oem.length > 0 && (
-        <div className="rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
-          <span className="text-ink-mute dark:text-paper-mute">
-            Оригинальный номер (OEM):{" "}
-          </span>
-          <span className="font-mono font-semibold [overflow-wrap:anywhere]">
-            {state.oem.join(", ")}
-          </span>
+      {((kind === "article" && q) || state.oem.length > 0) && (
+        <div className="space-y-1 rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
+          {kind === "article" && q && (
+            <div>
+              <span className="text-ink-mute dark:text-paper-mute">Искомый номер: </span>
+              <span className="font-mono font-semibold [overflow-wrap:anywhere]">{q}</span>
+            </div>
+          )}
+          {state.oem.length > 0 && (
+            <div>
+              <span className="text-ink-mute dark:text-paper-mute">
+                Оригинальный номер (OEM):{" "}
+              </span>
+              <span className="font-mono font-semibold [overflow-wrap:anywhere]">
+                {state.oem.join(", ")}
+              </span>
+            </div>
+          )}
         </div>
       )}
       {state.offers.length > 1 && <PriceSort sort={sort} onChange={setSort} />}
@@ -187,8 +197,8 @@ export function ResultsList({
       {state.related.length > 0 && (
         <div className="space-y-3 pt-6">
           <div className="border-t border-paper-mute pt-4 dark:border-ink-mute">
-            <h2 className="text-xl font-bold">Сопутствующие товары</h2>
-            <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+            <h2 className="text-2xl font-bold sm:text-3xl">Сопутствующие товары</h2>
+            <p className="mt-1 text-base text-ink-mute dark:text-paper-mute">
               Может пригодиться к этому заказу
             </p>
           </div>
