@@ -14,6 +14,7 @@ interface Warehouse {
   active: boolean;
   sourceCode: string;
   color: string;
+  markup: number | null;
 }
 
 type Draft = {
@@ -26,10 +27,11 @@ type Draft = {
   active: boolean;
   sourceCode: string;
   color: string;
+  markup: string;
 };
 
 const DEFAULT_COLOR = "#F59E0B";
-const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true, sourceCode: "", color: DEFAULT_COLOR };
+const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "15", active: true, sourceCode: "", color: DEFAULT_COLOR, markup: "" };
 // Quick-pick palette (manager can also open the native picker for any colour).
 const COLOR_PRESETS = ["#F59E0B", "#EA580C", "#2563EB", "#16A34A", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
 
@@ -83,6 +85,7 @@ export function TabWarehouses() {
           active: draft.active,
           sourceCode: draft.sourceCode,
           color: draft.color,
+          markup: draft.markup,
         }),
       });
       const j = await res.json();
@@ -145,6 +148,11 @@ export function TabWarehouses() {
                   {w.sourceCode}
                 </span>
               )}
+              {w.markup != null && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                  наценка {w.markup}%
+                </span>
+              )}
               {!w.active && (
                 <span className="rounded-full bg-paper-soft px-2 py-0.5 text-xs text-ink-mute dark:bg-ink-mute">
                   выключен
@@ -174,6 +182,7 @@ export function TabWarehouses() {
                   active: w.active,
                   sourceCode: w.sourceCode ?? "",
                   color: w.color ?? DEFAULT_COLOR,
+                  markup: w.markup != null ? String(w.markup) : "",
                 })
               }
             >
@@ -217,6 +226,20 @@ export function TabWarehouses() {
               />
               <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
                 Любой код из заказа (Р1, М2, Т4, Т5…) — тогда доставка из заказа сама подставит этот склад.
+              </p>
+            </div>
+            <div>
+              <label className="label">Наценка склада, % (пусто = общая)</label>
+              <input
+                className="input"
+                inputMode="numeric"
+                placeholder="напр. 30"
+                value={draft.markup}
+                onChange={(e) => setDraft({ ...draft, markup: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+                Переопределяет общую наценку для этого склада (10–200). Пусто —
+                применяется общая наценка из «Настроек».
               </p>
             </div>
           </div>

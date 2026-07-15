@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup } from "@/lib/markup";
-import { getMarkupPercent, getAnalogsMax } from "@/lib/sheets/settings";
+import { getMarkupPercent, getAnalogsMax, getWarehouseMarkupMap } from "@/lib/sheets/settings";
 import type {
   PartOffer,
   PhaetonBrandItem,
@@ -79,14 +79,21 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    const [warehouseIds, markupPct, analogsMax] = await Promise.all([
+    const [warehouseIds, markupPct, analogsMax, whMarkup] = await Promise.all([
       getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
         return [] as string[];
       }),
       getMarkupPercent(),
       getAnalogsMax(),
+      getWarehouseMarkupMap().catch(() => ({} as Record<string, number>)),
     ]);
+
+    // Global markup by default, overridden per warehouse (admin «Склады»).
+    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
+    const codeOf = (o: PartOffer): string =>
+      o.sourceCode || SOURCE_CODE[o.source ?? "phaeton"] || "";
+    const markupForOffer = (o: PartOffer): number => whMarkup[codeOf(o)] ?? markupPct;
 
     // Catalog (Shate-M Laximo) — name search for a known vehicle by VIN turns
     // the free-text name into concrete OEM part numbers for THIS car, which we
@@ -333,6 +340,11 @@ export async function GET(req: NextRequest) {
     if (shatemOffers.length) allOffers.push(...shatemOffers);
     if (autotradeOffers.length) allOffers.push(...autotradeOffers);
 
+    // Re-price every offer with its warehouse's markup (global unless the
+    // warehouse has its own markup set in admin «Склады»). Done before the
+    // pick/sort so "cheapest" reflects the real customer price.
+    for (const o of allOffers) o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+
     // Show ONLY what the customer asked for: Astana warehouses, in stock now.
     // No relaxation to delivery/other cities. Word-match applies to name
     // search; compat is a sort hint, never a hard filter, so vehicle-fit
@@ -358,7 +370,6 @@ export async function GET(req: NextRequest) {
 
     // Coded supplier label — never expose the real supplier name to customers.
     // Each source gets an opaque code shown in parentheses after the city.
-    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
     // Strip `source` from the payload so the real supplier never reaches the
     // client — only the opaque code survives, embedded in the warehouse label.
     const offers = picked.map(({ source, ...o }) => {

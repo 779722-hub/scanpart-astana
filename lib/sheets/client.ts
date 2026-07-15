@@ -1,5 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
-import { parseCoord, normalizeColor, type Warehouse } from "@/lib/delivery/warehouse";
+import { parseCoord, normalizeColor, parseMarkup, type Warehouse } from "@/lib/delivery/warehouse";
 import type { Courier, Delivery, DeliveryStatus } from "@/lib/delivery/types";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
@@ -598,7 +598,7 @@ export async function readWarehouses(): Promise<Warehouse[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${WAREHOUSES_SHEET}!A2:J`,
+    range: `${WAREHOUSES_SHEET}!A2:K`,
   });
   return (data.values ?? [])
     .map((r) => ({
@@ -611,6 +611,7 @@ export async function readWarehouses(): Promise<Warehouse[]> {
       active: String(r[6] ?? "").toLowerCase() !== "false",
       sourceCode: String(r[8] ?? "").trim(),
       color: normalizeColor(String(r[9] ?? "")),
+      markup: parseMarkup(r[10] as string | number | null),
     }))
     .filter((w) => w.id);
 }
@@ -630,6 +631,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
     new Date().toISOString(),
     w.sourceCode ?? "",
     w.color ?? "",
+    w.markup ?? "",
   ];
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: id,
@@ -639,7 +641,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
   if (rowIdx === -1) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: id,
-      range: `${WAREHOUSES_SHEET}!A:J`,
+      range: `${WAREHOUSES_SHEET}!A:K`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [row] },
     });
@@ -647,7 +649,7 @@ export async function upsertWarehouse(w: Warehouse): Promise<void> {
   }
   await sheets.spreadsheets.values.update({
     spreadsheetId: id,
-    range: `${WAREHOUSES_SHEET}!A${rowIdx + 1}:J${rowIdx + 1}`,
+    range: `${WAREHOUSES_SHEET}!A${rowIdx + 1}:K${rowIdx + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
   });
@@ -937,6 +939,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "updated_at",
     "source_code",
     "color",
+    "markup",
   ],
   Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at"],
   CourierLocations: ["courier_id", "lat", "lng", "updated_at"],
