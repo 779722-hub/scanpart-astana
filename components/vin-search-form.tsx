@@ -7,6 +7,7 @@ import { Loader2, Car, ChevronRight, RotateCcw, Save, Pencil } from "lucide-reac
 import Link from "next/link";
 import { ModelWizard } from "./model-wizard";
 import { TechpassScanButton } from "./techpass-scan";
+import { isVinAcceptable } from "@/lib/vin/validator";
 
 interface Vehicle {
   make: string;
@@ -86,7 +87,7 @@ export function VinSearchForm({
   // right away so the customer lands on the search chooser, not an empty form.
   const autoRan = useRef(false);
   useEffect(() => {
-    if (!autoRan.current && initialVin.length === 17) {
+    if (!autoRan.current && isVinAcceptable(initialVin)) {
       autoRan.current = true;
       resolve(initialVin);
     }
@@ -152,7 +153,7 @@ export function VinSearchForm({
               <div className="text-ink-mute dark:text-paper-mute">{vehicle.year}</div>
             </div>
           </div>
-          {vin.length === 17 && !vin.startsWith("MANUAL") && (
+          {isVinAcceptable(vin) && !vin.startsWith("MANUAL") && (
             <div className="border-t border-paper-mute pt-3 dark:border-ink-mute">
               <div className="text-xs text-ink-mute dark:text-paper-mute">
                 Определён VIN — сверьте с техпаспортом (поле 5):
@@ -172,7 +173,7 @@ export function VinSearchForm({
                     <button
                       type="button"
                       className="btn-primary !py-2 text-sm"
-                      disabled={vinDraft.length !== 17}
+                      disabled={!isVinAcceptable(vinDraft)}
                       onClick={() => {
                         setEditingVin(false);
                         resolve(vinDraft);

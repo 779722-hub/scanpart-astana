@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeVin, type VehicleInfo } from "@/lib/vin/decoder";
-import { isVinFormatValid, normalizeVin } from "@/lib/vin/validator";
+import { isVinAcceptable, normalizeVin } from "@/lib/vin/validator";
 import { vehicleByVin } from "@/lib/shatem/catalog";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   // decode — enough for labelling saved cars ("Infiniti FX35") in the cabinet.
   const fast = req.nextUrl.searchParams.get("fast") === "1";
 
-  if (!isVinFormatValid(vin)) {
+  if (!isVinAcceptable(vin)) {
     return NextResponse.json(
       { ok: false, error: "invalid_format" },
       { status: 400 }

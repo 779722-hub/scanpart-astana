@@ -377,7 +377,7 @@ function Dashboard({
       body: JSON.stringify({ vin: vin.trim().toUpperCase() }),
     });
     if (!res.ok) {
-      alert("VIN должен быть 17 символов (без I, O, Q).");
+      alert("Проверьте VIN — обычно 17 символов (для старых/корейских авто допускается короче).");
       return false;
     }
     onChange();
@@ -393,7 +393,7 @@ function Dashboard({
       body: JSON.stringify({ oldVin, newVin: next }),
     });
     if (!res.ok) {
-      alert("VIN должен быть 17 символов (без I, O, Q).");
+      alert("Проверьте VIN — обычно 17 символов (для старых/корейских авто допускается короче).");
       return false;
     }
     onChange();

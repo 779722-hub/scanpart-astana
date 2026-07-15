@@ -6,7 +6,7 @@ import {
   replaceCustomerVin,
   saveCustomerVin,
 } from "@/lib/auth/customers";
-import { isVinFormatValid, normalizeVin } from "@/lib/vin/validator";
+import { isVinAcceptable, normalizeVin } from "@/lib/vin/validator";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ const replaceSchema = z.object({
 });
 
 function valid(vin: string): boolean {
-  return vin.startsWith("MANUAL") || isVinFormatValid(vin);
+  return vin.startsWith("MANUAL") || isVinAcceptable(vin);
 }
 
 export async function POST(req: NextRequest) {
