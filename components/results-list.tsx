@@ -169,7 +169,13 @@ export function ResultsList({
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
       {state.offers.length > 1 && <PriceSort sort={sort} onChange={setSort} />}
       {sortedOffers.map((o, i) => (
-        <OfferCard key={o.id} offer={o} index={i} locale={locale} />
+        <OfferCard
+          key={o.id}
+          offer={o}
+          index={i}
+          locale={locale}
+          originalArticle={kind === "article" ? q : ""}
+        />
       ))}
 
       {state.related.length > 0 && (
@@ -392,14 +398,19 @@ function RelaxBanner({ level }: { level: RelaxLevel }) {
   );
 }
 
+const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+
 function OfferCard({
   offer,
   index,
   locale,
+  originalArticle = "",
 }: {
   offer: PartOffer;
   index: number;
   locale: string;
+  /** The searched part number — shown as the original on analog cards. */
+  originalArticle?: string;
 }) {
   const t = useTranslations("results");
   const cart = useCart();
@@ -478,6 +489,14 @@ function OfferCard({
               {t("article")}
             </dt>
             <dd className="font-mono font-semibold">{offer.article}</dd>
+            {originalArticle &&
+              !offer.isOriginal &&
+              normArt(originalArticle) !== normArt(offer.article) && (
+                <>
+                  <dt className="text-ink-mute dark:text-paper-mute">Оригинальный номер</dt>
+                  <dd className="font-mono font-semibold">{originalArticle}</dd>
+                </>
+              )}
             <dt className="text-ink-mute dark:text-paper-mute">{t("stock")}</dt>
             <dd className="font-semibold">
               {offer.quantity} {t("stockSuffix")}
