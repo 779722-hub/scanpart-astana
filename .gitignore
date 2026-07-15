@@ -47,3 +47,12 @@ Thumbs.db
 
 # Pre-existing nested workspace from a previous attempt — keep out of the new repo.
 /scanpart-astana/
+
+.vercel
+
+# Autotrade probe output (scratch)
+scripts/.autotrade-search.html
+
+scripts/.at-*
+scripts/.search.js
+scripts/.global.js
