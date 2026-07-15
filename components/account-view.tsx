@@ -315,7 +315,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div>
-          <label className="label">WhatsApp (необязательно)</label>
+          <label className="label">WhatsApp (желательно)</label>
           <input
             className="input"
             inputMode="tel"
