@@ -2,12 +2,20 @@ import { readSetting } from "@/lib/sheets/client";
 import { getSetting } from "@/lib/sheets/settings";
 import { isVinFormatValid, normalizeVin } from "./validator";
 
-export type OcrProvider = "gemini" | "openai";
+export type OcrProvider = "gemini" | "openai" | "openrouter";
+
+// Fallback order: the selected provider goes first, the rest follow in this
+// priority (OpenRouter is a slower gateway, so it comes last).
+const PRIORITY: OcrProvider[] = ["gemini", "openai", "openrouter"];
+
+const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free";
 
 export interface OcrConfig {
   provider: OcrProvider | "";
   geminiKey: string;
   openaiKey: string;
+  openrouterKey: string;
+  openrouterModel: string;
 }
 
 const REQUEST_TIMEOUT_MS = 25_000;
@@ -15,23 +23,38 @@ const REQUEST_TIMEOUT_MS = 25_000;
 function parseConfig(map: Record<string, string | undefined>): OcrConfig {
   const p = (map.vin_ocr_provider ?? "").trim().toLowerCase();
   return {
-    provider: p === "gemini" || p === "openai" ? p : "",
+    provider: p === "gemini" || p === "openai" || p === "openrouter" ? p : "",
     geminiKey: (map.gemini_api_key ?? "").trim(),
     openaiKey: (map.openai_api_key ?? "").trim(),
+    openrouterKey: (map.openrouter_api_key ?? "").trim(),
+    openrouterModel: (map.openrouter_model ?? "").trim() || DEFAULT_OPENROUTER_MODEL,
   };
+}
+
+function keyFor(cfg: OcrConfig, provider: OcrProvider): string {
+  return provider === "gemini"
+    ? cfg.geminiKey
+    : provider === "openai"
+      ? cfg.openaiKey
+      : cfg.openrouterKey;
 }
 
 /** Read the VIN-OCR settings (provider + API keys). Cached (~60s) via getSetting. */
 export async function getOcrConfig(): Promise<OcrConfig> {
-  const [provider, geminiKey, openaiKey] = await Promise.all([
-    getSetting("vin_ocr_provider"),
-    getSetting("gemini_api_key"),
-    getSetting("openai_api_key"),
-  ]);
+  const [provider, geminiKey, openaiKey, openrouterKey, openrouterModel] =
+    await Promise.all([
+      getSetting("vin_ocr_provider"),
+      getSetting("gemini_api_key"),
+      getSetting("openai_api_key"),
+      getSetting("openrouter_api_key"),
+      getSetting("openrouter_model"),
+    ]);
   return parseConfig({
     vin_ocr_provider: provider,
     gemini_api_key: geminiKey,
     openai_api_key: openaiKey,
+    openrouter_api_key: openrouterKey,
+    openrouter_model: openrouterModel,
   });
 }
 
@@ -44,16 +67,21 @@ async function getOcrConfigFresh(): Promise<OcrConfig> {
 export async function vinOcrEnabled(): Promise<boolean> {
   const c = await getOcrConfig().catch(() => null);
   if (!c || !c.provider) return false;
-  return c.provider === "gemini" ? Boolean(c.geminiKey) : Boolean(c.openaiKey);
+  return Boolean(keyFor(c, c.provider));
 }
 
 const PROMPT =
   "На изображении — свидетельство о регистрации транспортного средства (техпаспорт), " +
-  "возможно казахстанское, где поля пронумерованы. Найди VIN — идентификационный номер " +
-  "транспортного средства, ровно 17 символов (латинские буквы и цифры, без букв I, O, Q). " +
+  "возможно казахстанское, где поля пронумерованы. Фото могло быть снято обычным телефоном: " +
+  "оно может быть тёмным, с бликами и засветкой, с тенями, под наклоном или слегка размытым — " +
+  "внимательно вглядись в текст и всё равно постарайся его прочитать. " +
+  "Найди VIN — идентификационный номер, ровно 17 символов из латинских букв и цифр " +
+  "(буквы I, O, Q в VIN не встречаются). " +
   "На казахстанских свидетельствах VIN обычно указан в поле под номером 5 (VIN / номер кузова). " +
   "Не путай его с номером двигателя, номером шасси, госномером или номером самого свидетельства. " +
-  "Верни ТОЛЬКО VIN одной строкой, без пояснений. Если VIN не виден — верни NONE.";
+  "Читай посимвольно и различай похожие знаки: 0 и O, 1 и I, 8 и B, 5 и S, 2 и Z, 6 и G. " +
+  "Верни ТОЛЬКО 17 символов VIN одной строкой, без пробелов и пояснений. " +
+  "Если VIN разобрать невозможно — верни NONE.";
 
 function firstVin(s: string): string | null {
   const m = s.match(/[A-HJ-NPR-Z0-9]{17}/);
@@ -97,12 +125,20 @@ async function callGemini(base64: string, mime: string, key: string): Promise<st
   return parts.map((p: { text?: string }) => p.text ?? "").join("");
 }
 
-async function callOpenai(base64: string, mime: string, key: string): Promise<string> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+/** OpenAI-compatible chat call — shared by OpenAI and OpenRouter (same schema). */
+async function callOpenaiCompatible(
+  url: string,
+  key: string,
+  model: string,
+  base64: string,
+  mime: string,
+  extraHeaders: Record<string, string> = {}
+): Promise<string> {
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}`, ...extraHeaders },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model,
       temperature: 0,
       max_tokens: 40,
       messages: [
@@ -118,10 +154,36 @@ async function callOpenai(base64: string, mime: string, key: string): Promise<st
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) {
-    throw new Error(`openai ${res.status}: ${await res.text().catch(() => "")}`);
+    throw new Error(`${url} ${res.status}: ${await res.text().catch(() => "")}`);
   }
   const j = await res.json();
   return j?.choices?.[0]?.message?.content ?? "";
+}
+
+async function callProvider(
+  provider: OcrProvider,
+  base64: string,
+  mime: string,
+  cfg: OcrConfig
+): Promise<string> {
+  if (provider === "gemini") return callGemini(base64, mime, cfg.geminiKey);
+  if (provider === "openai") {
+    return callOpenaiCompatible(
+      "https://api.openai.com/v1/chat/completions",
+      cfg.openaiKey,
+      "gpt-4o-mini",
+      base64,
+      mime
+    );
+  }
+  return callOpenaiCompatible(
+    "https://openrouter.ai/api/v1/chat/completions",
+    cfg.openrouterKey,
+    cfg.openrouterModel,
+    base64,
+    mime,
+    { "X-Title": "SCANPART" }
+  );
 }
 
 export interface RecognizeResult {
@@ -133,21 +195,17 @@ export interface RecognizeResult {
 
 /**
  * Recognize a VIN from an image. Tries the selected provider first; if it errors
- * or times out, automatically falls back to the other provider (when its key is
- * set). A successful reply with no VIN does NOT fall back — that's an image
- * problem, not a provider outage, and a second call would only waste money.
+ * or times out, automatically falls back to the next provider that has a key
+ * (Gemini → OpenAI → OpenRouter). A successful reply with no VIN does NOT fall
+ * back — that's an image problem, not a provider outage.
  */
 export async function recognizeVin(base64: string, mime: string): Promise<RecognizeResult> {
   const cfg = await getOcrConfig();
   if (!cfg.provider) return { ok: false, error: "disabled" };
 
-  const order: OcrProvider[] =
-    cfg.provider === "gemini" ? ["gemini", "openai"] : ["openai", "gemini"];
+  const order = [cfg.provider, ...PRIORITY.filter((p) => p !== cfg.provider)];
   const attempts = order
-    .map((provider) => ({
-      provider,
-      key: provider === "gemini" ? cfg.geminiKey : cfg.openaiKey,
-    }))
+    .map((provider) => ({ provider, key: keyFor(cfg, provider) }))
     .filter((a) => a.key);
 
   if (!attempts.length) return { ok: false, error: "disabled" };
@@ -155,10 +213,7 @@ export async function recognizeVin(base64: string, mime: string): Promise<Recogn
   let lastError: NonNullable<RecognizeResult["error"]> = "provider_error";
   for (const a of attempts) {
     try {
-      const text =
-        a.provider === "gemini"
-          ? await callGemini(base64, mime, a.key)
-          : await callOpenai(base64, mime, a.key);
+      const text = await callProvider(a.provider, base64, mime, cfg);
       const vin = extractVin(text);
       if (vin) return { ok: true, vin, provider: a.provider };
       return { ok: false, error: "no_vin", provider: a.provider };
@@ -179,40 +234,42 @@ export interface OcrKeysReport {
   provider: OcrProvider | "";
   gemini: KeyStatus;
   openai: KeyStatus;
+  openrouter: KeyStatus;
 }
 
-async function pingGemini(key: string): Promise<KeyStatus> {
-  if (!key) return { configured: false, ok: false };
+async function pingUrl(url: string, headers: Record<string, string>): Promise<boolean> {
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`,
-      { signal: AbortSignal.timeout(15_000) }
-    );
-    return { configured: true, ok: res.ok };
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+    return res.ok;
   } catch {
-    return { configured: true, ok: false };
+    return false;
   }
 }
 
-async function pingOpenai(key: string): Promise<KeyStatus> {
+async function pingKey(
+  key: string,
+  url: string,
+  headers: Record<string, string>
+): Promise<KeyStatus> {
   if (!key) return { configured: false, ok: false };
-  try {
-    const res = await fetch("https://api.openai.com/v1/models", {
-      headers: { authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(15_000),
-    });
-    return { configured: true, ok: res.ok };
-  } catch {
-    return { configured: true, ok: false };
-  }
+  return { configured: true, ok: await pingUrl(url, headers) };
 }
 
-/** Ping both providers with the freshly-stored keys — powers the admin test button. */
+/** Ping every provider with the freshly-stored keys — powers the admin test button. */
 export async function verifyOcrKeys(): Promise<OcrKeysReport> {
   const cfg = await getOcrConfigFresh();
-  const [gemini, openai] = await Promise.all([
-    pingGemini(cfg.geminiKey),
-    pingOpenai(cfg.openaiKey),
+  const [gemini, openai, openrouter] = await Promise.all([
+    pingKey(
+      cfg.geminiKey,
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(cfg.geminiKey)}`,
+      {}
+    ),
+    pingKey(cfg.openaiKey, "https://api.openai.com/v1/models", {
+      authorization: `Bearer ${cfg.openaiKey}`,
+    }),
+    pingKey(cfg.openrouterKey, "https://openrouter.ai/api/v1/auth/key", {
+      authorization: `Bearer ${cfg.openrouterKey}`,
+    }),
   ]);
-  return { provider: cfg.provider, gemini, openai };
+  return { provider: cfg.provider, gemini, openai, openrouter };
 }
