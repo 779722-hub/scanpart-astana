@@ -107,7 +107,7 @@ export default async function HomePage({
       // о том, ради чего сервис вообще нужен.
       Icon: Sparkles,
       title: "Автоматический поиск",
-      text: "Самый удобный подбор запчастей — без знания технических особенностей и каталогов. Укажите авто, остальное сделаем мы.",
+      text: "Самый удобный подбор запчастей — без знания технических особенностей и каталогов.",
     },
   ];
 
@@ -246,7 +246,7 @@ export default async function HomePage({
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
-                Время заказа: {settings?.expressHours ?? "Пн–Сб 09:00–16:30"}
+                Время заказа: {settings?.expressHours ?? "Пн–Сб 09:00–16:00"}
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />

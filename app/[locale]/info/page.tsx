@@ -27,7 +27,7 @@ export default async function InfoPage({
   // строки просто игнорируют.
   const vars = {
     price: settings?.expressDeliveryPrice ?? 4000,
-    expressHours: settings?.expressHours ?? "Пн-Сб 09:00–16:30",
+    expressHours: settings?.expressHours ?? "Пн-Сб 09:00–16:00",
     pickupAddress: settings?.pickupAddress ?? "г. Астана, пр. Республики, 68",
     pickupHours: settings?.pickupHours ?? "завтра 14:00–18:00",
   };

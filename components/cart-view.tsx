@@ -27,7 +27,7 @@ interface PublicSettings {
 
 const DEFAULTS: PublicSettings = {
   expressDeliveryPrice: 4000,
-  expressHours: "Пн–Сб 09:00–16:30",
+  expressHours: "Пн–Сб 09:00–16:00",
   pickupAddress: "г. Астана, пр. Республики, 68",
   pickupHours: "завтра с 14:00 до 18:00",
 };
