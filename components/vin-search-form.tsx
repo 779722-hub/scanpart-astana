@@ -8,6 +8,7 @@ import Link from "next/link";
 import { ModelWizard } from "./model-wizard";
 import { TechpassScanButton } from "./techpass-scan";
 import { isVinAcceptable } from "@/lib/vin/validator";
+import { useDesktopAutoFocus } from "@/lib/use-desktop-autofocus";
 
 interface Vehicle {
   make: string;
@@ -42,6 +43,7 @@ export function VinSearchForm({
   const tRoot = useTranslations();
   const router = useRouter();
   const [vin, setVin] = useState(initialVin);
+  const vinRef = useDesktopAutoFocus<HTMLInputElement>();
   const [status, setStatus] = useState<Status>("idle");
   const [errorKind, setErrorKind] =
     useState<"invalid" | "notFound" | "generic">("invalid");
@@ -253,13 +255,13 @@ export function VinSearchForm({
         <label className="label" htmlFor="vin">VIN</label>
         <input
           id="vin"
+          ref={vinRef}
           className="input uppercase tracking-[0.2em]"
           placeholder={t("placeholder")}
           value={vin}
           onChange={(e) => setVin(e.target.value.toUpperCase())}
           maxLength={17}
           autoComplete="off"
-          autoFocus
           required
           disabled={status === "loading"}
         />
