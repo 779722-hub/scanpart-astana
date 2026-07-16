@@ -1,8 +1,11 @@
+import { unstable_cache, revalidateTag } from "next/cache";
 import { MARKUP_DEFAULT, clampMarkup } from "@/lib/markup";
 import { readSetting, writeSetting, readWarehouses } from "./client";
 
 const CACHE_TTL_MS = 60_000;
-let cache: { at: number; map: Record<string, string> } | null = null;
+
+/** Tag-revalidated on admin write, like CONTENT_TAG/THEME_TAG in lib/content. */
+export const SETTINGS_TAG = "settings";
 
 // Per-warehouse markup overrides, keyed by supplier code (Р1/М2/Т3…). Cached
 // like settings; warehouses without an explicit markup are absent (use global).
@@ -23,11 +26,17 @@ export async function getWarehouseMarkupMap(): Promise<Record<string, number>> {
   return map;
 }
 
-async function readAll(): Promise<Record<string, string>> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.map;
-  const map = await readSetting();
-  cache = { at: Date.now(), map };
-  return map;
+// Cached in the Next data cache (not a module variable) so that statically
+// rendered pages — home, /info — are rebuilt when the admin saves a setting.
+const readAll = unstable_cache(
+  async (): Promise<Record<string, string>> => readSetting(),
+  ["sheets-settings"],
+  { tags: [SETTINGS_TAG], revalidate: 60 }
+);
+
+/** Drop the settings cache — call after any admin write. */
+export function invalidateSettings(): void {
+  revalidateTag(SETTINGS_TAG);
 }
 
 export async function getSetting(key: string): Promise<string | undefined> {
@@ -48,7 +57,7 @@ export async function getMarkupPercent(): Promise<number> {
 export async function setMarkupPercent(pct: number): Promise<number> {
   const clamped = clampMarkup(pct);
   await writeSetting("markup_percent", String(clamped));
-  cache = null;
+  invalidateSettings();
   return clamped;
 }
 

@@ -116,7 +116,7 @@
     "address": "Address (Astana only)",
     "submit": "Place order",
     "back": "New search",
-    "successExpress": "Your order has been received. Our manager will contact you shortly to confirm and take payment. Express delivery runs every 2–4 hours, Mon–Sat, 09:00–16:30, fee 4,000 KZT.",
+    "successExpress": "Your order has been received. Our manager will contact you shortly to confirm and take payment. Express delivery runs every 2–4 hours, Mon–Sat, 09:00–16:30, fee {price} KZT.",
     "successPickup": "You can pick up your order tomorrow between 14:00 and 18:00 at 68 Respublika Ave, Astana. Our manager will contact you shortly to confirm and take payment.",
     "openWhatsApp": "Open WhatsApp",
     "sending": "Sending…",
@@ -130,7 +130,7 @@
       "\"By name\" button — enter the part name (e.g. \"front brake pads\").",
       "Response from the warehouse: original and/or analogs with stock and price.",
       "Our manager contacts you to confirm the order and arrange payment.",
-      "Express delivery: 2–4 hours, Mon–Sat 09:00–16:30, fee 4,000 KZT.",
+      "Express delivery: 2–4 hours, Mon–Sat 09:00–16:30, fee {price} KZT.",
       "Pickup: next day, 14:00–18:00, 68 Respublika Ave, Astana.",
       "In your account you can save several of your cars and switch between them in one tap — every page shows which car the search is for."
     ]

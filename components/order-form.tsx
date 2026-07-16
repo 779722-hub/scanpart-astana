@@ -123,7 +123,10 @@ export function OrderForm({
   }
 
   if (status === "success") {
-    const message = kind === "express" ? t("successExpress") : t("successPickup");
+    const message =
+      kind === "express"
+        ? t("successExpress", { price: settings.expressDeliveryPrice })
+        : t("successPickup");
     return (
       <div className="card space-y-5">
         <div className="flex items-center gap-3 text-emerald-600">

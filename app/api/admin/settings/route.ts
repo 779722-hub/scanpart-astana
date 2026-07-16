@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/guards";
 import { readSetting, writeSetting } from "@/lib/sheets/client";
+import { invalidateSettings } from "@/lib/sheets/settings";
 
 export const runtime = "nodejs";
 
@@ -26,5 +27,8 @@ export async function PUT(req: NextRequest) {
   for (const [k, v] of Object.entries(parsed.data.patch)) {
     await writeSetting(k, v);
   }
+  // Settings feed statically rendered pages (home, /info) — drop their cache so
+  // the change shows up without waiting for a redeploy.
+  invalidateSettings();
   return NextResponse.json({ ok: true });
 }
