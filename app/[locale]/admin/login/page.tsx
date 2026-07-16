@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+import { noindexMetadata } from "@/lib/seo";
 import { unstable_setRequestLocale } from "next-intl/server";
 import { LoginForm } from "@/components/login-form";
+
+// Не должно быть в поиске. Именно noindex, а не Disallow в robots.txt:
+// Disallow не запрещает показ адреса в выдаче и мешает роботу увидеть запрет.
+export const metadata: Metadata = noindexMetadata("Вход в панель", false);
 
 export default function LoginPage({
   params: { locale },

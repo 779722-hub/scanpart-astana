@@ -2,6 +2,8 @@ import { getTranslations, unstable_setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { getAllSettings } from "@/lib/sheets/settings";
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
 interface InfoItem {
   title: string;
@@ -10,6 +12,14 @@ interface InfoItem {
 interface InfoSection {
   title: string;
   items: InfoItem[];
+}
+
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  return pageMetadata("info", locale);
 }
 
 export default async function InfoPage({

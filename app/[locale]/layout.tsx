@@ -11,6 +11,7 @@ import { SeoJsonLd } from "@/components/seo-jsonld";
 import { getImageSlot, imageAlt } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { SITE_NAME, OG_LOCALE, seoFor, type SeoLocale } from "@/lib/site";
+import { manrope } from "@/lib/font";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -69,22 +70,28 @@ export default async function LocaleLayout({
   unstable_setRequestLocale(locale);
   const messages = await getMessages();
 
+  // <html> рендерится здесь, а не в корневом layout: только тут известен язык
+  // страницы, а lang обязан ему соответствовать.
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
-      <ThemeStyle />
-      <SeoJsonLd locale={locale} />
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-          <SiteFooter />
-        </div>
-      </ThemeProvider>
-    </NextIntlClientProvider>
+    <html lang={locale} suppressHydrationWarning className={manrope.variable}>
+      <body>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ThemeStyle />
+          <SeoJsonLd locale={locale} />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="flex min-h-screen flex-col">
+              <SiteHeader />
+              <main className="flex-1">{children}</main>
+              <SiteFooter />
+            </div>
+          </ThemeProvider>
+        </NextIntlClientProvider>
+      </body>
+    </html>
   );
 }

@@ -5,8 +5,19 @@ import { VinSearchForm } from "@/components/vin-search-form";
 import { getSession } from "@/lib/session";
 import { findCustomer } from "@/lib/sheets/client";
 import { vinOcrEnabled } from "@/lib/vin/ocr";
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  return pageMetadata("vin", locale);
+}
+
 
 export default async function VinPage({
   params: { locale },
