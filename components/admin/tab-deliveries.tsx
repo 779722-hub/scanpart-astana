@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, CheckCircle2, Maximize2, X, ClipboardList } from "lucide-react";
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
@@ -96,6 +96,13 @@ export function TabDeliveries() {
   const [busy, setBusy] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
+
+  // Нативный список <select> раздаётся по ширине самого длинного пункта и
+  // вылезает за экран — названия запчастей длинные. Режем текст пункта.
+  function clip(s: string, n: number): string {
+    const v = (s ?? "").trim();
+    return v.length > n ? v.slice(0, n - 1).trimEnd() + "…" : v;
+  }
 
   async function regeocode() {
     if (!confirm("Пересчитать координаты доставок по адресам (только Астана)? Точки вне Астаны будут исправлены или убраны с карты.")) return;
@@ -361,7 +368,7 @@ export function TabDeliveries() {
             className="h-[26rem] w-full overflow-hidden rounded-2xl sm:h-[31rem]"
           />
         )}
-        <MapLegend warehouses={mapWarehouses} office={officePoint} />
+        <MapLegend warehouses={mapWarehouses} office={officePoint} markers={markers} />
         {(() => {
           const noCoords = [
             ...warehouses.filter((w) => w.lat == null || w.lng == null).map((w) => w.name),
@@ -583,7 +590,7 @@ export function TabDeliveries() {
                 <option value="">— выберите заказ —</option>
                 {orders.slice().reverse().map((o) => (
                   <option key={o.rowNumber} value={o.rowNumber}>
-                    #{o.rowNumber} · {o.clientName || o.phone} · {o.partName}{o.source ? ` · ${o.source}` : ""}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
+                    #{o.rowNumber} · {clip(o.clientName || o.phone, 22)} · {clip(o.partName, 34)}{o.source ? ` · ${o.source}` : ""}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
                   </option>
                 ))}
               </select>
@@ -639,12 +646,39 @@ export function TabDeliveries() {
   );
 }
 
-function MapLegend({ warehouses, office }: { warehouses: MapPoint[]; office: MapPoint | null }) {
-  const swatch = (color: string) => <span className="h-2.5 w-2.5 flex-none rounded-full ring-1 ring-black/20" style={{ background: color }} />;
+/**
+ * Легенда обязана повторять карту. Цвет и форму меток курьера и клиента
+ * задают в «Настройках», склады — во вкладке «Склады»; раньше здесь были
+ * зашиты красный и синий, и легенда врала, как только цвет меняли.
+ */
+function MapLegend({
+  warehouses,
+  office,
+  markers,
+}: {
+  warehouses: MapPoint[];
+  office: MapPoint | null;
+  markers: { courierColor: string; courierShape: MarkerShape; clientColor: string; clientShape: MarkerShape };
+}) {
+  const swatch = (color: string, shape: MarkerShape = "circle") => {
+    const style: CSSProperties = { background: color };
+    if (shape === "triangle") {
+      style.clipPath = "polygon(50% 0, 100% 100%, 0 100%)";
+    } else {
+      style.borderRadius = shape === "circle" ? "50%" : "2px";
+      if (shape === "diamond") style.transform = "rotate(45deg)";
+    }
+    return (
+      <span
+        className={`h-2.5 w-2.5 flex-none ${shape === "triangle" ? "" : "ring-1 ring-black/20"}`}
+        style={style}
+      />
+    );
+  };
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-mute dark:text-paper-mute">
-      <span className="inline-flex items-center gap-1">{swatch("#E10600")} курьер</span>
-      <span className="inline-flex items-center gap-1">{swatch("#2563EB")} клиент</span>
+      <span className="inline-flex items-center gap-1">{swatch(markers.courierColor, markers.courierShape)} курьер</span>
+      <span className="inline-flex items-center gap-1">{swatch(markers.clientColor, markers.clientShape)} клиент</span>
       {warehouses.map((w) => (
         <span key={w.id} className="inline-flex items-center gap-1">{swatch(w.color || "#F59E0B")} {w.name}</span>
       ))}

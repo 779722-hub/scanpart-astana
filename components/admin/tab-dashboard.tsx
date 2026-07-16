@@ -24,11 +24,34 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
   const [health, setHealth] = useState<Health | null>(null);
   const [orders, setOrders] = useState<{ count: number; today: number } | null>(null);
 
+  // Статус живой: перечитываем каждые 30 с и при возврате на вкладку, иначе
+  // панель показывает картину на момент открытия админки.
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then((j) => setHealth(j as Health))
-      .catch(() => setHealth(null));
+    let stop = false;
+    const pull = () => {
+      fetch("/api/health", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (!stop) setHealth(j as Health);
+        })
+        .catch(() => {
+          if (!stop) setHealth(null);
+        });
+    };
+    pull();
+    const id = setInterval(pull, 30_000);
+    const onFocus = () => {
+      if (document.visibilityState === "visible") pull();
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      stop = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
+
+  useEffect(() => {
     fetch("/api/admin/orders")
       .then((r) => r.json())
       .then((j) => {
