@@ -47,7 +47,8 @@
     "hint": "Enter the part number (e.g. W339055SA)",
     "submit": "Search",
     "continueHint": "Enter the part number or a part name (e.g. 41060EG090 or \"front brake pads\").",
-    "backHome": "Back to start"
+    "backHome": "Back to start",
+    "vinHint": "If you are not sure of the exact part number, it is safer to find the part by <link>your car's VIN</link>."
   },
   "name": {
     "title": "Search by name",
@@ -124,15 +125,85 @@
   },
   "info": {
     "title": "How the service works",
-    "lines": [
-      "\"By VIN\" button — search the catalog of your car by VIN (17 chars, e.g. JN8AS05Y37X012345).",
-      "\"By part number\" button — enter the part number (e.g. W339055SA).",
-      "\"By name\" button — enter the part name (e.g. \"front brake pads\").",
-      "Response from the warehouse: original and/or analogs with stock and price.",
-      "Our manager contacts you to confirm the order and arrange payment.",
-      "Express delivery: 2–4 hours, Mon–Sat 09:00–16:30, fee {price} KZT.",
-      "Pickup: next day, 14:00–18:00, 68 Respublika Ave, Astana.",
-      "In your account you can save several of your cars and switch between them in one tap — every page shows which car the search is for."
+    "intro": "Tell us your car and we show what actually fits it. Original and analogs in one list, with price and stock at warehouses in Astana. No phone calls, no «send us a photo of the part».",
+    "ctaVin": "Find by VIN",
+    "sections": [
+      {
+        "title": "Four ways to find a part",
+        "items": [
+          {
+            "title": "By VIN — the most precise way",
+            "body": "A VIN opens the manufacturer catalog, so we show parts for your exact build, not roughly similar ones. We accept a VIN of any length: on older, Japanese and Korean cars the body number is often shorter than 17 characters. If the VIN is unreadable, pick the make and model by hand."
+          },
+          {
+            "title": "Photograph your registration — the VIN fills itself in",
+            "body": "No retyping 17 characters and worrying about O versus 0. Photograph the document right in the browser or add an existing photo from your gallery — the VIN is recognised automatically (on the Kazakh registration it is field No. 5). It copes with glare and with poor light. If one character comes out wrong, fix it without retyping everything."
+          },
+          {
+            "title": "By part number",
+            "body": "Know the part number? Enter it. We show the original and analogs available in Astana. If the number does not fit your car, we warn you before you buy, not after."
+          },
+          {
+            "title": "By name — or just say it out loud",
+            "body": "Type front brake pads — or tap the button and speak. We match against your car catalog, not by guessing from words: ask for an oil filter and you get the filter, not its bracket."
+          }
+        ]
+      },
+      {
+        "title": "What the answer shows",
+        "items": [
+          {
+            "title": "The original number (OEM) for your car",
+            "body": "We show the factory number for your specific car, so it is easy to check and hard to get wrong."
+          },
+          {
+            "title": "Original and analogs side by side",
+            "body": "One list: the original plus analogs from different makers. You see where you would overpay and where the same thing costs less — the list sorts by price."
+          },
+          {
+            "title": "Stock and price right away",
+            "body": "We show what is physically on the shelves in Astana, with quantity and final price. If it is not in the city, we offer to bring it and tell you how long it takes."
+          },
+          {
+            "title": "Whether it fits your car",
+            "body": "Every item is marked: fits, compatibility unconfirmed, or not for your car. So you do not buy the wrong thing and drive back to return it."
+          },
+          {
+            "title": "Related products",
+            "body": "Below the list — what the same repair usually needs: greases, fasteners, kits. So you do not come back for a small part."
+          }
+        ]
+      },
+      {
+        "title": "Delivery and payment",
+        "items": [
+          {
+            "title": "Express delivery across Astana in 2–4 hours",
+            "body": "Our courier brings it, fee {price} KZT. Order window: {expressHours}."
+          },
+          {
+            "title": "Pickup — free",
+            "body": "{pickupAddress}. You can collect it {pickupHours}."
+          },
+          {
+            "title": "Payment after confirmation",
+            "body": "After you order, our manager contacts you, confirms the item and its availability, and takes payment. Nothing to pay upfront."
+          }
+        ]
+      },
+      {
+        "title": "Your account",
+        "items": [
+          {
+            "title": "All your cars in one place",
+            "body": "Save several cars and switch between them in one tap — every page shows which one the search is for. No more hunting for the VIN."
+          },
+          {
+            "title": "Order history",
+            "body": "Past orders stay at hand: repeat any item with one button — no need to search again."
+          }
+        ]
+      }
     ]
   },
   "errors": {
@@ -217,7 +288,6 @@
   },
   "vinSavedHeader": "My saved cars:",
   "vehicleBar": {
-    "searchingFor": "Searching for:",
     "changeCar": "Change car",
     "noCar": "No car selected",
     "specifyVin": "Specify by VIN",

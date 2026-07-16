@@ -60,14 +60,14 @@ export async function SiteHeader() {
 
       {/* current vehicle bar — mounted into the header (same colour), always
           visible so the customer knows which car they're searching for and can
-          switch it in one tap */}
+          switch it in one tap. Без подписи: машина и так читается по значку,
+          а лишнее слово ело ширину на телефоне. Значок — в высоту логотипа. */}
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 border-t border-paper-mute/50 px-3 py-1.5 text-sm sm:px-6 dark:border-ink-mute/50">
         {vehicle?.make ? (
           <>
-            <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
-              <Car className="h-4 w-4 flex-none text-brand" />
-              <span className="flex-none">{tv("searchingFor")}</span>
-              <strong className="truncate text-ink dark:text-paper">
+            <span className="flex min-w-0 items-center gap-2 text-ink-mute dark:text-paper-mute">
+              <Car className="h-8 w-8 flex-none text-brand sm:h-9 sm:w-9" aria-hidden />
+              <strong className="truncate text-base text-ink sm:text-lg dark:text-paper">
                 {vehicle.make}
                 {vehicle.model && vehicle.model !== "—" ? ` ${vehicle.model}` : ""}
                 {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
@@ -80,9 +80,8 @@ export async function SiteHeader() {
           </>
         ) : (
           <>
-            <span className="flex min-w-0 items-center gap-1.5 text-ink-mute dark:text-paper-mute">
-              <Car className="h-4 w-4 flex-none text-brand" />
-              <span className="flex-none">{tv("searchingFor")}</span>
+            <span className="flex min-w-0 items-center gap-2 text-ink-mute dark:text-paper-mute">
+              <Car className="h-8 w-8 flex-none text-brand sm:h-9 sm:w-9" aria-hidden />
               <span className="truncate">{tv("noCarValue")}</span>
             </span>
             <Link href={vinHref} className={btnCls}>

@@ -115,6 +115,7 @@ export default async function HomePage({
     { n: 2, text: "Получите цены и наличие со склада в Астане" },
     { n: 3, text: "Добавьте в корзину и оформите заказ" },
     { n: 4, text: "Менеджер свяжется с вами для подтверждения и оплаты" },
+    { n: 5, text: "Самовывоз на следующий день или экспресс-доставка нашим курьером" },
   ];
 
   return (
@@ -194,7 +195,8 @@ export default async function HomePage({
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Как это работает
         </h2>
-        <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 5 шагов: в 4 колонки последний уезжал в отдельный ряд один */}
+        <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map((s) => (
             <li key={s.n} className="card flex items-start gap-3">
               <span className="flex h-9 w-9 flex-none items-center justify-center rounded-2xl bg-brand text-base font-bold text-white">
