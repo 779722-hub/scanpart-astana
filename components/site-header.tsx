@@ -66,8 +66,9 @@ export async function SiteHeader() {
         {vehicle?.make ? (
           <>
             <span className="flex min-w-0 items-center gap-2 text-ink-mute dark:text-paper-mute">
-              <Car className="h-8 w-8 flex-none text-brand sm:h-9 sm:w-9" aria-hidden />
-              <strong className="truncate text-base text-ink sm:text-lg dark:text-paper">
+              {/* −20% от высоты логотипа: 32→26, 36→29 */}
+              <Car className="h-[26px] w-[26px] flex-none text-brand sm:h-[29px] sm:w-[29px]" aria-hidden />
+              <strong className="truncate text-sm font-semibold tracking-tight text-ink sm:text-base dark:text-paper">
                 {vehicle.make}
                 {vehicle.model && vehicle.model !== "—" ? ` ${vehicle.model}` : ""}
                 {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
@@ -81,7 +82,8 @@ export async function SiteHeader() {
         ) : (
           <>
             <span className="flex min-w-0 items-center gap-2 text-ink-mute dark:text-paper-mute">
-              <Car className="h-8 w-8 flex-none text-brand sm:h-9 sm:w-9" aria-hidden />
+              {/* −20% от высоты логотипа: 32→26, 36→29 */}
+              <Car className="h-[26px] w-[26px] flex-none text-brand sm:h-[29px] sm:w-[29px]" aria-hidden />
               <span className="truncate">{tv("noCarValue")}</span>
             </span>
             <Link href={vinHref} className={btnCls}>
