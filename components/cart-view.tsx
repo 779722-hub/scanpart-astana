@@ -158,7 +158,7 @@ export function CartView({ locale }: { locale: string }) {
                 <div className="text-xs text-ink-mute dark:text-paper-mute">
                   {t("subtotalParts")}
                 </div>
-                <div className="text-xl font-black text-brand">
+                <div className="price-brand text-xl font-semibold">
                   {fmt(item.price * item.quantity)} ₸
                 </div>
               </div>
@@ -191,7 +191,7 @@ export function CartView({ locale }: { locale: string }) {
                 <Truck className="mr-1 inline h-4 w-4 text-brand" />
                 {t("deliveryExpress")}
               </span>
-              <span className="font-black text-brand">
+              <span className="price-brand font-semibold">
                 +{fmt(settings.expressDeliveryPrice)} ₸
               </span>
             </div>
@@ -222,7 +222,7 @@ export function CartView({ locale }: { locale: string }) {
                 <Store className="mr-1 inline h-4 w-4 text-brand" />
                 {t("deliveryPickup")}
               </span>
-              <span className="font-black text-emerald-600">{t("deliveryFree")}</span>
+              <span className="font-semibold text-emerald-600">{t("deliveryFree")}</span>
             </div>
             <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
               <MapPin className="mr-1 inline h-3 w-3" />
@@ -251,7 +251,7 @@ export function CartView({ locale }: { locale: string }) {
         </div>
         <div className="flex items-baseline justify-between border-t border-paper-mute/60 pt-2 dark:border-ink/40">
           <span className="text-sm font-semibold">{t("grandTotal")}</span>
-          <span className="text-2xl font-black text-brand">
+          <span className="price-brand text-2xl font-semibold">
             {fmt(grandTotal)} ₸
           </span>
         </div>

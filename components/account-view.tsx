@@ -153,7 +153,10 @@ function GuestView({
         {t("guestPitch")}
       </p>
       <AppearanceCard />
-      <Link href={`/${locale}`} className="text-sm underline text-ink-mute dark:text-paper-mute">
+      <Link
+        href={`/${locale}`}
+        className="inline-flex min-h-[44px] items-center text-sm underline text-ink-mute dark:text-paper-mute"
+      >
         ← {t("backHome")}
       </Link>
     </div>

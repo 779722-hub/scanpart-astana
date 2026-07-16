@@ -14,7 +14,7 @@ export function AccountButton({ signedIn }: { signedIn: boolean }) {
   return (
     <Link
       href={`/${locale}/account`}
-      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-2.5 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
+      className="inline-flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-3 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
       aria-label="Личный кабинет"
     >
       <User className="h-4 w-4" />
