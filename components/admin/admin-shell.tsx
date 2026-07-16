@@ -103,11 +103,19 @@ export function AdminShell({
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Панель управления</h1>
-          <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
-            {user.email} · <span className="font-semibold">{user.role}</span>
-          </p>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon-192.png"
+            alt="SCANPART"
+            className="h-11 w-11 flex-none rounded-xl object-cover shadow-card"
+          />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Панель управления</h1>
+            <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+              {user.email} · <span className="font-semibold">{user.role}</span>
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
