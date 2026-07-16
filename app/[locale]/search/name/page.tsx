@@ -5,8 +5,19 @@ import { CopyVin } from "@/components/copy-vin";
 import { getSession } from "@/lib/session";
 import { voiceSearchEnabled, sttServerConfigured } from "@/lib/voice/stt";
 import { Car, ChevronRight } from "lucide-react";
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  return pageMetadata("name", locale);
+}
+
 
 export default async function NamePage({
   params: { locale },

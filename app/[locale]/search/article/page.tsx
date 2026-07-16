@@ -2,6 +2,16 @@ import { getTranslations, unstable_setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
 import { SearchInputForm } from "@/components/search-input-form";
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
+
+export function generateMetadata({
+  params: { locale },
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  return pageMetadata("article", locale);
+}
 
 export default async function ArticlePage({
   params: { locale },

@@ -1,13 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
 import { SITE_URL, SITE_NAME, seoFor, DEFAULT_LOCALE } from "@/lib/site";
-
-const manrope = Manrope({
-  subsets: ["latin", "cyrillic", "cyrillic-ext"],
-  display: "swap",
-  variable: "--font-manrope",
-});
 
 const seo = seoFor(DEFAULT_LOCALE);
 
@@ -28,14 +21,19 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+/**
+ * Корневой layout намеренно ничего не оборачивает.
+ *
+ * <html> переехал вниз — в layout локали и в layout курьера, — потому что
+ * атрибут lang обязан совпадать с языком страницы. Раньше здесь стояло жёсткое
+ * lang="ru", и казахская с английской версией объявляли себя русскими: робот
+ * считал казахский текст русским, а скринридер читал его с русским
+ * произношением. Отсюда язык не виден — у корневого layout нет параметров.
+ */
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <html lang="ru" suppressHydrationWarning className={manrope.variable}>
-      <body>{children}</body>
-    </html>
-  );
+  return children;
 }
