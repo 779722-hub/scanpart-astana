@@ -125,7 +125,7 @@
   },
   "info": {
     "title": "How the service works",
-    "intro": "Tell us your car and we show what actually fits it. Original and analogs in one list, with price and stock at warehouses in Astana. No phone calls, no «send us a photo of the part».",
+    "intro": "Tell us your car and we show what actually fits it. Original and analogs in one list, with price and stock at our warehouse in Astana. No phone calls, no «send us a photo of the part».",
     "ctaVin": "Find by VIN",
     "sections": [
       {
@@ -162,7 +162,7 @@
           },
           {
             "title": "Stock and price right away",
-            "body": "We show what is physically on the shelves in Astana, with quantity and final price. If it is not in the city, we offer to bring it and tell you how long it takes."
+            "body": "We show what is physically on the shelf in Astana, with quantity and final price. We sell only from stock — if it is in the list, it is there."
           },
           {
             "title": "Whether it fits your car",
@@ -186,8 +186,8 @@
             "body": "{pickupAddress}. You can collect it {pickupHours}."
           },
           {
-            "title": "Payment after confirmation",
-            "body": "After you order, our manager contacts you, confirms the item and its availability, and takes payment. Nothing to pay upfront."
+            "title": "Payment only after we confirm the part is in stock",
+            "body": "After you order, our manager contacts you, confirms the item and its availability in the warehouse, and takes payment."
           }
         ]
       },

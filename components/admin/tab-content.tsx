@@ -35,8 +35,11 @@ function groupLabel(g: string): string {
   return GROUP_LABELS[g] ?? `📁 ${g}`;
 }
 
+type Defaults = Record<Locale, Record<string, string>>;
+
 export function TabContent() {
   const [rows, setRows] = useState<ContentRow[] | null>(null);
+  const [defaults, setDefaults] = useState<Defaults | null>(null);
   const [locale, setLocale] = useState<Locale>("ru");
   const [filter, setFilter] = useState("");
   const [savedKey, setSavedKey] = useState<string | null>(null);
@@ -47,7 +50,10 @@ export function TabContent() {
   useEffect(() => {
     fetch("/api/admin/content")
       .then((r) => r.json())
-      .then((j) => setRows(j.ok ? j.rows : []))
+      .then((j) => {
+        setRows(j.ok ? j.rows : []);
+        setDefaults(j.ok ? (j.defaults ?? null) : null);
+      })
       .catch(() => setRows([]));
   }, []);
 
@@ -106,6 +112,30 @@ export function TabContent() {
           }
           return next;
         }) ?? null
+      );
+      setSavedKey(row.key);
+      setTimeout(() => setSavedKey((k) => (k === row.key ? null : k)), 1500);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  /** Снять перебивку во всех языках — на сайте останется текст из кода. */
+  async function resetToCode(row: ContentRow) {
+    setSavingKey(row.key);
+    try {
+      for (const l of ["ru", "kk", "en"] as Locale[]) {
+        if (!row[l]) continue;
+        await fetch("/api/admin/content", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ key: row.key, locale: l, value: "" }),
+        });
+      }
+      setRows(
+        (cur) =>
+          cur?.map((r) => (r.key === row.key ? { ...r, ru: "", kk: "", en: "" } : r)) ??
+          null
       );
       setSavedKey(row.key);
       setTimeout(() => setSavedKey((k) => (k === row.key ? null : k)), 1500);
@@ -222,7 +252,9 @@ export function TabContent() {
                   key={row.key}
                   row={row}
                   locale={locale}
+                  codeText={defaults?.[locale]?.[row.key]}
                   onSave={(v) => save(row, v)}
+                  onReset={() => resetToCode(row)}
                   saving={savingKey === row.key}
                   saved={savedKey === row.key}
                 />
@@ -270,32 +302,70 @@ function ContentGroup({
 function ContentEditor({
   row,
   locale,
+  codeText,
   onSave,
+  onReset,
   saving,
   saved,
 }: {
   row: ContentRow;
   locale: Locale;
+  codeText?: string;
   onSave: (value: string) => void | Promise<void>;
+  onReset: () => void | Promise<void>;
   saving: boolean;
   saved: boolean;
 }) {
   const [value, setValue] = useState(row[locale]);
   const dirty = value !== row[locale];
   const isLong = (row[locale] ?? "").length > 80 || value.length > 80;
+  // Строка перебивает код, только если она непустая. Пусто → берётся текст
+  // из messages/*.json, и правки разработчика доезжают до сайта сами.
+  const overriding = Boolean(row[locale]?.trim());
+  const diverged = overriding && codeText !== undefined && row[locale] !== codeText;
   return (
     <div className="card space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <code className="rounded bg-paper-soft px-2 py-1 text-xs dark:bg-ink-mute">
           {row.key}
         </code>
-        {dirty && (
-          <span className="text-xs text-amber-600">несохранённые изменения</span>
-        )}
+        <span className="flex items-center gap-2">
+          {diverged && (
+            <span className="chip bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+              перебивает код
+            </span>
+          )}
+          {dirty && (
+            <span className="text-xs text-amber-600">несохранённые изменения</span>
+          )}
+        </span>
       </div>
       {row.where && (
         <div className="text-xs text-ink-mute dark:text-paper-mute">
           📍 Где: {row.where}
+        </div>
+      )}
+      {diverged && (
+        <div className="rounded-2xl bg-paper-soft px-3 py-2 text-xs dark:bg-ink-mute">
+          <div className="text-ink-mute dark:text-paper-mute">
+            В коде сейчас: <span className="text-ink dark:text-paper">{codeText || "(пусто)"}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                !confirm(
+                  `Убрать перебивку «${row.key}» на всех языках?\n\nНа сайте покажется текст из кода — и правки разработчика будут доезжать сами, без ручного редактирования здесь.`
+                )
+              )
+                return;
+              setValue("");
+              onReset();
+            }}
+            className="mt-1.5 font-semibold text-brand underline underline-offset-2"
+          >
+            Вернуть текст из кода (все языки)
+          </button>
         </div>
       )}
       {isLong ? (
