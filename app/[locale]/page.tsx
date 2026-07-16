@@ -14,7 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import type { Metadata } from "next";
-import { getImageSlot } from "@/lib/content";
+import { getImageSlot, imageAlt } from "@/lib/content";
 import { getAllSettings } from "@/lib/sheets/settings";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { SITE_URL, LOCALES, DEFAULT_LOCALE } from "@/lib/site";
@@ -59,6 +59,8 @@ export default async function HomePage({
     : heroFallback?.publicId
       ? cldUrl(heroFallback.publicId, { width: 1920 })
       : null;
+  // Подпись берём у того слота, чья картинка реально показана в светлой теме.
+  const heroAlt = imageAlt(heroLight?.publicId ? heroLight : heroFallback, locale);
 
   const cards = [
     {
@@ -121,15 +123,33 @@ export default async function HomePage({
 
   return (
     <div className="relative isolate">
-      {/* hero background — two layers, switched by .dark class */}
+      {/* hero — two layers, switched by .dark class.
+          Светлый — настоящий <img>: CSS-фон в поиск по картинкам не попадает
+          (у фона нет alt) и грузится поздно, уже после разбора стилей.
+          Тёмный намеренно остался фоном: скрытый <img> браузер всё равно
+          качает, а фон под display:none — нет. Так светлая тема (и Googlebot,
+          он рендерит светлую) не платит за тёмную картинку. */}
       {lightUrl ? (
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-[64vh] sm:h-[82vh] bg-cover bg-center dark:hidden"
-          style={{
-            backgroundImage: `linear-gradient(180deg, rgba(248,249,251,0) 0%, rgba(248,249,251,0.15) 45%, rgba(248,249,251,0.75) 80%, rgba(248,249,251,1) 100%), url(${lightUrl})`,
-          }}
-        />
+        <div className="absolute inset-x-0 top-0 -z-10 h-[64vh] overflow-hidden sm:h-[82vh] dark:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightUrl}
+            alt={heroAlt}
+            width={1920}
+            height={1080}
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover object-center"
+          />
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(180deg, rgba(248,249,251,0) 0%, rgba(248,249,251,0.15) 45%, rgba(248,249,251,0.75) 80%, rgba(248,249,251,1) 100%)",
+            }}
+          />
+        </div>
       ) : (
         <div
           aria-hidden
