@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Car, ChevronRight, Lock } from "lucide-react";
+import { Car, ChevronRight } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
@@ -23,7 +23,6 @@ export async function SiteHeader() {
   const vehicle = session.vehicle;
   const isCustomer = Boolean(session.customer);
   const vinHref = `/${locale}/search/vin`;
-  const accountHref = `/${locale}/account`;
   const btnCls =
     "inline-flex flex-none items-center gap-1 rounded-2xl bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm";
 
@@ -74,18 +73,10 @@ export async function SiteHeader() {
                 {vehicle.year && vehicle.year !== "—" ? ` ${vehicle.year}` : ""}
               </strong>
             </span>
-            {isCustomer ? (
-              <Link href={vinHref} className={btnCls}>
-                {tv("changeCar")}
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              // Switching cars is a cabinet feature — send guests to log in.
-              <Link href={accountHref} className={btnCls}>
-                <Lock className="h-3.5 w-3.5" />
-                {tv("loginToChange")}
-              </Link>
-            )}
+            <Link href={vinHref} className={btnCls}>
+              {tv("changeCar")}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </>
         ) : (
           <>

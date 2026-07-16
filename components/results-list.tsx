@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
-import { CopyVin } from "@/components/copy-vin";
 
 interface FitWarning {
   make: string;
@@ -45,26 +44,16 @@ function formatKzt(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n);
 }
 
-function dayWord(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "день";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "дня";
-  return "дней";
-}
-
 export function ResultsList({
   locale,
   q,
   strict = false,
   kind = "article",
-  vin = "",
 }: {
   locale: string;
   q: string;
   strict?: boolean;
   kind?: "article" | "name";
-  vin?: string;
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -114,9 +103,9 @@ export function ResultsList({
           <Loader2 className="h-9 w-9 animate-spin text-brand" />
         </span>
         <div>
-          <div className="text-lg font-bold">Ожидайте, идёт поиск по базе…</div>
+          <div className="text-lg font-bold">{t("loadingTitle")}</div>
           <div className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
-            Проверяем наличие на складе в Астане
+            {t("loadingHint")}
           </div>
         </div>
       </div>
@@ -125,15 +114,12 @@ export function ResultsList({
 
   if (state.kind === "empty") {
     return (
-      <div className="space-y-4">
-        <div className="card space-y-5 text-center">
-          <Package className="mx-auto h-12 w-12 text-ink-mute" />
-          <p className="text-lg">{t("empty")}</p>
-          <Link href={`/${locale}/search/${kind}`} className="btn-primary inline-flex">
-            {t("newSearch")}
-          </Link>
-        </div>
-        <CatalogHint vin={vin} />
+      <div className="card space-y-5 text-center">
+        <Package className="mx-auto h-12 w-12 text-ink-mute" />
+        <p className="text-lg">{t("empty")}</p>
+        <Link href={`/${locale}/search/${kind}`} className="btn-primary inline-flex">
+          {t("newSearch")}
+        </Link>
       </div>
     );
   }
@@ -141,7 +127,7 @@ export function ResultsList({
   if (state.kind === "error") {
     return (
       <div className="card space-y-4 text-center">
-        <p className="text-lg">Сервис временно недоступен.</p>
+        <p className="text-lg">{t("errorService")}</p>
         <Link href={`/${locale}`} className="btn-secondary inline-flex">
           {t("newSearch")}
         </Link>
@@ -172,7 +158,7 @@ export function ResultsList({
       {state.oem.length > 0 && (
         <div className="rounded-2xl bg-paper-soft px-4 py-3 text-sm dark:bg-ink-mute">
           <span className="text-ink-mute dark:text-paper-mute">
-            Оригинальный номер (OEM):{" "}
+            {t("oemLabel")}{" "}
           </span>
           <span className="font-mono font-semibold [overflow-wrap:anywhere]">
             {state.oem.join(", ")}
@@ -187,9 +173,9 @@ export function ResultsList({
       {state.related.length > 0 && (
         <div className="space-y-3 pt-6">
           <div className="border-t border-paper-mute pt-4 dark:border-ink-mute">
-            <h2 className="text-2xl font-bold sm:text-3xl">Сопутствующие товары</h2>
+            <h2 className="text-2xl font-bold sm:text-3xl">{t("relatedTitle")}</h2>
             <p className="mt-1 text-base text-ink-mute dark:text-paper-mute">
-              Может пригодиться к этому заказу
+              {t("relatedHint")}
             </p>
           </div>
           {state.related.map((o, i) => (
@@ -198,7 +184,6 @@ export function ResultsList({
         </div>
       )}
 
-      {state.level !== "exact" && <CatalogHint vin={vin} />}
       <div className="pt-2 text-center">
         <Link href={`/${locale}/search/${kind}`} className="btn-secondary inline-flex">
           {t("newSearch")}
@@ -215,13 +200,14 @@ function PriceSort({
   sort: "asc" | "desc";
   onChange: (s: "asc" | "desc") => void;
 }) {
+  const t = useTranslations("results");
   const options: { value: "asc" | "desc"; label: string }[] = [
-    { value: "asc", label: "Сначала дешевле" },
-    { value: "desc", label: "Сначала дороже" },
+    { value: "asc", label: t("sortAsc") },
+    { value: "desc", label: t("sortDesc") },
   ];
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-ink-mute dark:text-paper-mute">Сортировка:</span>
+      <span className="text-ink-mute dark:text-paper-mute">{t("sortLabel")}</span>
       <div className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 dark:border-ink-mute dark:bg-ink-soft">
         {options.map(({ value, label }) => {
           const active = sort === value;
@@ -244,21 +230,11 @@ function PriceSort({
   );
 }
 
-function CatalogHint({ vin }: { vin?: string }) {
-  const t = useTranslations("results");
-  return (
-    <div className="card space-y-3">
-      <div className="text-sm font-semibold">{t("catalogHintTitle")}</div>
-      {vin && <CopyVin vin={vin} />}
-      <p className="text-xs text-ink-mute dark:text-paper-mute">
-        {t("catalogHintFooter")}
-      </p>
-    </div>
-  );
-}
 
 function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
+  const t = useTranslations("results");
   const label = [fit.make, fit.model, fit.year].filter(Boolean).join(" ");
+  const bold = (chunks: ReactNode) => <strong>{chunks}</strong>;
   // Manually-chosen car (no VIN): name results are not catalog-verified.
   if (fit.needsVin) {
     return (
@@ -267,18 +243,16 @@ function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
           <AlertTriangle className="h-8 w-8 flex-none text-amber-600" />
           <div>
             <div className="text-lg font-bold text-amber-900 dark:text-amber-100">
-              Показаны совпадения по названию — без проверки на ваш авто
+              {t("fitNameTitle")}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-              Точный подбор по названию для <strong>{label}</strong> работает по
-              VIN (каталог производителя). Укажите VIN, чтобы показать только
-              подходящие детали.
+              {t.rich("fitNameBody", { label, b: bold })}
             </p>
             <Link
               href={`/${locale}/search/vin`}
               className="mt-2 inline-block text-sm font-semibold text-brand underline"
             >
-              Указать VIN
+              {t("fitNameVinAction")}
             </Link>
           </div>
         </div>
@@ -292,18 +266,16 @@ function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
           <AlertTriangle className="h-8 w-8 flex-none text-amber-600" />
           <div>
             <div className="text-lg font-bold text-amber-900 dark:text-amber-100">
-              Совместимость с вашим авто не подтверждена
+              {t("fitUnconfirmedTitle")}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-              Не удалось подтвердить, что этот номер подходит для{" "}
-              <strong>{label}</strong>. Проверьте номер или подберите деталь по
-              названию для вашего авто.
+              {t.rich("fitUnconfirmedBody", { label, b: bold })}
             </p>
             <Link
               href={`/${locale}/search/name`}
               className="mt-2 inline-block text-sm font-semibold text-brand underline"
             >
-              Подобрать по названию для {label}
+              {t("fitUnconfirmedAction", { label })}
             </Link>
           </div>
         </div>
@@ -317,11 +289,10 @@ function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
         <AlertTriangle className="h-8 w-8 flex-none text-brand" />
         <div>
           <div className="text-lg font-bold text-brand">
-            Эти детали не для вашего авто
+            {t("fitMismatchTitle")}
           </div>
           <p className="mt-1 text-sm leading-relaxed">
-            Показаны результаты по номеру, но по описанию они для другого
-            автомобиля, а не для <strong>{label}</strong>.
+            {t.rich("fitMismatchBody", { label, b: bold })}
           </p>
         </div>
       </div>
@@ -338,6 +309,7 @@ function MismatchWarning({
   vehicle: FitWarning;
   onReveal: () => void;
 }) {
+  const t = useTranslations("results");
   const label = [vehicle.make, vehicle.model, vehicle.year]
     .filter(Boolean)
     .join(" ");
@@ -347,20 +319,22 @@ function MismatchWarning({
         <AlertTriangle className="h-9 w-9 flex-none text-brand" />
         <div>
           <div className="text-lg font-bold text-brand sm:text-xl">
-            Этот парт-номер не для вашего авто
+            {t("mismatchTitle")}
           </div>
           <p className="mt-1 text-sm leading-relaxed">
-            Введённый парт-номер, судя по описанию, для другого автомобиля, а не
-            для <strong>{label}</strong>. Проверьте номер или смените авто.
+            {t.rich("mismatchBody", {
+              label,
+              b: (chunks: ReactNode) => <strong>{chunks}</strong>,
+            })}
           </p>
         </div>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link href={`/${locale}/search/vin`} className="btn-primary flex-1">
-          Сменить авто
+          {t("mismatchChangeCar")}
         </Link>
         <button onClick={onReveal} className="btn-secondary flex-1">
-          Показать всё равно
+          {t("mismatchShowAnyway")}
         </button>
       </div>
     </div>
@@ -368,6 +342,7 @@ function MismatchWarning({
 }
 
 function RelaxBanner({ level }: { level: RelaxLevel }) {
+  const t = useTranslations("results");
   // For delivery-related levels we use a louder banner so the customer
   // immediately understands the part isn't on the Astana shelf.
   if (level === "with-delivery" || level === "any-warehouse") {
@@ -377,11 +352,10 @@ function RelaxBanner({ level }: { level: RelaxLevel }) {
           <Truck className="mt-0.5 h-7 w-7 flex-none text-amber-600" />
           <div>
             <div className="text-base font-bold text-amber-900 sm:text-lg dark:text-amber-100">
-              На складе в Астане нет в наличии
+              {t("relaxDeliveryTitle")}
             </div>
             <p className="mt-1 text-sm text-amber-900/90 dark:text-amber-200/90">
-              Можно заказать с доставкой с другого склада. Срок доставки указан
-              в каждой карточке ниже.
+              {t("relaxDeliveryBody")}
             </p>
           </div>
         </div>
@@ -389,10 +363,8 @@ function RelaxBanner({ level }: { level: RelaxLevel }) {
     );
   }
   const messages: Partial<Record<RelaxLevel, string>> = {
-    "no-make":
-      "Точных совпадений с вашей маркой нет — показаны другие варианты в наличии в Астане.",
-    "no-words":
-      "По вашему запросу совпадений в Астане нет — показаны похожие позиции, которые есть в наличии.",
+    "no-make": t("relaxNoMake"),
+    "no-words": t("relaxNoWords"),
   };
   const message = messages[level];
   if (!message) return null;
@@ -458,7 +430,7 @@ function OfferCard({
             title={offer.compatReason}
           >
             <AlertTriangle className="h-3 w-3" />
-            не для вашего авто
+            {t("badgeMismatch")}
           </span>
         ) : offer.compat === "unknown" ? (
           <span
@@ -472,7 +444,7 @@ function OfferCard({
         {offer.fromCatalog && (
           <span
             className="chip bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
-            title="Парт-номер найден в каталоге автозапчастей по вашему запросу"
+            title={t("badgeCatalogHint")}
           >
             <BookOpen className="h-3 w-3" />
             {t("badgeCatalog")}
@@ -505,10 +477,10 @@ function OfferCard({
               <Clock className="h-5 w-5 flex-none" />
               <div className="leading-tight">
                 <div className="text-[11px] uppercase tracking-wider">
-                  Доставка под заказ
+                  {t("shipmentLabel")}
                 </div>
                 <div className="text-lg font-black sm:text-xl">
-                  ~{offer.shipmentDays} {dayWord(offer.shipmentDays)}
+                  {t("shipmentDays", { n: offer.shipmentDays })}
                 </div>
               </div>
             </div>
@@ -532,12 +504,12 @@ function OfferCard({
           <>
             <Link href={`/${locale}/cart`} className="btn-primary flex-1">
               <ShoppingCart className="h-4 w-4" />
-              Перейти в корзину
+              {t("goToCart")}
             </Link>
             <button
               onClick={() => cart.remove(offer.id)}
               className="btn-secondary"
-              aria-label="Удалить из корзины"
+              aria-label={t("removeFromCart")}
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -545,7 +517,7 @@ function OfferCard({
         ) : (
           <button onClick={onAdd} className="btn-primary flex-1">
             <ShoppingCart className="h-4 w-4" />
-            В корзину
+            {t("addToCart")}
           </button>
         )}
       </div>

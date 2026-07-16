@@ -1,6 +1,7 @@
 import { getTranslations, unstable_setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
+import { getAllSettings } from "@/lib/sheets/settings";
 
 export default async function InfoPage({
   params: { locale },
@@ -10,6 +11,10 @@ export default async function InfoPage({
   unstable_setRequestLocale(locale);
   const t = await getTranslations("info");
   const tNav = await getTranslations("nav");
+  const settings = await getAllSettings().catch(() => null);
+  // Delivery fee is admin-controlled — only `lines` uses {price}, the rest
+  // ignore the param.
+  const price = settings?.expressDeliveryPrice ?? 4000;
   const lines = t.raw("lines") as string[];
 
   return (
@@ -18,10 +23,10 @@ export default async function InfoPage({
         {t("title")}
       </h1>
       <ul className="mt-6 space-y-3">
-        {lines.map((line, i) => (
+        {lines.map((_, i) => (
           <li key={i} className="card flex items-start gap-3">
             <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-brand" />
-            <p className="text-pretty">{line}</p>
+            <p className="text-pretty">{t(`lines.${i}`, { price })}</p>
           </li>
         ))}
       </ul>
