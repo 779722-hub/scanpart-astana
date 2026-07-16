@@ -5,14 +5,39 @@ import { requireAuth } from "@/lib/auth/guards";
 import { readContent, writeContent, writeContentWhere } from "@/lib/sheets/client";
 import { CONTENT_TAG } from "@/lib/content";
 import { translationConfigured, translateRuToKkEn } from "@/lib/translate";
+import ru from "@/messages/ru.json";
+import kk from "@/messages/kk.json";
+import en from "@/messages/en.json";
 
 export const runtime = "nodejs";
+
+/** messages/*.json → плоская карта «ключ через точку» → текст. */
+function flatten(
+  node: unknown,
+  prefix = "",
+  out: Record<string, string> = {}
+): Record<string, string> {
+  if (typeof node === "string") {
+    if (prefix) out[prefix] = node;
+  } else if (Array.isArray(node)) {
+    node.forEach((v, i) => flatten(v, prefix ? `${prefix}.${i}` : String(i), out));
+  } else if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      flatten(v, prefix ? `${prefix}.${k}` : k, out);
+    }
+  }
+  return out;
+}
+
+// Тексты из кода — чтобы панель показывала, что именно перебивает строка и
+// когда перебивка разошлась с кодом. Без этого правка в коде молча тонет.
+const DEFAULTS = { ru: flatten(ru), kk: flatten(kk), en: flatten(en) };
 
 export async function GET() {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
   const rows = await readContent();
-  return NextResponse.json({ ok: true, rows });
+  return NextResponse.json({ ok: true, rows, defaults: DEFAULTS });
 }
 
 const putSchema = z.object({
