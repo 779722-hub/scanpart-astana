@@ -13,7 +13,7 @@ export function CartButton() {
   return (
     <Link
       href={`/${locale}/cart`}
-      className="relative inline-flex h-8 items-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-2.5 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
+      className="relative inline-flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-3 text-sm font-semibold transition hover:border-ink-mute sm:h-9 sm:min-w-0 sm:px-3 dark:border-ink-mute dark:bg-ink-soft"
       aria-label="Корзина"
     >
       <ShoppingCart className="h-4 w-4" />

@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
 
 const selectCls =
-  "h-8 appearance-none cursor-pointer rounded-2xl border border-paper-mute bg-white pl-2 pr-5 text-sm font-semibold leading-none text-ink transition hover:bg-paper focus:outline-none focus:ring-2 focus:ring-brand/40 dark:border-ink-mute dark:bg-ink-soft dark:text-paper sm:h-9";
+  // text-base на мобильном — иначе iOS зумит страницу при тапе по select
+  "h-11 appearance-none cursor-pointer rounded-2xl border border-paper-mute bg-white pl-2.5 pr-5 text-base font-semibold leading-none text-ink transition hover:bg-paper focus:outline-none focus:ring-1 focus:ring-brand dark:border-ink-mute dark:bg-ink-soft dark:text-paper sm:h-9 sm:text-sm";
 const caretCls =
   "pointer-events-none absolute right-1 top-1/2 h-3 w-3 -translate-y-1/2 opacity-50";
 

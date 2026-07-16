@@ -38,20 +38,23 @@
 }
 
 @layer components {
+  /* Кнопки без ореола: только заливка и потемнение на hover. Крупная тень
+     вокруг кнопки читалась как подсветка и спорила с красным. */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-brand
            px-5 py-3 sm:px-6 sm:py-4
-           text-base font-semibold text-white shadow-card transition
-           hover:bg-brand-600 hover:shadow-cardHover
-           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400
+           text-base font-semibold text-white transition
+           hover:bg-brand-600
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2
            active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-paper-mute
            bg-white px-5 py-3 sm:px-6 sm:py-4
-           text-base font-semibold text-ink shadow-card transition
-           hover:border-ink-mute hover:shadow-cardHover
-           dark:border-paper-mute/50 dark:bg-ink-soft dark:text-paper dark:hover:border-paper-mute;
+           text-base font-semibold text-ink transition
+           hover:border-ink-mute hover:bg-paper-soft
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2
+           dark:border-paper-mute/50 dark:bg-ink-soft dark:text-paper dark:hover:border-paper-mute dark:hover:bg-ink-mute;
   }
   .card {
     @apply rounded-2xl bg-white p-4 shadow-card ring-1 ring-paper-mute
@@ -59,9 +62,10 @@
            dark:bg-ink-soft dark:ring-paper-mute/20;
   }
   .input {
+    /* Фокус — тонкая рамка вместо широкого красного ореола. */
     @apply block w-full rounded-2xl border border-paper-mute bg-white
            px-4 py-3 text-base sm:text-lg
-           outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30
+           outline-none transition focus:border-brand focus:ring-1 focus:ring-brand
            dark:border-paper-mute/40 dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute;
     /* keep ≥16px to avoid iOS auto-zoom on focus */
     font-size: 16px;
@@ -70,6 +74,43 @@
     .input {
       font-size: 18px;
     }
+  }
+  /* Карточка товара: при наведении слева вырастает красная отметка. Эффект
+     только для мыши — на тач-экранах :hover залипает после тапа. */
+  .card-offer {
+    @apply card relative overflow-hidden;
+  }
+  .card-offer::before {
+    content: "";
+    @apply absolute inset-y-0 left-0 w-[3px] bg-brand;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  .card-offer:focus-within::before {
+    transform: scaleX(1);
+  }
+  @media (hover: hover) {
+    .card-offer {
+      transition:
+        transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1),
+        box-shadow 200ms cubic-bezier(0.2, 0.7, 0.3, 1);
+    }
+    .card-offer:hover {
+      @apply -translate-y-0.5 shadow-cardHover;
+    }
+    .card-offer:hover::before {
+      transform: scaleX(1);
+    }
+  }
+  /* Цена: фирменный красный на тёмном фоне даёт контраст 3.5:1 — мелкие
+     цифры так не читаются. Осветляем ТОТ ЖЕ красный из админки (--c-brand),
+     а не подставляем другой: 4.8:1. */
+  .price-brand {
+    @apply text-brand tabular-nums;
+  }
+  .dark .price-brand {
+    color: color-mix(in srgb, rgb(var(--c-brand, 225 6 0)) 70%, #fff);
   }
   .label {
     @apply mb-1 block text-sm font-medium text-ink-mute dark:text-paper-mute;

@@ -156,7 +156,7 @@ export default async function HomePage({
       {/* HERO */}
       <section className="mx-auto max-w-6xl px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-20">
         <div className="inline-block rounded-3xl bg-white/80 px-5 py-4 shadow-card backdrop-blur-md sm:px-8 sm:py-6 dark:bg-ink/70 dark:shadow-cardHover">
-          <h1 className="text-balance text-3xl font-black tracking-tight text-ink sm:text-5xl md:text-6xl dark:text-paper">
+          <h1 className="text-balance text-3xl font-bold tracking-tight text-ink sm:text-5xl md:text-6xl dark:text-paper">
             {t("title")}
           </h1>
           <p className="mt-3 max-w-2xl text-pretty text-base text-ink-mute sm:mt-4 sm:text-lg dark:text-paper-mute">
@@ -197,7 +197,7 @@ export default async function HomePage({
         <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((s) => (
             <li key={s.n} className="card flex items-start gap-3">
-              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-2xl bg-brand text-base font-black text-white">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-2xl bg-brand text-base font-bold text-white">
                 {s.n}
               </span>
               <p className="text-sm leading-snug">{s.text}</p>

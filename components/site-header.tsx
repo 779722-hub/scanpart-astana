@@ -24,7 +24,7 @@ export async function SiteHeader() {
   const isCustomer = Boolean(session.customer);
   const vinHref = `/${locale}/search/vin`;
   const btnCls =
-    "inline-flex flex-none items-center gap-1 rounded-2xl bg-brand px-3 py-1 text-xs font-semibold text-white shadow-card transition hover:bg-brand-600 sm:text-sm";
+    "inline-flex min-h-[36px] flex-none items-center gap-1 rounded-2xl bg-brand px-3 py-1 text-xs font-semibold text-white transition hover:bg-brand-600 sm:min-h-0 sm:text-sm";
 
   return (
     <header className="sticky top-0 z-40 border-b border-paper-mute/60 bg-paper/80 backdrop-blur dark:border-ink-mute/60 dark:bg-ink/80">

@@ -206,7 +206,7 @@ function PriceSort({
     { value: "desc", label: t("sortDesc") },
   ];
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span className="text-ink-mute dark:text-paper-mute">{t("sortLabel")}</span>
       <div className="inline-flex rounded-2xl border border-paper-mute bg-white p-0.5 dark:border-ink-mute dark:bg-ink-soft">
         {options.map(({ value, label }) => {
@@ -215,9 +215,9 @@ function PriceSort({
             <button
               key={value}
               onClick={() => onChange(value)}
-              className={`rounded-xl px-3 py-1.5 font-semibold transition ${
+              className={`whitespace-nowrap rounded-xl px-3 py-1.5 font-semibold transition ${
                 active
-                  ? "bg-brand text-white shadow-card"
+                  ? "bg-brand text-white"
                   : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
               }`}
             >
@@ -402,7 +402,7 @@ function OfferCard({
   };
 
   return (
-    <article className="card">
+    <article className="card-offer">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span
           className={`chip ${
@@ -454,7 +454,7 @@ function OfferCard({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-4">
         <div className="min-w-0">
-          <h3 className="text-base font-bold leading-tight [overflow-wrap:anywhere] sm:text-xl">{offer.name}</h3>
+          <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere] sm:text-lg">{offer.name}</h3>
           <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-ink-mute dark:text-paper-mute">{t("brand")}</dt>
             <dd className="font-semibold">{offer.brand}</dd>
@@ -479,7 +479,7 @@ function OfferCard({
                 <div className="text-[11px] uppercase tracking-wider">
                   {t("shipmentLabel")}
                 </div>
-                <div className="text-lg font-black sm:text-xl">
+                <div className="text-lg font-semibold">
                   {t("shipmentDays", { n: offer.shipmentDays })}
                 </div>
               </div>
@@ -490,9 +490,9 @@ function OfferCard({
           <div className="text-xs uppercase tracking-wider text-ink-mute dark:text-paper-mute">
             {t("price")}
           </div>
-          <div className="text-2xl font-black text-brand sm:text-3xl">
+          <div className="price-brand text-2xl font-semibold">
             {formatKzt(offer.priceFinal)}
-            <span className="ml-1 text-sm font-semibold text-ink sm:text-base dark:text-paper">
+            <span className="ml-1 text-sm font-medium text-ink-mute dark:text-paper-mute">
               {t("priceUnit")}
             </span>
           </div>

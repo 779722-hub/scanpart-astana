@@ -73,7 +73,7 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
           <span>Заказов всего</span>
           <span className="text-brand">Открыть →</span>
         </div>
-        <div className="mt-4 text-5xl font-black text-brand">
+        <div className="mt-4 text-5xl font-bold tabular-nums text-brand">
           {orders?.count ?? "—"}
         </div>
       </button>
@@ -86,7 +86,7 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
           <span>Заказы сегодня</span>
           <span className="text-brand">Открыть →</span>
         </div>
-        <div className="mt-4 text-5xl font-black">{orders?.today ?? "—"}</div>
+        <div className="mt-4 text-5xl font-bold tabular-nums">{orders?.today ?? "—"}</div>
       </button>
     </div>
   );

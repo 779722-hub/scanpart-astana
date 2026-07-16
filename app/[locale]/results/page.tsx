@@ -29,14 +29,20 @@ export default async function ResultsPage({
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
-          <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
+      <div className="mb-6 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            {t("title")}
+          </h1>
+          <p className="mt-1 truncate text-sm text-ink-mute dark:text-paper-mute">
             «{q}»
           </p>
         </div>
-        <Link href={`/${locale}`} className="btn-secondary">
+        {/* flex-none + nowrap: на 390px кнопка иначе ломалась на две строки */}
+        <Link
+          href={`/${locale}`}
+          className="btn-secondary flex-none whitespace-nowrap px-4 py-2.5 text-sm sm:px-6 sm:py-4 sm:text-base"
+        >
           {t("newSearch")}
         </Link>
       </div>
