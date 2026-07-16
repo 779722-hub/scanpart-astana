@@ -18,7 +18,7 @@ async function main() {
     markup_percent: "35",
     analogs_max: "3",
     express_delivery_price: "4000",
-    express_hours: "Пн–Сб 09:00–16:30",
+    express_hours: "Пн–Сб 09:00–16:00",
     pickup_address: "г. Астана, пр. Республики, 68",
     pickup_hours: "завтра 14:00–18:00",
     manager_phone_display: "",

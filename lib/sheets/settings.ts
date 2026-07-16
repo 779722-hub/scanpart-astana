@@ -97,7 +97,7 @@ export async function getAllSettings(): Promise<PublicSettings> {
     markupPercent: clampMarkup(Number(map.markup_percent ?? MARKUP_DEFAULT)),
     analogsMax: clampAnalogs(Number(map.analogs_max ?? ANALOGS_DEFAULT)),
     expressDeliveryPrice: Number(map.express_delivery_price ?? 4000),
-    expressHours: map.express_hours ?? "Пн-Сб 09:00–16:30",
+    expressHours: map.express_hours ?? "Пн-Сб 09:00–16:00",
     pickupAddress: map.pickup_address ?? "г. Астана, пр. Республики, 68",
     pickupHours: map.pickup_hours ?? "завтра 14:00–18:00",
     managerPhoneDisplay: map.manager_phone_display ?? "",
