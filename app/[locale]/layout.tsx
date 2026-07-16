@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ThemeStyle } from "@/components/theme-style";
 import { SeoJsonLd } from "@/components/seo-jsonld";
-import { getImageSlot } from "@/lib/content";
+import { getImageSlot, imageAlt } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { SITE_NAME, OG_LOCALE, seoFor, type SeoLocale } from "@/lib/site";
 
@@ -25,7 +25,14 @@ export async function generateMetadata({
   const fullTitle = `${seo.title} · ${SITE_NAME}`;
   const og = await getImageSlot("og-default").catch(() => null);
   const images = og?.publicId
-    ? [{ url: cldUrl(og.publicId, { width: 1200 }), width: 1200, height: 630, alt: seo.title }]
+    ? [
+        {
+          url: cldUrl(og.publicId, { width: 1200 }),
+          width: 1200,
+          height: 630,
+          alt: imageAlt(og, locale) || seo.title,
+        },
+      ]
     : undefined;
 
   // No title.template anywhere — titles are used verbatim so the site-name
