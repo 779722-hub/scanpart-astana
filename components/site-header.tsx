@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Wrench, Car, ChevronRight, Lock } from "lucide-react";
+import { Car, ChevronRight, Lock } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
@@ -42,9 +42,12 @@ export async function SiteHeader() {
               className="h-8 w-auto max-w-[6rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
             />
           ) : (
-            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-2xl bg-brand text-white shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9">
-              <Wrench className="h-4 w-4" />
-            </span>
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src="/icon-192.png"
+              alt={logoText}
+              className="h-8 w-8 flex-none rounded-2xl object-cover shadow-card transition group-hover:scale-105 sm:h-9 sm:w-9"
+            />
           )}
           <span className="truncate text-xl sm:hidden">{logoShort}</span>
           <span className="hidden truncate sm:block sm:text-xl">{logoText}</span>

@@ -156,7 +156,7 @@ export default function CourierPage() {
   const brand = (
     <div className="flex items-center justify-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {logoUrl ? <img src={logoUrl} alt="SCANPART" className="h-8 w-auto" /> : null}
+      <img src={logoUrl || "/icon-192.png"} alt="SCANPART" className="h-9 w-9 flex-none rounded-xl object-cover" />
       <span className="text-xl font-extrabold tracking-tight">
         <span className="text-brand">SCANPART</span> · Доставка
       </span>
@@ -365,7 +365,7 @@ export default function CourierPage() {
       <div className="mb-3 flex items-center justify-between border-b border-paper-mute pb-3 dark:border-ink-mute">
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {logoUrl ? <img src={logoUrl} alt="SCANPART" className="h-7 w-auto" /> : null}
+          <img src={logoUrl || "/icon-192.png"} alt="SCANPART" className="h-8 w-8 flex-none rounded-lg object-cover" />
           <span className="font-extrabold">
             <span className="text-brand">SCANPART</span> · Доставка
           </span>
