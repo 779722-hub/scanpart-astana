@@ -12,6 +12,7 @@ import { getImageSlot, imageAlt } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { SITE_NAME, OG_LOCALE, seoFor, type SeoLocale } from "@/lib/site";
 import { manrope } from "@/lib/font";
+import { getAllSettings } from "@/lib/sheets/settings";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -24,7 +25,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const seo = seoFor(locale);
   const fullTitle = `${seo.title} · ${SITE_NAME}`;
-  const og = await getImageSlot("og-default").catch(() => null);
+  const [og, settings] = await Promise.all([
+    getImageSlot("og-default").catch(() => null),
+    getAllSettings().catch(() => null),
+  ]);
   const images = og?.publicId
     ? [
         {
@@ -55,6 +59,11 @@ export async function generateMetadata({
       title: fullTitle,
       description: seo.description,
       images: images?.map((i) => i.url),
+    },
+    // Коды подтверждения из админки. Пустые поля Next просто не выводит.
+    verification: {
+      google: settings?.googleSiteVerification || undefined,
+      yandex: settings?.yandexVerification || undefined,
     },
   };
 }

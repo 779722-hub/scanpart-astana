@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { getAllSettings } from "@/lib/sheets/settings";
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
+import { SeoFaqJsonLd } from "@/components/seo-faq-jsonld";
 
 interface InfoItem {
   title: string;
@@ -44,8 +45,18 @@ export default async function InfoPage({
 
   const sections = t.raw("sections") as InfoSection[];
 
+  // Для FAQ-разметки берём ровно тот текст, что видит человек: Google требует
+  // совпадения, иначе разметка считается нарушением.
+  const faq = sections.flatMap((s, i) =>
+    s.items.map((_, j) => ({
+      title: t(`sections.${i}.items.${j}.title`),
+      body: t(`sections.${i}.items.${j}.body`, vars),
+    }))
+  );
+
   return (
     <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
+      <SeoFaqJsonLd items={faq} />
       <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
         {t("title")}
       </h1>

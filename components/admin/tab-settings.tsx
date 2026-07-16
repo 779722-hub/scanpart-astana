@@ -45,6 +45,16 @@ const FIELDS: {
   { key: "manager_whatsapp_e164", label: "WhatsApp менеджера (E.164 без +, напр. 77000000000)" },
   { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)" },
   { key: "telegram_chat_id", label: "Telegram chat ID для уведомлений (можно определить кнопкой ниже)" },
+  {
+    key: "google_site_verification",
+    label: "Google Search Console: код подтверждения",
+    hint: "Только значение content из мета-тега, без кавычек и HTML",
+  },
+  {
+    key: "yandex_verification",
+    label: "Яндекс.Вебмастер: код подтверждения",
+    hint: "Только значение content из мета-тега, без кавычек и HTML",
+  },
 ];
 
 // Keys for the VIN-OCR (техпаспорт по фото) card — saved together with FIELDS.
