@@ -129,3 +129,18 @@ export async function getImageSlot(slot: string): Promise<ImageRow | null> {
   const all = await getImageRows();
   return all.find((i) => i.slot === slot) ?? null;
 }
+
+/**
+ * Alt-подпись картинки на языке страницы. В админке alt заполняется на трёх
+ * языках, но рендерился всегда русский — казахский и английский лежали
+ * мёртвым грузом. Пусто на языке страницы → откатываемся на русский.
+ */
+export function imageAlt(row: ImageRow | null | undefined, locale: string): string {
+  if (!row) return "";
+  const byLocale: Record<string, string> = {
+    ru: row.altRu,
+    kk: row.altKk,
+    en: row.altEn,
+  };
+  return (byLocale[locale] || row.altRu || "").trim();
+}

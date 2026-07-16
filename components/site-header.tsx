@@ -5,7 +5,7 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
 import { BrandLink } from "./brand-link";
-import { getThemeMap, getImageSlot } from "@/lib/content";
+import { getThemeMap, getImageSlot, imageAlt } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { getSession } from "@/lib/session";
 
@@ -37,7 +37,7 @@ export async function SiteHeader() {
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={cldUrl(logo.publicId, { width: 144 })}
-              alt={logo.altRu || logoText}
+              alt={imageAlt(logo, locale) || logoText}
               className="h-8 w-auto max-w-[6rem] flex-none object-contain transition group-hover:scale-105 sm:h-9 sm:max-w-[9rem]"
             />
           ) : (
