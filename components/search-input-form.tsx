@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Search } from "lucide-react";
 import { VoiceSearchButton } from "./voice-search-button";
+import { useDesktopAutoFocus } from "@/lib/use-desktop-autofocus";
 
 export function SearchInputForm({
   locale,
@@ -21,6 +22,7 @@ export function SearchInputForm({
   const router = useRouter();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
+  const qRef = useDesktopAutoFocus<HTMLInputElement>();
 
   function go(query: string) {
     const clean = query.trim();
@@ -45,12 +47,12 @@ export function SearchInputForm({
         </label>
         <input
           id="q"
+          ref={qRef}
           className="input"
           placeholder={t("placeholder")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
-          autoFocus
           required
           disabled={loading}
         />
