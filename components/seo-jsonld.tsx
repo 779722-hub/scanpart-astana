@@ -9,14 +9,21 @@ import { SITE_URL, SITE_NAME } from "@/lib/site";
  * AutoPartsStore (address, phone, area served). Rendered site-wide.
  */
 export async function SeoJsonLd({ locale }: { locale: string }) {
-  const [settings, og] = await Promise.all([
+  const [settings, og, logoSlot] = await Promise.all([
     getAllSettings().catch(() => null),
     getImageSlot("og-default").catch(() => null),
+    getImageSlot("logo").catch(() => null),
   ]);
 
   const image = og?.publicId
     ? cldUrl(og.publicId, { width: 1200 })
     : `${SITE_URL}/favicon.svg`;
+
+  // В Organization.logo должен быть логотип, а не og-картинка: раньше сюда
+  // подставлялась og-обложка, и Google считал логотипом её.
+  const logo = logoSlot?.publicId
+    ? cldUrl(logoSlot.publicId, { width: 512 })
+    : `${SITE_URL}/icon-512.png`;
 
   const store: Record<string, unknown> = {
     "@type": ["Store", "AutoPartsStore"],
@@ -42,7 +49,7 @@ export async function SeoJsonLd({ locale }: { locale: string }) {
       "@id": `${SITE_URL}/#org`,
       name: SITE_NAME,
       url: SITE_URL,
-      logo: image,
+      logo,
     },
     {
       "@type": "WebSite",

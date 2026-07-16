@@ -89,6 +89,8 @@ export interface PublicSettings {
   managerPhoneDisplay: string;
   managerWhatsappE164: string;
   telegramChatId: string;
+  googleSiteVerification: string;
+  yandexVerification: string;
 }
 
 export async function getAllSettings(): Promise<PublicSettings> {
@@ -103,5 +105,9 @@ export async function getAllSettings(): Promise<PublicSettings> {
     managerPhoneDisplay: map.manager_phone_display ?? "",
     managerWhatsappE164: map.manager_whatsapp_e164 ?? "",
     telegramChatId: map.telegram_chat_id ?? "",
+    // Коды подтверждения владения сайтом. Держим в админке, а не в env: их
+    // вставляют один раз, и ради этого не должно требоваться выкатывать код.
+    googleSiteVerification: map.google_site_verification ?? "",
+    yandexVerification: map.yandex_verification ?? "",
   };
 }
