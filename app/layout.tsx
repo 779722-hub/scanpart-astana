@@ -17,7 +17,14 @@ export const metadata: Metadata = {
   description: seo.description,
   keywords: seo.keywords,
   applicationName: SITE_NAME,
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon-32.png"],
+  },
   robots: { index: true, follow: true },
 };
 
