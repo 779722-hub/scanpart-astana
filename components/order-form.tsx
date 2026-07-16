@@ -152,7 +152,7 @@ export function OrderForm({
           <Link href={`/${locale}`} className="btn-primary flex-1">
             На главную
           </Link>
-          <Link href={`/${locale}/search/article`} className="btn-secondary flex-1">
+          <Link href={`/${locale}/search/vin`} className="btn-secondary flex-1">
             {t("back")}
           </Link>
         </div>

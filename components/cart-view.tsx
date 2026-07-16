@@ -115,14 +115,14 @@ export function CartView({ locale }: { locale: string }) {
             <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <div className="text-xs text-ink-mute dark:text-paper-mute">
-                  Цена за шт.
+                  {t("pricePerUnit")}
                 </div>
                 <div className="font-bold">{fmt(item.price)} ₸</div>
               </div>
 
               <div>
                 <div className="mb-1 text-xs text-ink-mute dark:text-paper-mute">
-                  В наличии: {item.availableQty}
+                  {t("available", { n: String(item.availableQty) })}
                 </div>
                 <div className="inline-flex items-center overflow-hidden rounded-2xl border border-paper-mute dark:border-ink">
                   <button

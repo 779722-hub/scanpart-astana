@@ -19,14 +19,16 @@ import {
   Plus,
   SunMoon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
 function AppearanceCard() {
+  const t = useTranslations("account");
   return (
     <section className="card flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
         <SunMoon className="h-5 w-5 text-brand" />
-        <span className="font-semibold">Тема сайта</span>
+        <span className="font-semibold">{t("themeTitle")}</span>
       </div>
       <ThemeSwitcher />
     </section>
@@ -112,6 +114,7 @@ function GuestView({
   locale: string;
   onSignedIn: () => void;
 }) {
+  const t = useTranslations("account");
   const [tab, setTab] = useState<"login" | "register">("login");
   return (
     <div className="space-y-4">
@@ -126,7 +129,7 @@ function GuestView({
               : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
           }`}
         >
-          Войти
+          {t("tabLogin")}
         </button>
         <button
           role="tab"
@@ -138,7 +141,7 @@ function GuestView({
               : "text-ink-mute hover:bg-paper dark:text-paper-mute dark:hover:bg-ink"
           }`}
         >
-          Регистрация
+          {t("tabRegister")}
         </button>
       </div>
       {tab === "login" ? (
@@ -147,18 +150,18 @@ function GuestView({
         <RegisterForm onDone={onSignedIn} />
       )}
       <p className="px-2 text-xs text-ink-mute dark:text-paper-mute">
-        Личный кабинет: сохраним VIN ваших авто и историю заказов, чтобы вы могли
-        повторить покупку в один клик.
+        {t("guestPitch")}
       </p>
       <AppearanceCard />
       <Link href={`/${locale}`} className="text-sm underline text-ink-mute dark:text-paper-mute">
-        ← На главную
+        ← {t("backHome")}
       </Link>
     </div>
   );
 }
 
 function LoginForm({ onDone }: { onDone: () => void }) {
+  const t = useTranslations("account");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -178,8 +181,8 @@ function LoginForm({ onDone }: { onDone: () => void }) {
       if (!res.ok || !j.ok) {
         setErr(
           j.error === "rate_limited"
-            ? `Слишком много попыток, через ${j.retryAfter} с`
-            : "Неверный email или пароль"
+            ? t("errRateLimited", { seconds: String(j.retryAfter) })
+            : t("errInvalidCreds")
         );
         return;
       }
@@ -191,9 +194,9 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="card space-y-4">
-      <h1 className="text-2xl font-bold">Вход</h1>
+      <h1 className="text-2xl font-bold">{t("loginTitle")}</h1>
       <div>
-        <label className="label">Email / Логин</label>
+        <label className="label">{t("fieldEmail")}</label>
         <input
           className="input"
           type="email"
@@ -204,7 +207,7 @@ function LoginForm({ onDone }: { onDone: () => void }) {
         />
       </div>
       <div>
-        <label className="label">Пароль</label>
+        <label className="label">{t("fieldPassword")}</label>
         <input
           className="input"
           type="password"
@@ -221,13 +224,14 @@ function LoginForm({ onDone }: { onDone: () => void }) {
       )}
       <button className="btn-primary w-full" disabled={busy}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-        Войти
+        {t("submitLogin")}
       </button>
     </form>
   );
 }
 
 function RegisterForm({ onDone }: { onDone: () => void }) {
+  const t = useTranslations("account");
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -252,10 +256,10 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
       if (!res.ok || !j.ok) {
         setErr(
           j.error === "email_taken"
-            ? "Аккаунт с таким email уже существует"
+            ? t("errEmailTaken")
             : j.error === "rate_limited"
-              ? `Слишком много попыток, через ${j.retryAfter} с`
-              : "Проверьте поля и попробуйте ещё раз"
+              ? t("errRateLimited", { seconds: String(j.retryAfter) })
+              : t("errCheckFields")
         );
         return;
       }
@@ -267,9 +271,9 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="card space-y-4">
-      <h1 className="text-2xl font-bold">Регистрация</h1>
+      <h1 className="text-2xl font-bold">{t("registerTitle")}</h1>
       <div>
-        <label className="label">Email / Логин</label>
+        <label className="label">{t("fieldEmail")}</label>
         <input
           className="input"
           type="email"
@@ -280,7 +284,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
         />
       </div>
       <div>
-        <label className="label">Пароль (≥ 8 символов)</label>
+        <label className="label">{t("fieldPasswordNew")}</label>
         <input
           className="input"
           type="password"
@@ -292,7 +296,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
         />
       </div>
       <div>
-        <label className="label">Имя</label>
+        <label className="label">{t("fieldName")}</label>
         <input
           className="input"
           autoComplete="name"
@@ -303,7 +307,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="label">Телефон</label>
+          <label className="label">{t("fieldPhone")}</label>
           <input
             className="input"
             inputMode="tel"
@@ -314,7 +318,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div>
-          <label className="label">WhatsApp (желательно)</label>
+          <label className="label">{t("fieldWhatsapp")}</label>
           <input
             className="input"
             inputMode="tel"
@@ -335,7 +339,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
         ) : (
           <UserPlus className="h-4 w-4" />
         )}
-        Создать аккаунт
+        {t("submitRegister")}
       </button>
     </form>
   );
@@ -352,6 +356,7 @@ function Dashboard({
   orders: OrderRow[];
   onChange: () => void;
 }) {
+  const t = useTranslations("account");
   const router = useRouter();
 
   async function logout() {
@@ -361,7 +366,7 @@ function Dashboard({
   }
 
   async function deleteVin(vin: string) {
-    if (!confirm(`Убрать VIN ${vin} из сохранённых?`)) return;
+    if (!confirm(t("vinDeleteConfirm", { vin }))) return;
     await fetch("/api/customer/vins", {
       method: "DELETE",
       headers: { "content-type": "application/json" },
@@ -377,7 +382,7 @@ function Dashboard({
       body: JSON.stringify({ vin: vin.trim().toUpperCase() }),
     });
     if (!res.ok) {
-      alert("Проверьте VIN — обычно 17 символов (для старых/корейских авто допускается короче).");
+      alert(t("vinInvalid"));
       return false;
     }
     onChange();
@@ -393,7 +398,7 @@ function Dashboard({
       body: JSON.stringify({ oldVin, newVin: next }),
     });
     if (!res.ok) {
-      alert("Проверьте VIN — обычно 17 символов (для старых/корейских авто допускается короче).");
+      alert(t("vinInvalid"));
       return false;
     }
     onChange();
@@ -408,14 +413,14 @@ function Dashboard({
       <header className="card flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Здравствуйте, {me.name}
+            {t("headerTitle", { name: me.name })}
           </h1>
           <p className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
             {me.email} · {me.phone}
           </p>
         </div>
         <button onClick={logout} className="btn-secondary !px-4 !py-2 text-sm">
-          <LogOut className="h-4 w-4" /> Выйти
+          <LogOut className="h-4 w-4" /> {t("logout")}
         </button>
       </header>
 
@@ -423,12 +428,11 @@ function Dashboard({
       <section className="card space-y-3">
         <div className="flex items-center gap-2">
           <Car className="h-5 w-5 text-brand" />
-          <h2 className="text-lg font-bold">Мои авто (VIN)</h2>
+          <h2 className="text-lg font-bold">{t("vinsTitle")}</h2>
         </div>
         {me.vins.length === 0 ? (
           <p className="text-sm text-ink-mute dark:text-paper-mute">
-            Когда вы введёте VIN в поиске, мы сохраним его сюда. Или добавьте
-            вручную ниже.
+            {t("vinsEmpty")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -450,11 +454,11 @@ function Dashboard({
       <section className="card space-y-3">
         <div className="flex items-center gap-2">
           <Package className="h-5 w-5 text-brand" />
-          <h2 className="text-lg font-bold">История заказов</h2>
+          <h2 className="text-lg font-bold">{t("ordersTitle")}</h2>
         </div>
         {grouped.length === 0 ? (
           <p className="text-sm text-ink-mute dark:text-paper-mute">
-            Пока заказов нет.
+            {t("ordersEmpty")}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -471,7 +475,7 @@ function Dashboard({
                     <div className="text-sm font-semibold">{g.status}</div>
                   </div>
                   <span className="text-xs text-ink-mute dark:text-paper-mute">
-                    Повторить — выберите позицию:
+                    {t("orderRepeatHint")}
                   </span>
                 </div>
                 <ul className="mt-2 space-y-2 text-sm">
@@ -496,15 +500,15 @@ function Dashboard({
                           )
                         }
                         className="btn-secondary flex-none !px-3 !py-1.5 text-xs"
-                        title="Найти эту позицию: оригинал и аналоги для вашего авто"
+                        title={t("orderRepeatItemTitle")}
                       >
-                        <RefreshCw className="h-3 w-3" /> Повторить
+                        <RefreshCw className="h-3 w-3" /> {t("orderRepeatItem")}
                       </button>
                     </li>
                   ))}
                 </ul>
                 <div className="mt-2 text-right text-sm">
-                  Сумма: <strong>{fmt(g.total)} ₸</strong>
+                  {t("orderTotal")}: <strong>{fmt(g.total)} ₸</strong>
                 </div>
               </li>
             ))}
@@ -564,6 +568,7 @@ function VinRow({
   onDelete: () => void;
   onEdit: (next: string) => Promise<boolean>;
 }) {
+  const t = useTranslations("account");
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(vin);
@@ -619,7 +624,7 @@ function VinRow({
               if (ok) setEditing(false);
             }}
             className="rounded-xl p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-            aria-label="Сохранить"
+            aria-label={t("vinAddSave")}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           </button>
@@ -629,7 +634,7 @@ function VinRow({
               setEditing(false);
             }}
             className="rounded-xl p-2 text-ink-mute dark:text-paper-mute hover:bg-paper dark:hover:bg-ink"
-            aria-label="Отмена"
+            aria-label={t("cancel")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -643,7 +648,7 @@ function VinRow({
       <div className="flex items-center gap-2">
         <Car className="h-4 w-4 flex-none text-brand" />
         <span className="font-bold">
-          {label || (vin.startsWith("MANUAL") ? "Автомобиль" : "Определяем модель…")}
+          {label || (vin.startsWith("MANUAL") ? t("vehicleFallback") : t("vehicleResolving"))}
         </span>
         {vehicle?.year && vehicle.year !== "—" && (
           <span className="text-sm text-ink-mute dark:text-paper-mute">{vehicle.year}</span>
@@ -659,21 +664,21 @@ function VinRow({
           className="btn-primary flex-1 !px-3 !py-2 text-sm"
         >
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          Поиск запчастей
+          {t("vinSearchAction")}
         </button>
         <button
           onClick={() => setEditing(true)}
           className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-paper-mute bg-white px-3 py-2 text-sm font-semibold text-ink transition hover:border-ink-mute dark:border-ink dark:bg-ink-soft dark:text-paper"
         >
           <Pencil className="h-4 w-4" />
-          Изменить
+          {t("vinEditAction")}
         </button>
         <button
           onClick={onDelete}
           className="inline-flex items-center justify-center gap-1.5 rounded-2xl border-2 border-brand/40 bg-brand/5 px-3 py-2 text-sm font-semibold text-brand transition hover:border-brand hover:bg-brand/10"
         >
           <Trash2 className="h-4 w-4" />
-          Удалить
+          {t("vinDeleteAction")}
         </button>
       </div>
     </li>
@@ -681,6 +686,7 @@ function VinRow({
 }
 
 function AddVinForm({ onAdd }: { onAdd: (vin: string) => Promise<boolean> }) {
+  const t = useTranslations("account");
   const [open, setOpen] = useState(false);
   const [vin, setVin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -691,7 +697,7 @@ function AddVinForm({ onAdd }: { onAdd: (vin: string) => Promise<boolean> }) {
         onClick={() => setOpen(true)}
         className="btn-secondary !px-4 !py-2 text-sm"
       >
-        <Plus className="h-4 w-4" /> Добавить VIN
+        <Plus className="h-4 w-4" /> {t("vinAdd")}
       </button>
     );
   }
@@ -722,7 +728,7 @@ function AddVinForm({ onAdd }: { onAdd: (vin: string) => Promise<boolean> }) {
       />
       <button className="btn-primary !px-4 !py-2 text-sm" disabled={busy || !vin.trim()}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-        Сохранить
+        {t("vinAddSave")}
       </button>
       <button
         type="button"
@@ -732,7 +738,7 @@ function AddVinForm({ onAdd }: { onAdd: (vin: string) => Promise<boolean> }) {
         }}
         className="btn-secondary !px-3 !py-2 text-sm"
       >
-        Отмена
+        {t("cancel")}
       </button>
     </form>
   );
