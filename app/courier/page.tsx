@@ -238,8 +238,12 @@ export default function CourierPage() {
         body: JSON.stringify({ login: login.trim(), password }),
       });
       setCourier(r.courier);
-    } catch {
-      setLoginErr("Неверный логин или пароль");
+    } catch (e) {
+      setLoginErr(
+        (e as Error).message === "rate_limited"
+          ? "Слишком много попыток входа. Подождите 10 минут."
+          : "Неверный логин или пароль"
+      );
     } finally {
       setBusy(false);
     }
