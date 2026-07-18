@@ -88,6 +88,8 @@ export interface PartOffer {
   source?: "phaeton" | "shatem" | "autotrade";
   /** Opaque supplier code (Р1/М2) exposed to the client; stored on the order. */
   sourceCode?: string;
+  /** URL фото детали (ручное/OEM), если есть и включён показ фото. */
+  image?: string;
 }
 
 export type RelaxLevel =
