@@ -6,6 +6,8 @@ export interface TelegramOrderItem {
   name: string;
   price: number;
   quantity: number;
+  /** Склад, где лежит позиция (имя из «Складов» или код Р1/М2/Т3…). */
+  warehouse?: string;
 }
 
 export interface TelegramOrderMessage {
@@ -38,6 +40,7 @@ export async function sendOrderToTelegram(m: TelegramOrderMessage): Promise<bool
       (it, idx) =>
         `${idx + 1}. <b>${escapeHtml(it.name)}</b>\n` +
         `   Бренд: ${escapeHtml(it.brand)} · Парт-номер: <code>${escapeHtml(it.article)}</code>\n` +
+        (it.warehouse ? `   🏬 Склад: <b>${escapeHtml(it.warehouse)}</b>\n` : "") +
         `   ${fmt(it.price)} ₸ × ${it.quantity} = <b>${fmt(it.price * it.quantity)} ₸</b>`
     )
     .join("\n");

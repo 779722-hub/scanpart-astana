@@ -26,6 +26,25 @@ export async function getWarehouseMarkupMap(): Promise<Record<string, number>> {
   return map;
 }
 
+// Код склада (Р1/М2/Т3…) → его имя из вкладки «Склады». Нужно, чтобы в заказе
+// менеджеру показывать читаемое имя склада, а не голый код. Кэш как у наценок.
+let whNameCache: { at: number; map: Record<string, string> } | null = null;
+export async function getWarehouseNameMap(): Promise<Record<string, string>> {
+  if (whNameCache && Date.now() - whNameCache.at < CACHE_TTL_MS) {
+    return whNameCache.map;
+  }
+  const map: Record<string, string> = {};
+  try {
+    for (const w of await readWarehouses()) {
+      if (w.sourceCode && w.name) map[w.sourceCode] = w.name;
+    }
+  } catch {
+    /* пусто → в заказе покажется сам код склада */
+  }
+  whNameCache = { at: Date.now(), map };
+  return map;
+}
+
 // Cached in the Next data cache (not a module variable) so that statically
 // rendered pages — home, /info — are rebuilt when the admin saves a setting.
 const readAll = unstable_cache(
