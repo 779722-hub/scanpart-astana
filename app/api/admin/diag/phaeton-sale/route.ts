@@ -48,6 +48,11 @@ export async function POST(req: NextRequest) {
         return html.slice(Math.max(0, at - 120), at + 40).replace(/\s+/g, " ");
       }
     ).slice(0, 8);
+    // Полные строки таблицы (для карты полей SaleOut).
+    const rows = Array.from(
+      html.matchAll(/<tr[^>]*data-price[\s\S]{0,900}?<\/tr>/gi),
+      (m) => m[0].replace(/\s+/g, " ")
+    ).slice(0, 3);
     return NextResponse.json({
       path,
       status,
@@ -55,6 +60,7 @@ export async function POST(req: NextRequest) {
       loggedOut: /Account\/Login/i.test(html),
       groupCtx: groupCtx.slice(0, 25),
       cityCtx,
+      rows,
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
