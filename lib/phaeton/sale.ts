@@ -39,16 +39,34 @@ const clean = (s: string) =>
 const toNum = (s: string | undefined): number =>
   Number((s ?? "").replace(/[^\d]/g, "")) || 0;
 
-const NON_MAKE = new Set([
-  "АВТОМОБИЛИ", "ГРУЗОВЫЕ", "ЛЕГКОВЫЕ", "ДЛЯ", "ВСЕ", "УНИВЕРСАЛЬНЫЙ",
-  "УНИВЕРСАЛЬНАЯ", "КОМПЛЕКТ", "AUTO", "OE", "ОЕ",
+// Белый список автомарок — марку показываем ТОЛЬКО если она отсюда, иначе
+// пусто (в применимости бывает мусор: «РРРРРРРР», коды, «адаптер» и т.п.).
+const CAR_MAKES = new Set([
+  "TOYOTA", "LEXUS", "SCION", "DAIHATSU", "HONDA", "ACURA", "NISSAN", "INFINITI",
+  "DATSUN", "MAZDA", "MITSUBISHI", "SUBARU", "SUZUKI", "ISUZU", "HYUNDAI", "KIA",
+  "GENESIS", "SSANGYONG", "DAEWOO", "CHEVROLET", "CHEVY", "CADILLAC", "BUICK",
+  "GMC", "PONTIAC", "SATURN", "HUMMER", "FORD", "LINCOLN", "MERCURY", "DODGE",
+  "CHRYSLER", "JEEP", "RAM", "PLYMOUTH", "VOLKSWAGEN", "VW", "AUDI", "PORSCHE",
+  "SEAT", "SKODA", "BMW", "MINI", "MERCEDES", "MERCEDES-BENZ", "MB", "SMART",
+  "MAYBACH", "OPEL", "VAUXHALL", "RENAULT", "DACIA", "ALPINE", "PEUGEOT",
+  "CITROEN", "DS", "FIAT", "ALFA", "ALFAROMEO", "LANCIA", "ABARTH", "FERRARI",
+  "MASERATI", "LAMBORGHINI", "VOLVO", "SAAB", "JAGUAR", "LANDROVER", "LAND",
+  "RANGEROVER", "ROVER", "MG", "BENTLEY", "ROLLSROYCE", "ASTONMARTIN", "LOTUS",
+  "MCLAREN", "TESLA", "GEELY", "CHERY", "HAVAL", "GREATWALL", "GWM", "BYD",
+  "LIFAN", "JAC", "FAW", "CHANGAN", "DONGFENG", "ZOTYE", "BRILLIANCE", "BAIC",
+  "GAC", "EXEED", "OMODA", "JAECOO", "TANK", "LADA", "VAZ", "ВАЗ", "GAZ", "ГАЗ",
+  "UAZ", "УАЗ", "ZAZ", "ЛАДА", "MOSKVICH", "МОСКВИЧ", "TATA", "MAHINDRA",
+  "PROTON", "PERODUA", "IRAN", "IKCO", "SCANIA", "MAN", "IVECO", "DAF", "MACK",
+  "KENWORTH", "FREIGHTLINER", "HINO", "FUSO", "KAMAZ", "КАМАЗ", "MAZ", "МАЗ",
 ]);
 
-/** Первая осмысленная марка авто из применимости (для сортировки «по марке»). */
+/** Первая ЗНАКОМАЯ марка авто из применимости, иначе пусто. */
 function firstMake(applicability: string): string {
-  for (const w of applicability.trim().split(/[\s,;/()]+/)) {
-    const up = w.toUpperCase().replace(/[^A-ZА-ЯЁ0-9-]/g, "");
-    if (up.length >= 2 && /[A-ZА-ЯЁ]/.test(up) && !NON_MAKE.has(up)) return up;
+  const tokens = applicability.toUpperCase().split(/[^A-ZА-ЯЁ0-9-]+/).filter(Boolean);
+  for (const raw of tokens) {
+    if (CAR_MAKES.has(raw)) return raw;
+    const base = raw.split("-")[0]; // «HYUNDAI-KIA» → «HYUNDAI»
+    if (base && CAR_MAKES.has(base)) return base;
   }
   return "";
 }
@@ -189,12 +207,15 @@ const readCache = unstable_cache(
       const key = `${brand}|${article}`.toUpperCase();
       if (seen.has(key)) continue;
       seen.add(key);
+      const applicability = r[3] ?? "";
       out.push({
         brand,
         article,
         name: r[2] || article,
-        applicability: r[3] ?? "",
-        make: r[4] ?? "",
+        applicability,
+        // Марку пересчитываем по применимости (белый список), а не берём из
+        // сохранённой колонки — так старые мусорные значения чинятся сразу.
+        make: firstMake(applicability),
         priceRaw: Number(r[5]) || 0,
         oldPrice: r[6] ? Number(r[6]) || null : null,
         deliveryDays: Number(r[7]) || 0,
