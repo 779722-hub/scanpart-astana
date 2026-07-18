@@ -7,6 +7,7 @@ import {
   appendSaleCache,
   ensureSheetStructure,
   writeSetting,
+  readSetting,
 } from "@/lib/sheets/client";
 
 /**
@@ -157,7 +158,10 @@ export async function syncSaleChunk(): Promise<{
 }> {
   if (!phaetonShopConfigured()) return { from: 0, scraped: 0, next: 1 };
   await ensureSheetStructure().catch(() => {});
-  const cur = Math.max(1, Number(await getSetting("sale_sync_cursor").catch(() => "1")) || 1);
+  // Курсор читаем НАПРЯМУЮ (не через кэш getSetting 60с), иначе быстрые прогоны
+  // видят старое значение и топчутся на первых страницах.
+  const settings = await readSetting().catch(() => ({}) as Record<string, string>);
+  const cur = Math.max(1, Number(settings.sale_sync_cursor) || 1);
   const items = await fetchPagesRange(cur, SYNC_CHUNK);
   if (cur <= 1) await clearSaleCache().catch(() => {});
   await appendSaleCache(
