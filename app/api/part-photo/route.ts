@@ -75,7 +75,11 @@ export async function GET(req: NextRequest) {
 
   // 3) Каталог Shate-M по артикулу (кроме сопутствующих).
   if (!rel) {
-    const dataUri = await resolvePartImageDataUri(a, b || undefined, size).catch(() => null);
+    // Картинки Shate-M низкого разрешения — при запросе крупного размера
+    // апскейлятся и мылятся. Капаем, чтобы оставались чёткими (примерно как
+    // фото Autotrade по видимому размеру).
+    const shatemSize = Math.min(size, 500);
+    const dataUri = await resolvePartImageDataUri(a, b || undefined, shatemSize).catch(() => null);
     if (dataUri) {
       const decoded = decodeDataUri(dataUri);
       if (decoded) {
