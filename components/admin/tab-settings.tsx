@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, Mic } from "lucide-react";
+import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, Mic, Tag, RefreshCw } from "lucide-react";
 import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
@@ -34,7 +34,6 @@ const FIELDS: {
   { key: "photo_size_shatem", label: "Размер фото Shate-M при открытии, px", hint: "по умолч. 400 (низкое разрешение — мельче, чтобы не мылилось)", kind: "number" },
   { key: "sale_enabled", label: "Раздел «Распродажа» (скидочные товары Астаны)", kind: "select", options: YESNO_OPTIONS, def: "off" },
   { key: "sale_markup_percent", label: "Наценка для распродажи, %", hint: "пусто = как общая наценка", kind: "number" },
-  { key: "sale_pages", label: "Сколько страниц распродажи сканировать", hint: "1 страница ≈ 6 товаров Астаны; по умолч. 40 (~240). Больше — полнее, но медленнее.", kind: "number" },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза / офиса (куда курьер везёт самовывоз)" },
@@ -77,6 +76,8 @@ export function TabSettings() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrMsg, setOcrMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saleBusy, setSaleBusy] = useState(false);
+  const [saleMsg, setSaleMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function testOcrKeys() {
     setOcrBusy(true);
@@ -97,6 +98,29 @@ export function TabSettings() {
       setOcrMsg({ ok: false, text: "Ошибка проверки — попробуйте ещё раз." });
     } finally {
       setOcrBusy(false);
+    }
+  }
+
+  async function refreshSale() {
+    setSaleBusy(true);
+    setSaleMsg(null);
+    try {
+      const r = await fetch("/api/cron/sale-sync");
+      const j = await r.json();
+      if (r.ok && j.ok) {
+        setSaleMsg({
+          ok: true,
+          text: `Добавлено со страниц ${j.from}–${j.from + 39}: ${j.scraped} записей. ${
+            j.next === 1 ? "Цикл завершён — дальше начнётся заново." : `Дальше со стр. ${j.next}.`
+          }`,
+        });
+      } else {
+        setSaleMsg({ ok: false, text: `Ошибка: ${j.error ?? r.status}` });
+      }
+    } catch {
+      setSaleMsg({ ok: false, text: "Сеть недоступна" });
+    } finally {
+      setSaleBusy(false);
     }
   }
 
@@ -290,6 +314,36 @@ export function TabSettings() {
           {geoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />}
           Определить координаты офиса по адресу
         </button>
+      </div>
+
+      {/* Распродажа — обновление накопленного списка */}
+      <div className="card space-y-3">
+        <div className="flex items-center gap-2">
+          <Tag className="h-5 w-5 text-brand" />
+          <h2 className="text-lg font-bold">Распродажа</h2>
+        </div>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          Список распродажи собирается из Phaeton по частям (~40 страниц за раз) и
+          копится автоматически раз в сутки. Кнопка ниже добавляет следующую порцию
+          сразу — нажимайте несколько раз, чтобы быстро набрать полный список. Включение
+          раздела и наценка — в настройках выше.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn-secondary !px-3 !py-2 text-sm"
+            onClick={refreshSale}
+            disabled={saleBusy}
+          >
+            {saleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Обновить распродажу (+порция)
+          </button>
+          {saleMsg && (
+            <span className={`text-sm ${saleMsg.ok ? "text-emerald-600 dark:text-emerald-400" : "text-brand"}`}>
+              {saleMsg.text}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* VIN-OCR — распознавание техпаспорта по фото */}

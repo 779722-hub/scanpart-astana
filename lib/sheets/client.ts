@@ -887,6 +887,7 @@ export async function deleteDelivery(deliveryId: string): Promise<void> {
 
 const SHEET_HEADERS: Record<string, string[]> = {
   Settings: ["key", "value"],
+  SaleCache: ["brand", "article", "name", "applicability", "make", "priceRaw", "oldPrice", "delivery", "available"],
   Orders: [
     "Date",
     "Telegram ID",
@@ -960,6 +961,42 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "delivered_at",
   ],
 };
+
+// --- Sale cache (накопитель распродажи, пишется синком, читается /api/sale) ---
+const SALE_SHEET = "SaleCache";
+
+export async function readSaleCache(): Promise<string[][]> {
+  const sheets = sheetsClient();
+  try {
+    const { data } = await sheets.spreadsheets.values.get({
+      spreadsheetId: spreadsheetId(),
+      range: `${SALE_SHEET}!A2:I`,
+    });
+    return (data.values ?? []) as string[][];
+  } catch {
+    return [];
+  }
+}
+
+export async function clearSaleCache(): Promise<void> {
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: spreadsheetId(),
+    range: `${SALE_SHEET}!A2:I`,
+  });
+}
+
+export async function appendSaleCache(rows: (string | number)[][]): Promise<void> {
+  if (!rows.length) return;
+  const sheets = sheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${SALE_SHEET}!A:I`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: rows },
+  });
+}
 
 export async function ensureSheetStructure(): Promise<void> {
   const sheets = sheetsClient();

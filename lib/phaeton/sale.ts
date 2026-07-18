@@ -1,6 +1,13 @@
 import { unstable_cache } from "next/cache";
 import { shopGetHtml, phaetonShopConfigured } from "./shop-session";
 import { getSetting } from "@/lib/sheets/settings";
+import {
+  readSaleCache,
+  clearSaleCache,
+  appendSaleCache,
+  ensureSheetStructure,
+  writeSetting,
+} from "@/lib/sheets/client";
 
 /**
  * Раздел «Распродажа» из shop.phaeton.kz (/ru-RU/SaleOut) — скидочные товары.
@@ -32,10 +39,18 @@ const clean = (s: string) =>
 const toNum = (s: string | undefined): number =>
   Number((s ?? "").replace(/[^\d]/g, "")) || 0;
 
-/** Первая марка авто из строки применимости (для сортировки «по марке»). */
+const NON_MAKE = new Set([
+  "АВТОМОБИЛИ", "ГРУЗОВЫЕ", "ЛЕГКОВЫЕ", "ДЛЯ", "ВСЕ", "УНИВЕРСАЛЬНЫЙ",
+  "УНИВЕРСАЛЬНАЯ", "КОМПЛЕКТ", "AUTO", "OE", "ОЕ",
+]);
+
+/** Первая осмысленная марка авто из применимости (для сортировки «по марке»). */
 function firstMake(applicability: string): string {
-  const m = /^[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё-]+/.exec(applicability.trim());
-  return (m?.[0] ?? "").toUpperCase();
+  for (const w of applicability.trim().split(/[\s,;/()]+/)) {
+    const up = w.toUpperCase().replace(/[^A-ZА-ЯЁ0-9-]/g, "");
+    if (up.length >= 2 && /[A-ZА-ЯЁ]/.test(up) && !NON_MAKE.has(up)) return up;
+  }
+  return "";
 }
 
 function parseSaleOut(html: string): SaleItem[] {
@@ -103,11 +118,8 @@ function parseSaleOut(html: string): SaleItem[] {
 }
 
 const CONCURRENCY = 8;
-const PAGES_DEFAULT = 40;
-// Каждая страница SaleOut тянется ~несколько секунд; выше ~60 страниц холодный
-// скрейп рискует превысить maxDuration. Полный список (~979 стр.) — только
-// фоновой синхронизацией, не в запросе.
-const PAGES_MAX = 60;
+const SYNC_CHUNK = 40; // страниц за один прогон синка
+const SYNC_MAX_PAGE = 1000; // страховка (весь список ~979 стр.)
 
 async function fetchOnePage(page: number): Promise<SaleItem[]> {
   const { status, html } = await shopGetHtml(`/ru-RU/SaleOut?page=${page}`).catch(() => ({
@@ -118,40 +130,97 @@ async function fetchOnePage(page: number): Promise<SaleItem[]> {
   return parseSaleOut(html);
 }
 
-/**
- * Скрейпим первые N страниц SaleOut (по настройке), параллельно батчами.
- * Весь список — ~979 страниц (~5800 позиций Астаны), целиком вживую нельзя;
- * N ограничивает объём. Дедуп по бренд+артикул.
- */
-async function fetchSaleAstana(pages: number): Promise<SaleItem[]> {
-  if (!phaetonShopConfigured()) return [];
-  const nums = Array.from({ length: pages }, (_, i) => i + 1);
+/** Скрейпим диапазон страниц [start, start+count) параллельно батчами. */
+async function fetchPagesRange(start: number, count: number): Promise<SaleItem[]> {
+  const nums = Array.from({ length: count }, (_, i) => start + i);
   const all: SaleItem[] = [];
   for (let i = 0; i < nums.length; i += CONCURRENCY) {
     const batch = nums.slice(i, i + CONCURRENCY);
     const lists = await Promise.all(batch.map((p) => fetchOnePage(p).catch(() => [])));
     for (const l of lists) all.push(...l);
-    // Пустой батч (кончились страницы / разлогин) — дальше нет смысла.
-    if (lists.every((l) => l.length === 0) && i > 0) break;
+    if (lists.every((l) => l.length === 0)) break; // дальше страниц нет
   }
+  return all;
+}
+
+/**
+ * Один прогон фоновой синхронизации: скрейпит SYNC_CHUNK страниц от курсора и
+ * дописывает в лист SaleCache. Курсор (страница) хранится в настройках. При
+ * курсоре 1 лист очищается (начало нового цикла). Дойдя до конца/пустой
+ * страницы — курсор сбрасывается на 1. Так покрытие дорастает до полного за
+ * несколько прогонов (крон + кнопка «Обновить»), независимо от лимитов запроса.
+ */
+export async function syncSaleChunk(): Promise<{
+  from: number;
+  scraped: number;
+  next: number;
+}> {
+  if (!phaetonShopConfigured()) return { from: 0, scraped: 0, next: 1 };
+  await ensureSheetStructure().catch(() => {});
+  const cur = Math.max(1, Number(await getSetting("sale_sync_cursor").catch(() => "1")) || 1);
+  const items = await fetchPagesRange(cur, SYNC_CHUNK);
+  if (cur <= 1) await clearSaleCache().catch(() => {});
+  await appendSaleCache(
+    items.map((it) => [
+      it.brand, it.article, it.name, it.applicability, it.make,
+      it.priceRaw, it.oldPrice ?? "", it.deliveryDays, it.available,
+    ])
+  ).catch(() => {});
+  let next = cur + SYNC_CHUNK;
+  if (items.length === 0 || next > SYNC_MAX_PAGE) next = 1; // цикл завершён
+  await writeSetting("sale_sync_cursor", String(next)).catch(() => {});
+  await writeSetting("sale_sync_at", new Date().toISOString()).catch(() => {});
+  return { from: cur, scraped: items.length, next };
+}
+
+/** Прочитать накопленную распродажу из листа + дедуп по бренд+артикул. */
+const readCache = unstable_cache(
+  async (): Promise<SaleItem[]> => {
+    const rows = await readSaleCache().catch(() => [] as string[][]);
+    const seen = new Set<string>();
+    const out: SaleItem[] = [];
+    for (const r of rows) {
+      const brand = r[0] ?? "";
+      const article = r[1] ?? "";
+      if (!brand || !article) continue;
+      const key = `${brand}|${article}`.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        brand,
+        article,
+        name: r[2] || article,
+        applicability: r[3] ?? "",
+        make: r[4] ?? "",
+        priceRaw: Number(r[5]) || 0,
+        oldPrice: r[6] ? Number(r[6]) || null : null,
+        deliveryDays: Number(r[7]) || 0,
+        available: Number(r[8]) || 0,
+      });
+    }
+    return out;
+  },
+  ["phaeton-sale-cache"],
+  { revalidate: 300, tags: ["sale"] }
+);
+
+/** Живой фолбэк, если лист пуст (синк ещё не прогонялся): первые 20 страниц. */
+const liveFallback = unstable_cache(
+  async () => fetchPagesRange(1, 20).catch(() => [] as SaleItem[]),
+  ["phaeton-sale-live"],
+  { revalidate: 1800, tags: ["sale"] }
+);
+
+/** Распродажа для /api/sale: из накопленного листа, иначе живой фолбэк. */
+export async function getSaleAstana(): Promise<SaleItem[]> {
+  const cached = await readCache();
+  if (cached.length) return cached;
+  const live = await liveFallback();
   const seen = new Set<string>();
-  return all.filter((it) => {
+  return live.filter((it) => {
     const k = `${it.brand}|${it.article}`.toUpperCase();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
-}
-
-const cachedSale = unstable_cache(
-  async (pages: number) => fetchSaleAstana(pages).catch(() => [] as SaleItem[]),
-  ["phaeton-sale-astana"],
-  { revalidate: 3 * 3600, tags: ["sale"] }
-);
-
-/** Сколько страниц SaleOut сканировать (админка `sale_pages`, дефолт 40). */
-export async function getSaleAstana(): Promise<SaleItem[]> {
-  const raw = Number((await getSetting("sale_pages").catch(() => "")) ?? "");
-  const pages = Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), PAGES_MAX) : PAGES_DEFAULT;
-  return cachedSale(pages);
 }

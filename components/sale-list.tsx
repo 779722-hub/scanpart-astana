@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, Tag, ShoppingCart, Trash2, Car, Clock } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { PartPhotoLightbox } from "@/components/part-photo-lightbox";
 
 interface SaleItem {
   id: string;
@@ -129,6 +130,7 @@ function SaleCard({
   cart: ReturnType<typeof useCart>;
 }) {
   const inCart = cart.isInCart(item.id);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const discount =
     item.oldPrice && item.oldPrice > item.price
       ? Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100)
@@ -138,7 +140,12 @@ function SaleCard({
   return (
     <article className="card-offer">
       <div className="flex items-start gap-3 sm:gap-4">
-        <button type="button" className="group flex-none" aria-label="Фото">
+        <button
+          type="button"
+          onClick={() => setPhotoOpen(true)}
+          className="group flex-none"
+          aria-label="Открыть фото детали"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={img}
@@ -146,9 +153,17 @@ function SaleCard({
             loading="lazy"
             width={80}
             height={80}
-            className="h-16 w-16 rounded-2xl bg-white object-contain p-1 ring-1 ring-paper-mute sm:h-20 sm:w-20 dark:ring-ink-mute"
+            className="h-16 w-16 rounded-2xl bg-white object-contain p-1 ring-1 ring-paper-mute transition group-hover:ring-brand sm:h-20 sm:w-20 dark:ring-ink-mute"
           />
         </button>
+        {photoOpen && (
+          <PartPhotoLightbox
+            thumb={img}
+            full={`${img}${img.includes("?") ? "&" : "?"}s=1000`}
+            alt={item.name}
+            onClose={() => setPhotoOpen(false)}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-bold leading-snug [overflow-wrap:anywhere]">{item.name}</h3>
           <div className="mt-1 text-sm text-ink-mute dark:text-paper-mute">
