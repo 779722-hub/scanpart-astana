@@ -32,6 +32,8 @@ const FIELDS: {
   { key: "photo_size_phaeton", label: "Размер фото Phaeton при открытии, px", hint: "по умолч. 1000", kind: "number" },
   { key: "photo_size_autotrade", label: "Размер фото Autotrade при открытии, px", hint: "по умолч. 800", kind: "number" },
   { key: "photo_size_shatem", label: "Размер фото Shate-M при открытии, px", hint: "по умолч. 400 (низкое разрешение — мельче, чтобы не мылилось)", kind: "number" },
+  { key: "sale_enabled", label: "Раздел «Распродажа» (скидочные товары Астаны)", kind: "select", options: YESNO_OPTIONS, def: "off" },
+  { key: "sale_markup_percent", label: "Наценка для распродажи, %", hint: "пусто = как общая наценка", kind: "number" },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза / офиса (куда курьер везёт самовывоз)" },
