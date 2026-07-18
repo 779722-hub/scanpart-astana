@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
         return html.slice(Math.max(0, at - 120), at + 40).replace(/\s+/g, " ");
       }
     ).slice(0, 8);
-    // Полные строки таблицы (для карты полей SaleOut): окно вокруг data-price.
+    // Шапка товара НАД таблицей наличия: широкое окно ДО первой data-price.
     const rows = Array.from(html.matchAll(/data-price="/gi), (m) => {
       const at = m.index ?? 0;
-      return html.slice(Math.max(0, at - 120), at + 1400).replace(/\s+/g, " ");
-    }).slice(0, 2);
+      return html.slice(Math.max(0, at - 1700), at + 40).replace(/\s+/g, " ").slice(-1600);
+    }).slice(0, 1);
     return NextResponse.json({
       path,
       status,
