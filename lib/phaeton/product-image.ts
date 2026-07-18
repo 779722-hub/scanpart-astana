@@ -12,7 +12,9 @@ const SHOP = (process.env.PHAETON_SHOP_BASE || "https://shop.phaeton.kz").replac
 
 /** Публичная ссылка на фото или null, если бренд/артикул пустой. */
 export function phaetonImageUrl(article: string, brand?: string): string | null {
-  const a = article.trim();
+  // Phaeton в имени файла убирает дефисы/пробелы из артикула
+  // (напр. «AP-89» → «AP89.JPG»), поэтому нормализуем так же.
+  const a = article.trim().replace(/[\s-]/g, "");
   const b = (brand ?? "").trim();
   if (!a || !b) return null;
   return `${SHOP}/ProductsImages/${encodeURIComponent(b)}/${encodeURIComponent(a)}.JPG`;
