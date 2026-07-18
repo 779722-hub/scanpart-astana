@@ -11,7 +11,6 @@ import {
   Users,
   Contact,
   LogOut,
-  Send,
   BookOpen,
   ClipboardList,
   Warehouse,
@@ -82,17 +81,7 @@ export function AdminShell({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("dashboard");
-  const [publishing, setPublishing] = useState(false);
   const visibleTabs = TABS.filter((t) => !t.ownerOnly || user.role === "owner");
-
-  async function publish() {
-    setPublishing(true);
-    try {
-      await fetch("/api/admin/revalidate", { method: "POST" });
-    } finally {
-      setPublishing(false);
-    }
-  }
 
   async function logout() {
     await fetch("/api/admin/auth/logout", { method: "POST" });
@@ -118,15 +107,8 @@ export function AdminShell({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={publish}
-            disabled={publishing}
-            className="btn-secondary"
-            title="Сбросить кеш и опубликовать изменения"
-          >
-            <Send className="h-4 w-4" />
-            {publishing ? "Публикация…" : "Опубликовать"}
-          </button>
+          {/* Отдельная «Опубликовать» убрана: каждое «Сохранить» во вкладках уже
+              публикует изменение (ревалидирует свой кэш). Две кнопки путали. */}
           <button onClick={logout} className="btn-secondary" title="Выйти">
             <LogOut className="h-4 w-4" />
           </button>

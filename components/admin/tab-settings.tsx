@@ -478,15 +478,18 @@ export function TabSettings() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : status === "saved" ? (
             <>
-              <CheckCircle2 className="h-4 w-4" /> Сохранено
+              <CheckCircle2 className="h-4 w-4" /> Сохранено и опубликовано
             </>
           ) : (
             <>
-              <Save className="h-4 w-4" /> Сохранить
+              <Save className="h-4 w-4" /> Сохранить и опубликовать
             </>
           )}
         </button>
       </div>
+      <p className="text-xs text-ink-mute dark:text-paper-mute">
+        Изменения публикуются сразу при сохранении — отдельная кнопка не нужна.
+      </p>
 
       {/* Telegram connection */}
       <div className="card space-y-3">
