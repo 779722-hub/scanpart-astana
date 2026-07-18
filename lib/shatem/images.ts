@@ -1,4 +1,9 @@
-import { searchArticles, getArticleWithContents, searchContent } from "./client";
+import {
+  searchArticles,
+  getArticleWithContents,
+  searchContent,
+  postContentsRaw,
+} from "./client";
 
 const norm = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
 
@@ -57,11 +62,19 @@ export async function resolvePartImageDebug(
       full.contents?.[0];
     if (!content) return out;
     out.contentId = content.contentId.slice(0, 12) + "…";
-    const res = await searchContent(content.contentId);
-    const value = res?.[0]?.value ?? "";
-    out.gotDataUri = value.startsWith("data:");
-    out.valuePrefix = value.slice(0, 30);
-    out.valueLen = value.length;
+    const id = content.contentId;
+    const candidates: Array<[string, unknown]> = [
+      ["keys[str]", { contentKeys: [id], heightSize: 400, widthSize: 400 }],
+      ["keys[{contentId}]", { contentKeys: [{ contentId: id, heightSize: 400, widthSize: 400 }] }],
+      ["keys[{id}]", { contentKeys: [{ id, heightSize: 400, widthSize: 400 }] }],
+      ["keys[{contentId}]+size", { contentKeys: [{ contentId: id }], heightSize: 400, widthSize: 400 }],
+    ];
+    const probes: Record<string, string> = {};
+    for (const [label, body] of candidates) {
+      const r = await postContentsRaw(body).catch((e) => ({ status: -1, text: (e as Error).message }));
+      probes[label] = `${r.status} ${r.text.slice(0, 80)}`;
+    }
+    out.probes = probes;
   } catch (err) {
     out.error = (err as Error).message;
   }

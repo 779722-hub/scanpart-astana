@@ -138,8 +138,21 @@ export function searchContent(
 ): Promise<ShatemContentResult[]> {
   return api<ShatemContentResult[]>("/api/v1/contents/search", {
     method: "POST",
-    body: JSON.stringify({ contentId, heightSize: size, widthSize: size }),
+    body: JSON.stringify({ contentKeys: [contentId], heightSize: size, widthSize: size }),
   });
+}
+
+/** Raw POST /contents/search — returns status+body for shape probing (debug). */
+export async function postContentsRaw(
+  body: unknown
+): Promise<{ status: number; text: string }> {
+  const t = await token();
+  const res = await rawFetch("/api/v1/contents/search", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { Authorization: `Bearer ${t}` },
+  });
+  return { status: res.status, text: (await res.text()).slice(0, 400) };
 }
 
 /**
