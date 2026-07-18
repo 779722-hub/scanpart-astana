@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
 import { resolvePartImageDataUri } from "@/lib/shatem/images";
 import { resolveAutotradePhotoUrl } from "@/lib/autotrade/images";
+import { phaetonImageUrl } from "@/lib/phaeton/product-image";
 
 export const runtime = "nodejs";
 
@@ -42,10 +43,12 @@ function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
  * Картинка детали для карточки результата. Приоритет:
  *   1) ручной слот `part:<артикул>` (Cloudinary) — редирект;
  *   2) фото Autotrade по артикулу — чистое (без вотермарка), актуальное;
- *   3) каталог Shate-M по артикулу (заводское, бренд производителя);
- *   4) наш логотип — если фото нигде нет.
- * При `rel=1` (сопутствующий товар) шаг Shate-M пропускается — только Autotrade,
- * иначе короткие коды дают ложные совпадения.
+ *   3) фото каталога Phaeton по бренду+артикулу (публичное, студийное HQ);
+ *   4) каталог Shate-M по артикулу (заводское, бренд производителя);
+ *   5) наш логотип — если фото нигде нет.
+ * При `rel=1` (сопутствующий товар) пропускается только Shate-M (подбор по
+ * коду даёт ложные фото); Autotrade и Phaeton ищут по точному бренду+артикулу,
+ * поэтому безопасны.
  * Ответ кэшируется CDN Vercel по URL, поэтому резолв — один раз.
  */
 export async function GET(req: NextRequest) {
@@ -73,7 +76,14 @@ export async function GET(req: NextRequest) {
     if (served) return served;
   }
 
-  // 3) Каталог Shate-M по артикулу (кроме сопутствующих).
+  // 3) Фото каталога Phaeton по бренду+артикулу (публичный файл, студийное HQ).
+  const phUrl = phaetonImageUrl(a, b || undefined);
+  if (phUrl) {
+    const served = await serveRemoteImage(phUrl);
+    if (served) return served;
+  }
+
+  // 4) Каталог Shate-M по артикулу (кроме сопутствующих).
   if (!rel) {
     // Картинки Shate-M низкого разрешения — при запросе крупного размера
     // апскейлятся и мылятся. Капаем, чтобы оставались чёткими (примерно как
