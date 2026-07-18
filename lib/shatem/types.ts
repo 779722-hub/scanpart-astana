@@ -56,6 +56,25 @@ export interface ShatemArticleHit {
   article: ShatemArticle;
 }
 
+/** One media item on an article (contentType e.g. "ImageTwoDimensional"). */
+export interface ShatemContent {
+  sortOrder?: number;
+  contentId: string;
+  contentType?: string;
+}
+
+/** GET /api/v1/articles/{id}?include=contents — article + its media list. */
+export interface ShatemArticleWithContents {
+  article: ShatemArticle;
+  contents?: ShatemContent[];
+}
+
+/** POST /api/v1/contents/search — one resolved image (base64 data URI). */
+export interface ShatemContentResult {
+  id: string;
+  value: string; // "data:image/webp;base64,…"
+}
+
 /** One price/stock offer (POST /api/v1/prices/search item). */
 export interface ShatemPriceItem {
   id: string; // priceId — needed to add to Shate-M cart / order

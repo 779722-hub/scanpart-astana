@@ -13,6 +13,8 @@ import type {
   ShatemDeliveryAddress,
   ShatemLocation,
   ShatemPriceFilterKey,
+  ShatemArticleWithContents,
+  ShatemContentResult,
 } from "./types";
 
 const DEFAULT_TIMEOUT = 20_000;
@@ -118,6 +120,26 @@ export function getDeliveryAddresses(): Promise<ShatemDeliveryAddress[]> {
 /** Step A — resolve an article code to Shate-M internal articleId(s) + brand. */
 export function searchArticles(code: string): Promise<ShatemArticleHit[]> {
   return api<ShatemArticleHit[]>(`/api/v1/articles/search/${encodeURIComponent(code)}`);
+}
+
+/** Article with its media list — used to resolve a part photo/schematic. */
+export function getArticleWithContents(
+  articleId: number
+): Promise<ShatemArticleWithContents> {
+  return api<ShatemArticleWithContents>(
+    `/api/v1/articles/${articleId}?include=contents`
+  );
+}
+
+/** Resolve a contentId to its image (returns base64 data URI in `value`). */
+export function searchContent(
+  contentId: string,
+  size = 400
+): Promise<ShatemContentResult[]> {
+  return api<ShatemContentResult[]>("/api/v1/contents/search", {
+    method: "POST",
+    body: JSON.stringify({ contentId, heightSize: size, widthSize: size }),
+  });
 }
 
 /**

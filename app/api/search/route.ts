@@ -18,7 +18,7 @@ import { searchAutotradeOffers, searchAutotradeRelated } from "@/lib/autotrade/s
 import { autotradeConfigured } from "@/lib/autotrade/session";
 import { articlesByVinAndName, articlesByVehicleAndName } from "@/lib/shatem/catalog";
 import { pickPerSource, partKey } from "@/lib/search/pick";
-import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
+import { partPhotoUrl } from "@/lib/parts/photos";
 
 export const runtime = "nodejs";
 const MAX_BRANDS_TO_QUERY = 6;
@@ -94,11 +94,11 @@ export async function GET(req: NextRequest) {
     const showOem = (showOemSetting ?? "on") !== "off";
 
     // Фото деталей — по умолчанию ВЫКЛ (opt-in). Включается в админке.
+    // При «on» отдаём офферам URL прокси /api/part-photo (ручной слот →
+    // фото из каталога Shate-M по артикулу → логотип). Резолв ленивый, в
+    // самом маршруте, кэшируется CDN — поиск не замедляется.
     const showPhotos =
       (await getSetting("show_photos").catch(() => "off")) === "on";
-    const photoMap = showPhotos
-      ? await getPartPhotoMap().catch(() => ({}) as Record<string, string>)
-      : {};
 
     // Global markup by default, overridden per warehouse (admin «Склады»).
     const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
@@ -400,7 +400,7 @@ export async function GET(req: NextRequest) {
       const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
       return {
       ...o,
-      image: photoMap[normPartKey(o.article)],
+      image: showPhotos ? partPhotoUrl(o.article, o.brand) : undefined,
       warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${code})`,
       // Opaque supplier code — already shown to the client in the label; carried
       // explicitly so it can be stored on the order for internal pickup routing.
@@ -436,7 +436,7 @@ export async function GET(req: NextRequest) {
         const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
         return {
           ...o,
-          image: photoMap[normPartKey(o.article)],
+          image: showPhotos ? partPhotoUrl(o.article, o.brand) : undefined,
           warehouse: `Астана (${code})`,
           sourceCode: code === "?" ? "" : code,
         };
