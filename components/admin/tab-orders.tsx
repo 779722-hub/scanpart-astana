@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck } from "lucide-react";
+import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck, Plus } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
 
 const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
@@ -50,6 +50,9 @@ export function TabOrders() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editType, setEditType] = useState<string>("Экспресс");
   const [editAddr, setEditAddr] = useState<string>("");
+  const [adding, setAdding] = useState<string | null>(null); // group key
+  const emptyItem = { partName: "", brand: "", partArticle: "", price: "", quantity: "1", source: "" };
+  const [newItem, setNewItem] = useState(emptyItem);
   const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
   const [warehouses, setWarehouses] = useState<{ id: string; sourceCode: string }[]>([]);
 
@@ -207,6 +210,62 @@ export function TabOrders() {
     }
   }
 
+  async function removeItem(g: OrderGroup, o: Order) {
+    const last = g.rows.length === 1;
+    const msg = last
+      ? `«${o.partName}» — последняя позиция. Заказ будет удалён целиком. Продолжить?`
+      : `Убрать позицию «${o.partName}» из заказа?`;
+    if (!confirm(msg)) return;
+    setSaving(g.key);
+    try {
+      await fetch(`/api/admin/orders/${o.rowNumber}`, { method: "DELETE" });
+      await refresh();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  function startAdd(g: OrderGroup) {
+    setNewItem(emptyItem);
+    setAdding(g.key);
+  }
+
+  async function addItem(g: OrderGroup) {
+    const price = Number(String(newItem.price).replace(",", "."));
+    const quantity = Number(newItem.quantity);
+    if (!newItem.partName.trim() || !Number.isFinite(price) || price < 0 || !Number.isInteger(quantity) || quantity < 1) {
+      alert("Заполните название и корректную цену/количество.");
+      return;
+    }
+    setSaving(g.key);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          fromRow: g.rows[0].rowNumber,
+          item: {
+            partName: newItem.partName.trim(),
+            brand: newItem.brand.trim(),
+            partArticle: newItem.partArticle.trim(),
+            price,
+            quantity,
+            source: newItem.source.trim(),
+          },
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok || !j.ok) {
+        alert(`Ошибка: ${j.error ?? res.status}`);
+        return;
+      }
+      setAdding(null);
+      await refresh();
+    } finally {
+      setSaving(null);
+    }
+  }
+
   async function removeOrder(g: OrderGroup) {
     if (!confirm(`Удалить заказ (${g.rows.length} поз.) безвозвратно?`)) return;
     setSaving(g.key);
@@ -292,12 +351,84 @@ export function TabOrders() {
                         )}
                       </div>
                     </div>
-                    <div className="whitespace-nowrap font-semibold">
-                      {fmt(o.price)} ₸ × {o.quantity}
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <span className="font-semibold">
+                        {fmt(o.price)} ₸ × {o.quantity}
+                      </span>
+                      <button
+                        onClick={() => removeItem(g, o)}
+                        disabled={saving === g.key}
+                        aria-label="Убрать позицию"
+                        title="Убрать позицию"
+                        className="flex h-7 w-7 flex-none items-center justify-center rounded-lg text-ink-mute transition hover:bg-brand/10 hover:text-brand disabled:opacity-50 dark:text-paper-mute"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {adding === g.key && (
+                <div className="mt-3 space-y-3 rounded-2xl border border-paper-mute p-3 dark:border-ink-mute">
+                  <div className="text-sm font-semibold">Новая позиция</div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      className="input sm:col-span-2"
+                      placeholder="Название детали*"
+                      value={newItem.partName}
+                      onChange={(e) => setNewItem({ ...newItem, partName: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Бренд"
+                      value={newItem.brand}
+                      onChange={(e) => setNewItem({ ...newItem, brand: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Парт-номер"
+                      value={newItem.partArticle}
+                      onChange={(e) => setNewItem({ ...newItem, partArticle: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      inputMode="numeric"
+                      placeholder="Цена, ₸*"
+                      value={newItem.price}
+                      onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      inputMode="numeric"
+                      placeholder="Количество*"
+                      value={newItem.quantity}
+                      onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                    />
+                    <select
+                      className="input sm:col-span-2"
+                      value={newItem.source}
+                      onChange={(e) => setNewItem({ ...newItem, source: e.target.value })}
+                    >
+                      <option value="">Склад (необязательно)</option>
+                      {Array.from(new Set(warehouses.map((w) => w.sourceCode).filter(Boolean))).map((c) => (
+                        <option key={c} value={c}>
+                          склад {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button className="btn-secondary !px-3 !py-2 text-sm" onClick={() => setAdding(null)}>
+                      <X className="h-4 w-4" /> Отмена
+                    </button>
+                    <button className="btn-primary !px-3 !py-2 text-sm" onClick={() => addItem(g)} disabled={saving === g.key}>
+                      {saving === g.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      Добавить
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {g.vin && (
                 <div className="mt-2 text-xs text-ink-mute dark:text-paper-mute [overflow-wrap:anywhere]">
@@ -365,6 +496,13 @@ export function TabOrders() {
                   >
                     <Truck className="h-4 w-4" />
                     Создать доставку
+                  </button>
+                  <button
+                    onClick={() => (adding === g.key ? setAdding(null) : startAdd(g))}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-sm font-semibold transition hover:border-ink-mute dark:border-ink-mute"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Позиция
                   </button>
                   <button
                     onClick={() => (editing === g.key ? setEditing(null) : startEdit(g))}
