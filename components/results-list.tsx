@@ -454,42 +454,47 @@ function OfferCard({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-4">
-        <div className="flex min-w-0 gap-3 sm:gap-4">
-          {offer.image && (
-            <button
-              type="button"
-              onClick={() => setPhotoOpen(true)}
-              className="group relative flex-none"
-              aria-label="Открыть фото детали"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={offer.image}
-                alt={offer.name}
-                loading="lazy"
-                width={96}
-                height={96}
-                className="h-16 w-16 rounded-2xl bg-white object-contain p-1 ring-1 ring-paper-mute transition group-hover:ring-brand sm:h-24 sm:w-24 dark:ring-ink-mute"
-              />
-            </button>
-          )}
-          {photoOpen && offer.image && (
-            <PartPhotoLightbox
-              thumb={offer.image}
-              full={`${offer.image}${offer.image.includes("?") ? "&" : "?"}s=800`}
+      {/* Заголовок: фото + крупное название в одну строку (одинаково на десктопе
+          и мобиле — карточка не вытягивается). */}
+      <div className="flex items-start gap-3 sm:gap-4">
+        {offer.image && (
+          <button
+            type="button"
+            onClick={() => setPhotoOpen(true)}
+            className="group relative flex-none"
+            aria-label="Открыть фото детали"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={offer.image}
               alt={offer.name}
-              onClose={() => setPhotoOpen(false)}
+              loading="lazy"
+              width={96}
+              height={96}
+              className="h-16 w-16 rounded-2xl bg-white object-contain p-1 ring-1 ring-paper-mute transition group-hover:ring-brand sm:h-20 sm:w-20 dark:ring-ink-mute"
             />
-          )}
-          <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere] sm:text-lg">{offer.name}</h3>
-          <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
+          </button>
+        )}
+        {photoOpen && offer.image && (
+          <PartPhotoLightbox
+            thumb={offer.image}
+            full={`${offer.image}${offer.image.includes("?") ? "&" : "?"}s=800`}
+            alt={offer.name}
+            onClose={() => setPhotoOpen(false)}
+          />
+        )}
+        <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug [overflow-wrap:anywhere] sm:text-xl">
+          {offer.name}
+        </h3>
+      </div>
+
+      {/* Детали (производитель / парт-номер / количество) + цена справа. */}
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-4">
+        <div className="min-w-0">
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-ink-mute dark:text-paper-mute">{t("brand")}</dt>
             <dd className="font-semibold">{offer.brand}</dd>
-            <dt className="text-ink-mute dark:text-paper-mute">
-              {t("article")}
-            </dt>
+            <dt className="text-ink-mute dark:text-paper-mute">{t("article")}</dt>
             <dd className="font-mono font-semibold">{offer.article}</dd>
             <dt className="text-ink-mute dark:text-paper-mute">{t("stock")}</dt>
             <dd className="font-semibold">
@@ -514,7 +519,6 @@ function OfferCard({
               </div>
             </div>
           )}
-          </div>
         </div>
         <div className="flex items-baseline justify-between gap-2 sm:block sm:text-right">
           <div className="text-xs uppercase tracking-wider text-ink-mute dark:text-paper-mute">
