@@ -104,7 +104,10 @@ function parseSaleOut(html: string): SaleItem[] {
 
 const CONCURRENCY = 8;
 const PAGES_DEFAULT = 40;
-const PAGES_MAX = 200;
+// Каждая страница SaleOut тянется ~несколько секунд; выше ~60 страниц холодный
+// скрейп рискует превысить maxDuration. Полный список (~979 стр.) — только
+// фоновой синхронизацией, не в запросе.
+const PAGES_MAX = 60;
 
 async function fetchOnePage(page: number): Promise<SaleItem[]> {
   const { status, html } = await shopGetHtml(`/ru-RU/SaleOut?page=${page}`).catch(() => ({
