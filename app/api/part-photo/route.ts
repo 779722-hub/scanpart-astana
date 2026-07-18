@@ -3,6 +3,7 @@ import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
 import { resolvePartImageDataUri } from "@/lib/shatem/images";
 import { resolveAutotradePhotoUrl } from "@/lib/autotrade/images";
 import { phaetonImageUrl } from "@/lib/phaeton/product-image";
+import { signedFetchUrl } from "@/lib/cloudinary";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,19 @@ async function serveRemoteImage(url: string): Promise<NextResponse | null> {
     status: 200,
     headers: { "Content-Type": type, "Cache-Control": CACHE_PHOTO },
   });
+}
+
+/**
+ * Отдать удалённую картинку с ресайзом через Cloudinary (лёгкая + кэш), а если
+ * fetch в аккаунте не разрешён — фолбэк на прямой (полноразмерный) URL.
+ */
+async function serveResized(remoteUrl: string, size: number): Promise<NextResponse | null> {
+  const signed = signedFetchUrl(remoteUrl, size);
+  if (signed) {
+    const viaCloudinary = await serveRemoteImage(signed);
+    if (viaCloudinary) return viaCloudinary;
+  }
+  return serveRemoteImage(remoteUrl);
 }
 
 /** Parse a `data:image/…;base64,…` URI into bytes + content-type. */
@@ -72,14 +86,14 @@ export async function GET(req: NextRequest) {
   // 2) Фото Autotrade по артикулу (чистый URL без вотермарка).
   const atUrl = await resolveAutotradePhotoUrl(a, b || undefined).catch(() => null);
   if (atUrl) {
-    const served = await serveRemoteImage(atUrl);
+    const served = await serveResized(atUrl, size);
     if (served) return served;
   }
 
   // 3) Фото каталога Phaeton по бренду+артикулу (публичный файл, студийное HQ).
   const phUrl = phaetonImageUrl(a, b || undefined);
   if (phUrl) {
-    const served = await serveRemoteImage(phUrl);
+    const served = await serveResized(phUrl, size);
     if (served) return served;
   }
 

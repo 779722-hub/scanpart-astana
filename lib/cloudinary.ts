@@ -96,5 +96,25 @@ export async function destroy(publicId: string): Promise<void> {
   await cld.uploader.destroy(publicId, { resource_type: "image" });
 }
 
+/**
+ * Подписанный Cloudinary fetch-URL: тянет удалённую картинку через Cloudinary
+ * с ресайзом (w, c_limit — не увеличивает) + f_auto/q_auto, кэширует на их CDN.
+ * Подпись обходит «strict transformations». Возвращает null, если Cloudinary
+ * не настроен. Требует, чтобы в аккаунте была разрешена доставка fetch.
+ */
+export function signedFetchUrl(remoteUrl: string, width: number): string | null {
+  try {
+    ensure();
+    return cld.url(remoteUrl, {
+      type: "fetch",
+      sign_url: true,
+      secure: true,
+      transformation: [{ width, crop: "limit", fetch_format: "auto", quality: "auto" }],
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Re-export pure URL builder (client-safe). */
 export { cldUrl } from "./cloudinary-url";
