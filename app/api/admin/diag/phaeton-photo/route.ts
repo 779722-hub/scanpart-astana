@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const brands = await searchBrands(article);
   const brand = brands.Items?.[0]?.Brand || "";
   const prices = await searchPrices({ article, brand, includeAnalogs: false });
-  const item = (prices.Items?.[0] ?? {}) as Record<string, unknown>;
+  const item = (prices.Items?.[0] ?? {}) as unknown as Record<string, unknown>;
   const itemId = String(item.ItemId ?? "");
   const categoryId = String(item.CategoryId ?? "");
   const supplierId = String(item.SupplierId ?? "");
