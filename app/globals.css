@@ -65,29 +65,30 @@
     @apply block w-full rounded-2xl border border-paper-mute bg-white
            px-4 py-3 text-base sm:text-lg
            outline-none transition
-           placeholder:text-ink-mute/70
-           dark:border-paper-mute/40 dark:bg-ink dark:text-paper dark:placeholder:text-paper-mute/60;
+           placeholder:text-ink-mute/70 focus:placeholder:text-ink-mute/45
+           dark:border-paper-mute/40 dark:bg-ink dark:text-paper
+           dark:placeholder:text-paper-mute/60 dark:focus:placeholder:text-paper-mute/40;
     /* keep ≥16px to avoid iOS auto-zoom on focus */
     font-size: 16px;
   }
   /* Фокус поля — только мягкое неоновое свечение (как фонарь: светлее в
      центре, красный по краям). Никаких жёстких рамок/колец поверх. */
   .input:focus {
-    border-color: rgba(225, 6, 0, 0.35);
+    border-color: rgba(225, 6, 0, 0.5);
     box-shadow:
-      0 0 6px rgba(255, 130, 130, 0.35),
-      0 0 16px rgba(225, 6, 0, 0.26),
-      0 0 32px rgba(225, 6, 0, 0.14);
+      0 0 7px rgba(255, 130, 130, 0.5),
+      0 0 18px rgba(225, 6, 0, 0.38),
+      0 0 36px rgba(225, 6, 0, 0.2);
   }
   /* Та же мягкая неоновая подсветка на наведении для кнопок-карточек главной.
      Только для мыши — на тач-экранах :hover залипает. */
   @media (hover: hover) {
     .neon-hover:hover {
-      border-color: rgba(225, 6, 0, 0.35);
+      border-color: rgba(225, 6, 0, 0.5);
       box-shadow:
-        0 0 8px rgba(255, 130, 130, 0.3),
-        0 0 20px rgba(225, 6, 0, 0.26),
-        0 0 38px rgba(225, 6, 0, 0.14);
+        0 0 9px rgba(255, 130, 130, 0.45),
+        0 0 22px rgba(225, 6, 0, 0.38),
+        0 0 40px rgba(225, 6, 0, 0.2);
     }
   }
   @screen sm {
