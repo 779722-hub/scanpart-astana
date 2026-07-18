@@ -33,6 +33,9 @@ function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
 export async function GET(req: NextRequest) {
   const a = (req.nextUrl.searchParams.get("a") ?? "").trim();
   const b = (req.nextUrl.searchParams.get("b") ?? "").trim();
+  // Размер: миниатюра ~400, лайтбокс запрашивает крупнее (?s=1000). Клампим.
+  const sRaw = Number(req.nextUrl.searchParams.get("s"));
+  const size = Number.isFinite(sRaw) ? Math.min(1600, Math.max(100, sRaw)) : 400;
   if (!a) return logoRedirect(req);
 
   // 1) Ручной слот — владелец загрузил фото сам.
@@ -45,7 +48,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 2) Каталог Shate-M по артикулу.
-  const dataUri = await resolvePartImageDataUri(a, b || undefined).catch(() => null);
+  const dataUri = await resolvePartImageDataUri(a, b || undefined, size).catch(() => null);
   if (dataUri) {
     const decoded = decodeDataUri(dataUri);
     if (decoded) {

@@ -16,7 +16,8 @@ const MAX_HITS_TO_TRY = 4;
  */
 export async function resolvePartImageDataUri(
   code: string,
-  brand?: string
+  brand?: string,
+  size = 400
 ): Promise<string | null> {
   const hits = await searchArticles(code).catch(() => []);
   if (!hits.length) return null;
@@ -37,7 +38,7 @@ export async function resolvePartImageDataUri(
       full?.contents?.find((c) => (c.contentType ?? "").startsWith("Image")) ??
       full?.contents?.[0];
     if (!content) continue;
-    const res = await searchContent(content.contentId).catch(() => []);
+    const res = await searchContent(content.contentId, size).catch(() => []);
     const value = res?.[0]?.value;
     if (value && value.startsWith("data:")) return value;
   }

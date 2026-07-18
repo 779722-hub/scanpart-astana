@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
 import { useCart } from "@/lib/cart";
+import { PartPhotoLightbox } from "@/components/part-photo-lightbox";
 
 interface FitWarning {
   make: string;
@@ -388,6 +389,7 @@ function OfferCard({
   const t = useTranslations("results");
   const cart = useCart();
   const inCart = cart.isInCart(offer.id);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const onAdd = () => {
     cart.add({
       id: offer.id,
@@ -455,10 +457,9 @@ function OfferCard({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-4">
         <div className="flex min-w-0 gap-3 sm:gap-4">
           {offer.image && (
-            <a
-              href={offer.image}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => setPhotoOpen(true)}
               className="group relative flex-none"
               aria-label="Открыть фото детали"
             >
@@ -471,7 +472,14 @@ function OfferCard({
                 height={96}
                 className="h-16 w-16 rounded-2xl bg-white object-contain p-1 ring-1 ring-paper-mute transition group-hover:ring-brand sm:h-24 sm:w-24 dark:ring-ink-mute"
               />
-            </a>
+            </button>
+          )}
+          {photoOpen && offer.image && (
+            <PartPhotoLightbox
+              src={`${offer.image}${offer.image.includes("?") ? "&" : "?"}s=1000`}
+              alt={offer.name}
+              onClose={() => setPhotoOpen(false)}
+            />
           )}
           <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere] sm:text-lg">{offer.name}</h3>
