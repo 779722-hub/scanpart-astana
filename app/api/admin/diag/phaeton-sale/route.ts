@@ -32,20 +32,20 @@ export async function POST(req: NextRequest) {
       const at = m.index ?? 0;
       return html.slice(Math.max(0, at - 60), at + 12).replace(/\s+/g, " ");
     }).slice(0, 4);
-    // Форма фильтров: select/checkbox с городами/складами.
-    const form = /<form[^>]*filters-form[\s\S]*?<\/form>/i.exec(html)?.[0] ?? "";
-    const filterFields = Array.from(
-      form.matchAll(/<(select|input)[^>]*\bname="([^"]+)"[^>]*>/gi),
-      (m) => ({ tag: m[1], name: m[2] })
-    );
-    // Опции, где встречаются города/склад.
-    const cityOpts = Array.from(
-      form.matchAll(/<option[^>]*value="([^"]*)"[^>]*>\s*([^<]*(?:Астана|Алматы|Караганда|склад|Склад)[^<]*)</gi),
-      (m) => ({ value: m[1], label: m[2].trim() })
-    ).slice(0, 15);
+    // Все input/select с name — кандидаты фильтров.
+    const named = Array.from(
+      new Set(Array.from(html.matchAll(/<(?:select|input)[^>]*\bname="([^"]+)"/gi), (m) => m[1]))
+    ).slice(0, 40);
+    // Контекст вокруг «Склад»/«Филиал»/«warehouse»/«storage»/«filial».
+    const kw = Array.from(
+      html.matchAll(/(Склад|Филиал|warehouse|storage|filial|Город)/gi),
+      (m) => {
+        const at = m.index ?? 0;
+        return html.slice(Math.max(0, at - 90), at + 90).replace(/\s+/g, " ");
+      }
+    ).slice(0, 8);
     return NextResponse.json({
-      path, status, htmlLen: html.length, products, astana, pager, pagerBlock, discountCtx,
-      filterFields: filterFields.slice(0, 20), cityOpts, formLen: form.length,
+      path, status, htmlLen: html.length, products, astana, pager, named, kw,
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
