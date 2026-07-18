@@ -49,8 +49,16 @@ function parseSaleOut(html: string): SaleItem[] {
     // Шапка товара — в ~1000 символах перед таблицей: Details-ссылка, название, применимость.
     const before = html.slice(Math.max(0, at - 1100), at);
     const det = /Details\?article=([^&"]+)&(?:amp;)?brand=([^"&]+)/i.exec(before);
-    let brand = /data-brand-title="([^"]*)"/i.exec(attrs)?.[1] ?? det?.[2] ?? "";
-    let article = det?.[1] ?? (/data-article="([^"]*)"/i.exec(attrs)?.[1] ?? "").toUpperCase();
+    // Параметры ссылки URL-кодированы (WK8019%2F1, 714%20137%200003) — декодируем.
+    const dec = (s: string) => {
+      try {
+        return decodeURIComponent(s);
+      } catch {
+        return s;
+      }
+    };
+    let brand = /data-brand-title="([^"]*)"/i.exec(attrs)?.[1] ?? (det ? dec(det[2]) : "");
+    let article = det ? dec(det[1]) : (/data-article="([^"]*)"/i.exec(attrs)?.[1] ?? "").toUpperCase();
     brand = clean(brand);
     article = clean(article);
     if (!brand || !article) continue;
