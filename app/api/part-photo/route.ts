@@ -4,8 +4,18 @@ import { resolvePartImageDataUri } from "@/lib/shatem/images";
 import { resolveAutotradePhotoUrl } from "@/lib/autotrade/images";
 import { phaetonImageUrl } from "@/lib/phaeton/product-image";
 import { signedFetchUrl } from "@/lib/cloudinary";
+import { getSetting } from "@/lib/sheets/settings";
 
 export const runtime = "nodejs";
+
+// Размер фото при открытии (лайтбокс) — свой по каждому поставщику, задаётся в
+// админке. Миниатюра в карточке всегда 400 (её видимый размер мал).
+const THUMB = 400;
+const VIEW_DEFAULTS = { phaeton: 1000, autotrade: 800, shatem: 400 };
+function numSetting(v: string | undefined, def: number): number {
+  const n = Number((v ?? "").replace(",", "."));
+  return Number.isFinite(n) && n >= 100 && n <= 2000 ? Math.round(n) : def;
+}
 
 const LOGO_PATH = "/logo.png";
 // Реальное фото кэшируем надолго; фолбэк-логотип — коротко, чтобы позже
@@ -69,9 +79,10 @@ export async function GET(req: NextRequest) {
   const a = (req.nextUrl.searchParams.get("a") ?? "").trim();
   const b = (req.nextUrl.searchParams.get("b") ?? "").trim();
   const rel = req.nextUrl.searchParams.get("rel") === "1";
-  // Размер: миниатюра ~400, лайтбокс запрашивает крупнее (?s=1000). Клампим.
+  // Миниатюра (нетس / малый s) → THUMB; лайтбокс (крупный s) → размер поставщика.
   const sRaw = Number(req.nextUrl.searchParams.get("s"));
-  const size = Number.isFinite(sRaw) ? Math.min(1600, Math.max(100, sRaw)) : 400;
+  const requested = Number.isFinite(sRaw) ? Math.min(1600, Math.max(100, sRaw)) : THUMB;
+  const isLarge = requested >= 600;
   if (!a) return logoRedirect(req);
 
   // 1) Ручной слот — владелец загрузил фото сам.
@@ -83,26 +94,31 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
+  // Размеры «при открытии» по поставщикам (админка). Миниатюра — всегда THUMB.
+  const [phV, atV, shV] = await Promise.all([
+    getSetting("photo_size_phaeton").catch(() => undefined),
+    getSetting("photo_size_autotrade").catch(() => undefined),
+    getSetting("photo_size_shatem").catch(() => undefined),
+  ]);
+
   // 2) Фото Autotrade по артикулу (чистый URL без вотермарка).
   const atUrl = await resolveAutotradePhotoUrl(a, b || undefined).catch(() => null);
   if (atUrl) {
-    const served = await serveResized(atUrl, size);
+    const served = await serveResized(atUrl, isLarge ? numSetting(atV, VIEW_DEFAULTS.autotrade) : THUMB);
     if (served) return served;
   }
 
   // 3) Фото каталога Phaeton по бренду+артикулу (публичный файл, студийное HQ).
   const phUrl = phaetonImageUrl(a, b || undefined);
   if (phUrl) {
-    const served = await serveResized(phUrl, size);
+    const served = await serveResized(phUrl, isLarge ? numSetting(phV, VIEW_DEFAULTS.phaeton) : THUMB);
     if (served) return served;
   }
 
   // 4) Каталог Shate-M по артикулу (кроме сопутствующих).
   if (!rel) {
-    // Картинки Shate-M низкого разрешения — при запросе крупного размера
-    // апскейлятся и мылятся. Капаем, чтобы оставались чёткими (примерно как
-    // фото Autotrade по видимому размеру).
-    const shatemSize = Math.min(size, 500);
+    // Картинки Shate-M низкого разрешения — не апскейлим выше размера поставщика.
+    const shatemSize = Math.min(requested, numSetting(shV, VIEW_DEFAULTS.shatem));
     const dataUri = await resolvePartImageDataUri(a, b || undefined, shatemSize).catch(() => null);
     if (dataUri) {
       const decoded = decodeDataUri(dataUri);
