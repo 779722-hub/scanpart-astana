@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Loader2, Tag, ShoppingCart, Trash2, Car, Clock } from "lucide-react";
+import { Loader2, Tag, ShoppingCart, Trash2, Car, Clock, Search } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { PartPhotoLightbox } from "@/components/part-photo-lightbox";
 
@@ -30,6 +30,7 @@ export function SaleList({ locale }: { locale: string }) {
   const [makes, setMakes] = useState<string[]>([]);
   const [sort, setSort] = useState<Sort>("make");
   const [make, setMake] = useState("");
+  const [query, setQuery] = useState("");
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
@@ -50,6 +51,16 @@ export function SaleList({ locale }: { locale: string }) {
       cancelled = true;
     };
   }, [sort, make]);
+
+  // Поиск по названию/бренду/артикулу/применимости — поверх фильтра по марке.
+  const shown = useMemo(() => {
+    if (!items) return null;
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((i) =>
+      [i.name, i.brand, i.article, i.applicability].some((f) => (f || "").toLowerCase().includes(q))
+    );
+  }, [items, query]);
 
   const sortOptions: { v: Sort; l: string }[] = useMemo(
     () => [
@@ -73,45 +84,58 @@ export function SaleList({ locale }: { locale: string }) {
       </div>
 
       {enabled && (
-        <div className="card flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-ink-mute dark:text-paper-mute">Сортировка</span>
-            <select className="input !w-auto !py-2" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              {sortOptions.map((o) => (
-                <option key={o.v} value={o.v}>
-                  {o.l}
-                </option>
-              ))}
-            </select>
-          </label>
-          {makes.length > 0 && (
+        <div className="card space-y-3">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
+            <input
+              className="input !py-2"
+              placeholder="Поиск по распродаже: название, бренд, парт-номер"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">
-              <span className="text-ink-mute dark:text-paper-mute">Марка</span>
-              <select className="input !w-auto !py-2" value={make} onChange={(e) => setMake(e.target.value)}>
-                <option value="">Все</option>
-                {makes.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+              <span className="text-ink-mute dark:text-paper-mute">Сортировка</span>
+              <select className="input !w-auto !py-2" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+                {sortOptions.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.l}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          {items && <span className="ml-auto text-xs text-ink-mute dark:text-paper-mute">товаров: {items.length}</span>}
+            {makes.length > 0 && (
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-ink-mute dark:text-paper-mute">Марка</span>
+                <select className="input !w-auto !py-2" value={make} onChange={(e) => setMake(e.target.value)}>
+                  <option value="">Все</option>
+                  {makes.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {shown && <span className="ml-auto text-xs text-ink-mute dark:text-paper-mute">товаров: {shown.length}</span>}
+          </div>
         </div>
       )}
 
-      {items === null ? (
+      {shown === null ? (
         <div className="card flex justify-center py-14">
           <Loader2 className="h-6 w-6 animate-spin text-brand" />
         </div>
       ) : !enabled ? (
         <div className="card text-center text-ink-mute dark:text-paper-mute">Распродажа сейчас недоступна.</div>
-      ) : items.length === 0 ? (
-        <div className="card text-center text-ink-mute dark:text-paper-mute">Пока нет товаров по распродаже в Астане.</div>
+      ) : shown.length === 0 ? (
+        <div className="card text-center text-ink-mute dark:text-paper-mute">
+          {query.trim() ? "Ничего не найдено — попробуйте другой запрос." : "Пока нет товаров по распродаже в Астане."}
+        </div>
       ) : (
         <div className="space-y-3">
-          {items.map((it) => (
+          {shown.map((it) => (
             <SaleCard key={it.id} item={it} locale={locale} cart={cart} />
           ))}
         </div>
