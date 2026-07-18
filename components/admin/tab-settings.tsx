@@ -30,6 +30,12 @@ const FIELDS: {
   { key: "markup_percent", label: "Наценка, %", hint: `${MARKUP_MIN}–${MARKUP_MAX}`, kind: "number" },
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
   { key: "show_oem", label: "Показывать OEM-номер оригинала в результатах", kind: "select", options: YESNO_OPTIONS, def: "on" },
+  { key: "show_photos", label: "Показывать фото деталей в результатах", kind: "select", options: YESNO_OPTIONS, def: "off" },
+  {
+    key: "tecdoc_api_key",
+    label: "Ключ TecDoc/RapidAPI для авто-фото (опционально)",
+    hint: "Пока пусто — фото берутся только из ручной загрузки. С ключом добавятся авто-фото по бренду+артикулу.",
+  },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза / офиса (куда курьер везёт самовывоз)" },
