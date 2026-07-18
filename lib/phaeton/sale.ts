@@ -1,6 +1,5 @@
 import { unstable_cache } from "next/cache";
 import { shopGetHtml, phaetonShopConfigured } from "./shop-session";
-import { getSetting } from "@/lib/sheets/settings";
 import {
   readSaleCache,
   clearSaleCache,
