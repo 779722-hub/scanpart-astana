@@ -31,14 +31,30 @@ export async function POST(req: NextRequest) {
         Array.from(html.matchAll(/["'(](\/[a-z-]*\/(?:Search|Catalog|Sale|Products)[^"'()\s]*)["')]/gi), (m) => m[1])
       )
     ).slice(0, 25);
+    // Контекст вокруг каждого GetSaleItems<guid> — увидим метку группы (склад/город?).
+    const groupCtx = Array.from(
+      html.matchAll(/GetSaleItems\/([0-9a-f-]{36})/gi),
+      (m) => {
+        const at = m.index ?? 0;
+        const around = html.slice(Math.max(0, at - 400), at + 60).replace(/\s+/g, " ");
+        return { guid: m[1], ctx: around.slice(-260) };
+      }
+    );
+    // Упоминания городов с окружением (где именно город в строке товара).
+    const cityCtx = Array.from(
+      html.matchAll(/(Астана|Алматы|Караганда|Astana|Almaty)/gi),
+      (m) => {
+        const at = m.index ?? 0;
+        return html.slice(Math.max(0, at - 120), at + 40).replace(/\s+/g, " ");
+      }
+    ).slice(0, 8);
     return NextResponse.json({
       path,
       status,
       htmlLen: html.length,
       loggedOut: /Account\/Login/i.test(html),
-      saleLinks: Array.from(new Map(links.map((l) => [l.href, l])).values()).slice(0, 25),
-      endpoints,
-      raw: html.slice(0, 2500),
+      groupCtx: groupCtx.slice(0, 25),
+      cityCtx,
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
