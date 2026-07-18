@@ -56,3 +56,4 @@ scripts/.autotrade-search.html
 scripts/.at-*
 scripts/.search.js
 scripts/.global.js
+_pp.mjs
