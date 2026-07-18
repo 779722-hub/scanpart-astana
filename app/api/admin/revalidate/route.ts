@@ -13,8 +13,9 @@ export async function POST() {
   revalidateTag(IMAGES_TAG);
   revalidateTag(THEME_TAG);
   revalidateTag(SETTINGS_TAG);
+  revalidateTag("sale");
   return NextResponse.json({
     ok: true,
-    revalidated: [CONTENT_TAG, IMAGES_TAG, THEME_TAG, SETTINGS_TAG],
+    revalidated: [CONTENT_TAG, IMAGES_TAG, THEME_TAG, SETTINGS_TAG, "sale"],
   });
 }
