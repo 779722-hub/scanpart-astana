@@ -5,6 +5,7 @@ import { applyMarkup } from "@/lib/markup";
 import { partPhotoUrl } from "@/lib/parts/photos";
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // скрейп нескольких страниц SaleOut при промахе кэша
 
 export async function GET(req: NextRequest) {
   const enabled = (await getSetting("sale_enabled").catch(() => "off")) === "on";

@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { shopGetHtml, phaetonShopConfigured } from "./shop-session";
+import { getSetting } from "@/lib/sheets/settings";
 
 /**
  * Раздел «Распродажа» из shop.phaeton.kz (/ru-RU/SaleOut) — скидочные товары.
@@ -98,16 +99,53 @@ function parseSaleOut(html: string): SaleItem[] {
   return items;
 }
 
-async function fetchSaleAstana(): Promise<SaleItem[]> {
-  if (!phaetonShopConfigured()) return [];
-  const { status, html } = await shopGetHtml("/ru-RU/SaleOut");
+const CONCURRENCY = 8;
+const PAGES_DEFAULT = 40;
+const PAGES_MAX = 200;
+
+async function fetchOnePage(page: number): Promise<SaleItem[]> {
+  const { status, html } = await shopGetHtml(`/ru-RU/SaleOut?page=${page}`).catch(() => ({
+    status: 0,
+    html: "",
+  }));
   if (status !== 200 || /Account\/Login/i.test(html)) return [];
   return parseSaleOut(html);
 }
 
-/** Кэш на 1 час — распродажа меняется не часто, скрейп тяжёлый. */
-export const getSaleAstana = unstable_cache(
-  async () => fetchSaleAstana().catch(() => [] as SaleItem[]),
+/**
+ * Скрейпим первые N страниц SaleOut (по настройке), параллельно батчами.
+ * Весь список — ~979 страниц (~5800 позиций Астаны), целиком вживую нельзя;
+ * N ограничивает объём. Дедуп по бренд+артикул.
+ */
+async function fetchSaleAstana(pages: number): Promise<SaleItem[]> {
+  if (!phaetonShopConfigured()) return [];
+  const nums = Array.from({ length: pages }, (_, i) => i + 1);
+  const all: SaleItem[] = [];
+  for (let i = 0; i < nums.length; i += CONCURRENCY) {
+    const batch = nums.slice(i, i + CONCURRENCY);
+    const lists = await Promise.all(batch.map((p) => fetchOnePage(p).catch(() => [])));
+    for (const l of lists) all.push(...l);
+    // Пустой батч (кончились страницы / разлогин) — дальше нет смысла.
+    if (lists.every((l) => l.length === 0) && i > 0) break;
+  }
+  const seen = new Set<string>();
+  return all.filter((it) => {
+    const k = `${it.brand}|${it.article}`.toUpperCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+const cachedSale = unstable_cache(
+  async (pages: number) => fetchSaleAstana(pages).catch(() => [] as SaleItem[]),
   ["phaeton-sale-astana"],
-  { revalidate: 3600, tags: ["sale"] }
+  { revalidate: 3 * 3600, tags: ["sale"] }
 );
+
+/** Сколько страниц SaleOut сканировать (админка `sale_pages`, дефолт 40). */
+export async function getSaleAstana(): Promise<SaleItem[]> {
+  const raw = Number((await getSetting("sale_pages").catch(() => "")) ?? "");
+  const pages = Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), PAGES_MAX) : PAGES_DEFAULT;
+  return cachedSale(pages);
+}
