@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const brands = await searchBrands(article);
     const brand = body.brand || brands.Items?.[0]?.Brand || "";
     const prices = await searchPrices({ article, brand, includeAnalogs: true });
-    const first = (prices.Items?.[0] ?? {}) as Record<string, unknown>;
+    const first = (prices.Items?.[0] ?? {}) as unknown as Record<string, unknown>;
     // Ищем любые поля с image/photo/url/foto в ключе или значении.
     const imageish: Record<string, unknown> = {};
     const scan = (obj: Record<string, unknown>, prefix = "") => {
