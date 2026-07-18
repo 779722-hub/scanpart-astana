@@ -1,11 +1,9 @@
-import {
-  searchArticles,
-  getArticleWithContents,
-  searchContent,
-  postContentsRaw,
-} from "./client";
+import { searchArticles, getArticleWithContents, searchContent } from "./client";
 
 const norm = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+
+// Сколько карточек-тёзок (по коду) максимум опросить в поиске картинки.
+const MAX_HITS_TO_TRY = 4;
 
 /**
  * Фото/схема детали по её артикулу через каталог Shate-M. Картинки заводские
@@ -23,60 +21,25 @@ export async function resolvePartImageDataUri(
   const hits = await searchArticles(code).catch(() => []);
   if (!hits.length) return null;
 
-  // Среди тёзок по коду берём совпадение по бренду, иначе первый.
-  const picked =
-    (brand && hits.find((h) => norm(h.article.tradeMarkName ?? "") === norm(brand))) ||
-    hits[0];
+  // Совпадение по бренду — вперёд; у части тёзок картинки нет, поэтому идём
+  // по списку, пока не найдём карточку с изображением (с разумным лимитом).
+  const ordered = brand
+    ? [...hits].sort(
+        (a, b) =>
+          (norm(a.article.tradeMarkName ?? "") === norm(brand) ? 0 : 1) -
+          (norm(b.article.tradeMarkName ?? "") === norm(brand) ? 0 : 1)
+      )
+    : hits;
 
-  const full = await getArticleWithContents(picked.article.id).catch(() => null);
-  const content =
-    full?.contents?.find((c) => (c.contentType ?? "").startsWith("Image")) ??
-    full?.contents?.[0];
-  if (!content) return null;
-
-  const res = await searchContent(content.contentId).catch(() => []);
-  const value = res?.[0]?.value;
-  return value && value.startsWith("data:") ? value : null;
-}
-
-/** Пошаговая диагностика резолва (для админ-debug маршрута part-photo). */
-export async function resolvePartImageDebug(
-  code: string,
-  brand?: string
-): Promise<Record<string, unknown>> {
-  const out: Record<string, unknown> = { code, brand };
-  try {
-    const hits = await searchArticles(code);
-    out.hits = hits.length;
-    out.hitBrands = hits.map((h) => h.article.tradeMarkName).slice(0, 8);
-    if (!hits.length) return out;
-    const picked =
-      (brand && hits.find((h) => norm(h.article.tradeMarkName ?? "") === norm(brand))) ||
-      hits[0];
-    out.pickedId = picked.article.id;
-    out.pickedBrand = picked.article.tradeMarkName;
-    const full = await getArticleWithContents(picked.article.id);
-    out.contents = (full.contents ?? []).map((c) => c.contentType);
+  for (const h of ordered.slice(0, MAX_HITS_TO_TRY)) {
+    const full = await getArticleWithContents(h.article.id).catch(() => null);
     const content =
-      full.contents?.find((c) => (c.contentType ?? "").startsWith("Image")) ??
-      full.contents?.[0];
-    if (!content) return out;
-    out.contentId = content.contentId.slice(0, 12) + "…";
-    const id = content.contentId;
-    const candidates: Array<[string, unknown]> = [
-      ["keys[str]", { contentKeys: [id], heightSize: 400, widthSize: 400 }],
-      ["keys[{contentId}]", { contentKeys: [{ contentId: id, heightSize: 400, widthSize: 400 }] }],
-      ["keys[{id}]", { contentKeys: [{ id, heightSize: 400, widthSize: 400 }] }],
-      ["keys[{contentId}]+size", { contentKeys: [{ contentId: id }], heightSize: 400, widthSize: 400 }],
-    ];
-    const probes: Record<string, string> = {};
-    for (const [label, body] of candidates) {
-      const r = await postContentsRaw(body).catch((e) => ({ status: -1, text: (e as Error).message }));
-      probes[label] = `${r.status} ${r.text.slice(0, 80)}`;
-    }
-    out.probes = probes;
-  } catch (err) {
-    out.error = (err as Error).message;
+      full?.contents?.find((c) => (c.contentType ?? "").startsWith("Image")) ??
+      full?.contents?.[0];
+    if (!content) continue;
+    const res = await searchContent(content.contentId).catch(() => []);
+    const value = res?.[0]?.value;
+    if (value && value.startsWith("data:")) return value;
   }
-  return out;
+  return null;
 }

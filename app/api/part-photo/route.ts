@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
-import { resolvePartImageDataUri, resolvePartImageDebug } from "@/lib/shatem/images";
-import { getCurrentUser } from "@/lib/auth/guards";
+import { resolvePartImageDataUri } from "@/lib/shatem/images";
 
 export const runtime = "nodejs";
 
@@ -34,22 +33,12 @@ function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
 export async function GET(req: NextRequest) {
   const a = (req.nextUrl.searchParams.get("a") ?? "").trim();
   const b = (req.nextUrl.searchParams.get("b") ?? "").trim();
-  // Debug доступен по DIAG_TOKEN или под админ-сессией.
-  let debug = false;
-  if (req.nextUrl.searchParams.get("debug") != null) {
-    const tok = req.nextUrl.searchParams.get("debug");
-    if (process.env.DIAG_TOKEN && tok === process.env.DIAG_TOKEN) debug = true;
-    else if (await getCurrentUser().catch(() => null)) debug = true;
-  }
-  if (debug)
-    return NextResponse.json(await resolvePartImageDebug(a, b || undefined));
   if (!a) return logoRedirect(req);
 
   // 1) Ручной слот — владелец загрузил фото сам.
   const key = normPartKey(a);
   const slot = await getPartPhotoMap().catch(() => ({}) as Record<string, string>);
   if (slot[key]) {
-    if (debug) return NextResponse.json({ source: "slot", url: slot[key] });
     const res = NextResponse.redirect(slot[key], 302);
     res.headers.set("Cache-Control", CACHE_PHOTO);
     return res;
@@ -60,8 +49,6 @@ export async function GET(req: NextRequest) {
   if (dataUri) {
     const decoded = decodeDataUri(dataUri);
     if (decoded) {
-      if (debug)
-        return NextResponse.json({ source: "shatem", type: decoded.type, bytes: decoded.buf.length });
       return new NextResponse(decoded.buf, {
         status: 200,
         headers: { "Content-Type": decoded.type, "Cache-Control": CACHE_PHOTO },
@@ -70,6 +57,5 @@ export async function GET(req: NextRequest) {
   }
 
   // 3) Фолбэк — логотип.
-  if (debug) return NextResponse.json({ source: "logo" });
   return logoRedirect(req);
 }
