@@ -48,11 +48,11 @@ export async function POST(req: NextRequest) {
         return html.slice(Math.max(0, at - 120), at + 40).replace(/\s+/g, " ");
       }
     ).slice(0, 8);
-    // Полные строки таблицы (для карты полей SaleOut).
-    const rows = Array.from(
-      html.matchAll(/<tr[^>]*data-price[\s\S]{0,900}?<\/tr>/gi),
-      (m) => m[0].replace(/\s+/g, " ")
-    ).slice(0, 3);
+    // Полные строки таблицы (для карты полей SaleOut): окно вокруг data-price.
+    const rows = Array.from(html.matchAll(/data-price="/gi), (m) => {
+      const at = m.index ?? 0;
+      return html.slice(Math.max(0, at - 120), at + 1400).replace(/\s+/g, " ");
+    }).slice(0, 2);
     return NextResponse.json({
       path,
       status,
