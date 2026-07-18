@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       loggedOut: /Account\/Login/i.test(html),
       saleLinks: Array.from(new Map(links.map((l) => [l.href, l])).values()).slice(0, 25),
       endpoints,
+      raw: html.slice(0, 2500),
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
