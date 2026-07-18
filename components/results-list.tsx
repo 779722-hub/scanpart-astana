@@ -476,7 +476,8 @@ function OfferCard({
           )}
           {photoOpen && offer.image && (
             <PartPhotoLightbox
-              src={`${offer.image}${offer.image.includes("?") ? "&" : "?"}s=1000`}
+              thumb={offer.image}
+              full={`${offer.image}${offer.image.includes("?") ? "&" : "?"}s=800`}
               alt={offer.name}
               onClose={() => setPhotoOpen(false)}
             />
