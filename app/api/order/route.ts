@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { orderSchema, normalizePhoneE164, formatPhonePretty } from "@/lib/schemas";
 import { appendOrder } from "@/lib/sheets/client";
-import { getAllSettings } from "@/lib/sheets/settings";
+import { getAllSettings, getWarehouseNameMap } from "@/lib/sheets/settings";
 import { sendOrderToTelegram } from "@/lib/telegram/bot";
 import { buildOrderWhatsAppMessage, buildWhatsAppLink } from "@/lib/whatsapp";
 import { getSession } from "@/lib/session";
@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
 
   const orderType = d.kind === "express" ? "Экспресс" : "Самовывоз";
   const settings = await getAllSettings().catch(() => null);
+  // Код склада → читаемое имя из «Складов», чтобы менеджер в заказе видел склад.
+  const whNames = await getWarehouseNameMap().catch(() => ({}) as Record<string, string>);
+  // Склад лежит на позиции; имя — из карты, иначе сам код. Источник скрыт от
+  // клиента, поэтому склад идёт ТОЛЬКО в телеграм менеджеру, не в WhatsApp клиента.
+  const warehouseOf = (code?: string) =>
+    code ? whNames[code] || code : undefined;
   const isoNow = new Date().toISOString();
 
   // 1. Append one row per cart item to Google Sheets.
@@ -90,6 +96,7 @@ export async function POST(req: NextRequest) {
         name: i.partName,
         price: i.price,
         quantity: i.quantity,
+        warehouse: warehouseOf(i.sourceCode),
       })),
       itemsTotal,
       deliveryFee,
