@@ -3,14 +3,27 @@ import { searchArticles, getArticleWithContents, searchContent } from "./client"
 const norm = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
 
 // Сколько карточек максимум опросить в поиске картинки.
-const MAX_HITS_TO_TRY = 4;
+const MAX_HITS_TO_TRY = 6;
+
+/** Значимые токены бренда (длиной ≥3), напр. «FEBI BILSTEIN» → {FEBI, BILSTEIN}. */
+function brandTokens(s: string): Set<string> {
+  return new Set(
+    s
+      .toUpperCase()
+      .split(/[^A-ZА-ЯЁ0-9]+/)
+      .filter((t) => t.length >= 3)
+  );
+}
 
 /**
- * Совпадение брендов с допуском на суффиксы/формат (MANN ↔ MANN-FILTER).
- * Строгое равенство ИЛИ вхождение одного в другой (при длине ≥3, чтобы
- * короткие бренды не совпадали случайно).
+ * Совпадение брендов с допуском на формат/суффиксы. Совпадают, если делят
+ * значимый токен (MANN↔MANN-FILTER, SANGSIN BRAKE↔SANGSIN, FEBI BILSTEIN↔FEBI)
+ * ИЛИ один целиком входит в другой (для «склеенных» форм).
  */
 function brandMatches(a: string, b: string): boolean {
+  const A = brandTokens(a);
+  const B = brandTokens(b);
+  for (const t of A) if (B.has(t)) return true;
   const x = norm(a);
   const y = norm(b);
   if (!x || !y) return false;

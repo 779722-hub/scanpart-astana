@@ -436,7 +436,9 @@ export async function GET(req: NextRequest) {
         const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
         return {
           ...o,
-          image: showPhotos ? partPhotoUrl(o.article, o.brand) : undefined,
+          // Сопутствующие (смазки, комплекты) — фото не ищем: их короткие коды
+          // дают ложные совпадения в каталоге. Всегда логотип.
+          image: showPhotos ? "/logo.png" : undefined,
           warehouse: `Астана (${code})`,
           sourceCode: code === "?" ? "" : code,
         };
