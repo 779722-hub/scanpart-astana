@@ -182,7 +182,7 @@ export default async function HomePage({
             <Link
               key={href}
               href={href}
-              className="card group flex min-h-[7.5rem] flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-cardHover sm:min-h-[10rem]"
+              className="card neon-hover group flex min-h-[7.5rem] flex-col justify-between transition hover:-translate-y-0.5 sm:min-h-[10rem]"
             >
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-2xl shadow-card sm:h-12 sm:w-12 ${accent}`}
