@@ -40,6 +40,18 @@ interface OrderGroup {
   total: number;
 }
 
+// Оффер из /api/search (та же выдача, что видит клиент): цена уже с наценкой,
+// warehouse — метка вида «Астана (Р1)», sourceCode — код склада.
+interface SearchHit {
+  brand: string;
+  article: string;
+  name: string;
+  priceFinal: number;
+  quantity: number;
+  warehouse: string;
+  sourceCode?: string;
+}
+
 const STATUSES = ["Новый", "В работе", "Выполнен", "Отменён"];
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
@@ -53,6 +65,10 @@ export function TabOrders() {
   const [adding, setAdding] = useState<string | null>(null); // group key
   const emptyItem = { partName: "", brand: "", partArticle: "", price: "", quantity: "1", source: "" };
   const [newItem, setNewItem] = useState(emptyItem);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchKind, setSearchKind] = useState<"article" | "name">("article");
+  const [searching, setSearching] = useState(false);
+  const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null);
   const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
   const [warehouses, setWarehouses] = useState<{ id: string; sourceCode: string }[]>([]);
 
@@ -227,7 +243,40 @@ export function TabOrders() {
 
   function startAdd(g: OrderGroup) {
     setNewItem(emptyItem);
+    setSearchQ("");
+    setSearchHits(null);
     setAdding(g.key);
+  }
+
+  async function runPartSearch() {
+    const query = searchQ.trim();
+    if (!query) return;
+    setSearching(true);
+    setSearchHits(null);
+    try {
+      const params = new URLSearchParams({ q: query, k: searchKind });
+      const j = await fetch(`/api/search?${params.toString()}`).then((r) => r.json());
+      const offers: SearchHit[] = j.ok && Array.isArray(j.offers) ? j.offers : [];
+      setSearchHits(offers);
+    } catch {
+      setSearchHits([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  // Выбор оффера из поиска — подтягиваем название, цену и склад в форму.
+  function pickHit(o: SearchHit) {
+    setNewItem({
+      partName: o.name ?? "",
+      brand: o.brand ?? "",
+      partArticle: o.article ?? "",
+      price: String(o.priceFinal ?? ""),
+      quantity: "1",
+      source: o.sourceCode ?? "",
+    });
+    setSearchHits(null);
+    setSearchQ("");
   }
 
   async function addItem(g: OrderGroup) {
@@ -372,6 +421,62 @@ export function TabOrders() {
               {adding === g.key && (
                 <div className="mt-3 space-y-3 rounded-2xl border border-paper-mute p-3 dark:border-ink-mute">
                   <div className="text-sm font-semibold">Новая позиция</div>
+
+                  {/* Поиск запчасти — как на витрине: цена, склад и название
+                      подтягиваются из выдачи автоматически при выборе. */}
+                  <div className="space-y-2 rounded-xl bg-paper-soft p-2 dark:bg-ink-mute/40">
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        className="input !w-auto !py-2 text-sm"
+                        value={searchKind}
+                        onChange={(e) => setSearchKind(e.target.value as "article" | "name")}
+                      >
+                        <option value="article">По артикулу</option>
+                        <option value="name">По названию</option>
+                      </select>
+                      <input
+                        className="input min-w-[10rem] flex-1"
+                        placeholder="Найти запчасть…"
+                        value={searchQ}
+                        onChange={(e) => setSearchQ(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            runPartSearch();
+                          }
+                        }}
+                      />
+                      <button className="btn-secondary !px-3 !py-2 text-sm" onClick={runPartSearch} disabled={searching}>
+                        {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                        Найти
+                      </button>
+                    </div>
+                    {searchHits &&
+                      (searchHits.length === 0 ? (
+                        <p className="px-1 py-1 text-xs text-ink-mute dark:text-paper-mute">
+                          Ничего не найдено в наличии. Можно заполнить поля вручную ниже.
+                        </p>
+                      ) : (
+                        <div className="max-h-60 space-y-1 overflow-auto">
+                          {searchHits.map((o, i) => (
+                            <button
+                              key={i}
+                              onClick={() => pickHit(o)}
+                              className="flex w-full items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5 text-left text-sm transition hover:bg-brand/5 dark:bg-ink-soft dark:hover:bg-ink"
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-semibold">{o.name}</span>
+                                <span className="block truncate text-xs text-ink-mute dark:text-paper-mute">
+                                  {o.brand} · {o.article} · {o.warehouse}
+                                </span>
+                              </span>
+                              <span className="whitespace-nowrap font-semibold">{fmt(o.priceFinal)} ₸</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                  </div>
+
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <input
                       className="input sm:col-span-2"
@@ -411,7 +516,9 @@ export function TabOrders() {
                       onChange={(e) => setNewItem({ ...newItem, source: e.target.value })}
                     >
                       <option value="">Склад (необязательно)</option>
-                      {Array.from(new Set(warehouses.map((w) => w.sourceCode).filter(Boolean))).map((c) => (
+                      {Array.from(
+                        new Set([...warehouses.map((w) => w.sourceCode), newItem.source].filter(Boolean))
+                      ).map((c) => (
                         <option key={c} value={c}>
                           склад {c}
                         </option>
