@@ -6,14 +6,12 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import { SeoFaqJsonLd } from "@/components/seo-faq-jsonld";
 
-interface InfoItem {
-  title: string;
-  body: string;
-}
-interface InfoSection {
-  title: string;
-  items: InfoItem[];
-}
+// Число пунктов в каждой секции. Раньше контент лежал вложенными массивами
+// (info.sections[].items[]) — их нельзя было редактировать в админке, потому
+// что перебивки работают только с плоскими ключами. Теперь тексты — плоские
+// ключи info.s{N}_title / info.s{N}_i{M}_title / _body, а структуру (сколько
+// секций и пунктов) задаёт этот массив.
+const SECTION_ITEMS = [4, 5, 3, 2];
 
 export function generateMetadata({
   params: { locale },
@@ -43,15 +41,24 @@ export default async function InfoPage({
     pickupHours: settings?.pickupHours ?? "завтра 14:00–18:00",
   };
 
-  const sections = t.raw("sections") as InfoSection[];
+  const sections = SECTION_ITEMS.map((count, si) => {
+    const s = si + 1;
+    return {
+      title: t(`s${s}_title`),
+      items: Array.from({ length: count }, (_, ii) => {
+        const m = ii + 1;
+        return {
+          title: t(`s${s}_i${m}_title`),
+          body: t(`s${s}_i${m}_body`, vars),
+        };
+      }),
+    };
+  });
 
-  // Для FAQ-разметки берём ровно тот текст, что видит человек: Google требует
-  // совпадения, иначе разметка считается нарушением.
-  const faq = sections.flatMap((s, i) =>
-    s.items.map((_, j) => ({
-      title: t(`sections.${i}.items.${j}.title`),
-      body: t(`sections.${i}.items.${j}.body`, vars),
-    }))
+  // FAQ-разметка: берём ровно тот текст, что видит человек (Google требует
+  // совпадения). Строим из тех же плоских ключей.
+  const faq = sections.flatMap((s) =>
+    s.items.map((it) => ({ title: it.title, body: it.body }))
   );
 
   return (
@@ -68,20 +75,18 @@ export default async function InfoPage({
         {sections.map((s, i) => (
           <div key={i}>
             <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-              {t(`sections.${i}.title`)}
+              {s.title}
             </h2>
             <ul className="mt-4 space-y-3">
-              {s.items.map((_, j) => (
+              {s.items.map((it, j) => (
                 <li key={j} className="card flex items-start gap-3">
                   <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-brand/10">
                     <Check className="h-3 w-3 text-brand" aria-hidden />
                   </span>
                   <div className="min-w-0">
-                    <div className="font-semibold">
-                      {t(`sections.${i}.items.${j}.title`)}
-                    </div>
+                    <div className="font-semibold">{it.title}</div>
                     <p className="mt-1 text-pretty text-sm leading-relaxed text-ink-mute dark:text-paper-mute">
-                      {t(`sections.${i}.items.${j}.body`, vars)}
+                      {it.body}
                     </p>
                   </div>
                 </li>
