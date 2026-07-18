@@ -16,25 +16,20 @@ export async function POST(req: NextRequest) {
   const brand = body.brand || "WINKOD";
   const article = body.article || "W339055SA";
   try {
-    const path = `/ru-RU/Search/Details?brand=${encodeURIComponent(brand)}&article=${encodeURIComponent(article)}`;
-    const { status, html } = await shopGetHtml(path);
-    const loggedOut = /loginForm|Account\/Login/i.test(html);
-    // Все ссылки на изображения на странице.
-    const imgs = Array.from(
-      html.matchAll(/(?:src|data-src|href)="([^"]*\.(?:jpe?g|png|webp)[^"]*)"/gi),
+    // Прямой AJAX-эндпоинт картинок товара, найденный на странице Details.
+    const imgPath = `/ru-RU/Search/GetProductImages?article=${encodeURIComponent(article)}&brand=${encodeURIComponent(brand)}&mode=images`;
+    const imgRes = await shopGetHtml(imgPath);
+    // Вытащим ссылки на картинки из ответа (JSON или HTML).
+    const urls = Array.from(
+      imgRes.html.matchAll(/["'(]([^"'()\s]*\.(?:jpe?g|png|webp)[^"'()\s]*)["')]/gi),
       (m) => m[1]
-    ).filter((u) => !/logo|icon|call-center|favicon/i.test(u));
-    // Ссылки, похожие на фото товара (Photo/Image/Nomenclature/File/Upload).
-    const productish = Array.from(
-      html.matchAll(/["'(]([^"'()]*(?:Photo|Image|Nomenclature|File|Upload|Goods|Product)[^"'()]*)["')]/gi),
-      (m) => m[1]
-    ).filter((u) => /\.(jpe?g|png|webp)|Photo|Image|File/i.test(u)).slice(0, 20);
+    );
     return NextResponse.json({
-      status,
-      loggedOut,
-      htmlLen: html.length,
-      imgs: Array.from(new Set(imgs)).slice(0, 25),
-      productish: Array.from(new Set(productish)),
+      endpoint: "GetProductImages",
+      status: imgRes.status,
+      len: imgRes.html.length,
+      urls: Array.from(new Set(urls)).slice(0, 20),
+      raw: imgRes.html.slice(0, 1200),
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
