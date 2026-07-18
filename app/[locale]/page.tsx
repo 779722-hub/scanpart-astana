@@ -167,7 +167,7 @@ export default async function HomePage({
       />
 
       {/* HERO */}
-      <section className="mx-auto max-w-6xl px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-20">
+      <section className="mx-auto max-w-6xl px-4 pb-6 pt-4 sm:px-6 sm:pb-8 sm:pt-10">
         <div className="inline-block rounded-3xl bg-white/80 px-5 py-4 shadow-card backdrop-blur-md sm:px-8 sm:py-6 dark:bg-ink/70 dark:shadow-cardHover">
           <h1 className="text-balance text-3xl font-bold tracking-tight text-ink sm:text-5xl md:text-6xl dark:text-paper">
             {t("title")}
@@ -203,7 +203,7 @@ export default async function HomePage({
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Как это работает
         </h2>
@@ -221,7 +221,7 @@ export default async function HomePage({
       </section>
 
       {/* FEATURES */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Почему мы
         </h2>
@@ -241,7 +241,7 @@ export default async function HomePage({
       </section>
 
       {/* CONTACT / DELIVERY */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="card space-y-3">
             <div className="flex items-center gap-2 text-brand">
