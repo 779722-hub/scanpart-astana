@@ -436,9 +436,9 @@ export async function GET(req: NextRequest) {
         const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
         return {
           ...o,
-          // Сопутствующие (смазки, комплекты) — фото не ищем: их короткие коды
-          // дают ложные совпадения в каталоге. Всегда логотип.
-          image: showPhotos ? "/logo.png" : undefined,
+          // Сопутствующие — только точное фото Autotrade (rel=1 пропускает
+          // подбор по каталогу Shate-M, где короткие коды дают ложные фото).
+          image: showPhotos ? partPhotoUrl(o.article, o.brand, { rel: true }) : undefined,
           warehouse: `Астана (${code})`,
           sourceCode: code === "?" ? "" : code,
         };

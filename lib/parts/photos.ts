@@ -42,8 +42,15 @@ export function partPhotoSlot(article: string): string {
  * `part:` → фото из каталога Shate-M по артикулу → наш логотип (фолбэк).
  * CDN Vercel кэширует ответ по этому URL, так что резолв идёт лениво и один раз.
  */
-export function partPhotoUrl(article: string, brand?: string): string {
+export function partPhotoUrl(
+  article: string,
+  brand?: string,
+  opts?: { rel?: boolean }
+): string {
   const p = new URLSearchParams({ a: article });
   if (brand) p.set("b", brand);
+  // rel=1 — сопутствующий товар: берём только точное фото Autotrade, без
+  // подбора по каталогу Shate-M (там короткие коды дают ложные совпадения).
+  if (opts?.rel) p.set("rel", "1");
   return `/api/part-photo?${p.toString()}`;
 }

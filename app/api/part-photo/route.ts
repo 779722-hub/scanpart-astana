@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
 import { resolvePartImageDataUri } from "@/lib/shatem/images";
+import { resolveAutotradePhotoUrl } from "@/lib/autotrade/images";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,20 @@ function logoRedirect(req: NextRequest): NextResponse {
   return res;
 }
 
+/** Забрать байты картинки по URL (сервер-сайд — домен поставщика не утекает). */
+async function serveRemoteImage(url: string): Promise<NextResponse | null> {
+  const r = await fetch(url, { cache: "no-store" }).catch(() => null);
+  if (!r || !r.ok) return null;
+  const type = r.headers.get("content-type") || "image/jpeg";
+  if (!type.startsWith("image/")) return null;
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (buf.length < 200) return null; // пустышка/заглушка
+  return new NextResponse(buf, {
+    status: 200,
+    headers: { "Content-Type": type, "Cache-Control": CACHE_PHOTO },
+  });
+}
+
 /** Parse a `data:image/…;base64,…` URI into bytes + content-type. */
 function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
   const m = /^data:([^;]+);base64,(.*)$/s.exec(uri);
@@ -26,13 +41,17 @@ function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
 /**
  * Картинка детали для карточки результата. Приоритет:
  *   1) ручной слот `part:<артикул>` (Cloudinary) — редирект;
- *   2) фото из каталога Shate-M по артикулу (заводское, бренд производителя);
- *   3) наш логотип — если фото нигде нет.
- * Ответ кэшируется CDN Vercel по URL (?a=&b=), поэтому резолв — один раз.
+ *   2) фото Autotrade по артикулу — чистое (без вотермарка), актуальное;
+ *   3) каталог Shate-M по артикулу (заводское, бренд производителя);
+ *   4) наш логотип — если фото нигде нет.
+ * При `rel=1` (сопутствующий товар) шаг Shate-M пропускается — только Autotrade,
+ * иначе короткие коды дают ложные совпадения.
+ * Ответ кэшируется CDN Vercel по URL, поэтому резолв — один раз.
  */
 export async function GET(req: NextRequest) {
   const a = (req.nextUrl.searchParams.get("a") ?? "").trim();
   const b = (req.nextUrl.searchParams.get("b") ?? "").trim();
+  const rel = req.nextUrl.searchParams.get("rel") === "1";
   // Размер: миниатюра ~400, лайтбокс запрашивает крупнее (?s=1000). Клампим.
   const sRaw = Number(req.nextUrl.searchParams.get("s"));
   const size = Number.isFinite(sRaw) ? Math.min(1600, Math.max(100, sRaw)) : 400;
@@ -47,18 +66,27 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  // 2) Каталог Shate-M по артикулу.
-  const dataUri = await resolvePartImageDataUri(a, b || undefined, size).catch(() => null);
-  if (dataUri) {
-    const decoded = decodeDataUri(dataUri);
-    if (decoded) {
-      return new NextResponse(decoded.buf, {
-        status: 200,
-        headers: { "Content-Type": decoded.type, "Cache-Control": CACHE_PHOTO },
-      });
+  // 2) Фото Autotrade по артикулу (чистый URL без вотермарка).
+  const atUrl = await resolveAutotradePhotoUrl(a, b || undefined).catch(() => null);
+  if (atUrl) {
+    const served = await serveRemoteImage(atUrl);
+    if (served) return served;
+  }
+
+  // 3) Каталог Shate-M по артикулу (кроме сопутствующих).
+  if (!rel) {
+    const dataUri = await resolvePartImageDataUri(a, b || undefined, size).catch(() => null);
+    if (dataUri) {
+      const decoded = decodeDataUri(dataUri);
+      if (decoded) {
+        return new NextResponse(decoded.buf, {
+          status: 200,
+          headers: { "Content-Type": decoded.type, "Cache-Control": CACHE_PHOTO },
+        });
+      }
     }
   }
 
-  // 3) Фолбэк — логотип.
+  // 4) Фолбэк — логотип.
   return logoRedirect(req);
 }
