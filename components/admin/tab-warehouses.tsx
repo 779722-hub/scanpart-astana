@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Warehouse as WarehouseIcon, Save, Trash2, Plus, MapPin } from "lucide-react";
+import { Loader2, Warehouse as WarehouseIcon, Save, Trash2, Plus, MapPin, Check } from "lucide-react";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 
 interface Warehouse {
@@ -35,11 +35,82 @@ const empty: Draft = { name: "", address: "", lat: "", lng: "", pickupMinutes: "
 // Quick-pick palette (manager can also open the native picker for any colour).
 const COLOR_PRESETS = ["#F59E0B", "#EA580C", "#2563EB", "#16A34A", "#DC2626", "#7C3AED", "#0891B2", "#DB2777"];
 
+// Метки на карте (офис/курьер/клиент) — хранятся в настройках, правятся здесь.
+const MARKER_SHAPES = [
+  { v: "circle", l: "Круг" },
+  { v: "square", l: "Квадрат" },
+  { v: "triangle", l: "Треугольник" },
+  { v: "diamond", l: "Ромб" },
+];
+const MARKER_DEFAULTS: Record<string, string> = {
+  office_color: "#16A34A",
+  courier_color: "#E10600",
+  courier_shape: "circle",
+  client_color: "#2563EB",
+  client_shape: "circle",
+};
+
+function MarkerEditor({
+  title,
+  colorKey,
+  shapeKey,
+  markers,
+  onChange,
+}: {
+  title: string;
+  colorKey: string;
+  shapeKey?: string;
+  markers: Record<string, string>;
+  onChange: (patch: Record<string, string>) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-paper-mute p-3 dark:border-ink">
+      <div className="mb-2 text-sm font-semibold">{title}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="color"
+          className="h-9 w-12 cursor-pointer rounded-lg border border-paper-mute bg-transparent dark:border-ink"
+          value={markers[colorKey]}
+          onChange={(e) => onChange({ [colorKey]: e.target.value })}
+        />
+        {COLOR_PRESETS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange({ [colorKey]: c })}
+            className={`h-7 w-7 rounded-full ring-1 ring-black/20 ${
+              markers[colorKey]?.toLowerCase() === c.toLowerCase() ? "ring-2 ring-brand ring-offset-2" : ""
+            }`}
+            style={{ background: c }}
+            title={c}
+          />
+        ))}
+        {shapeKey && (
+          <select
+            className="input ml-auto !w-auto !py-2 text-sm"
+            value={markers[shapeKey]}
+            onChange={(e) => onChange({ [shapeKey]: e.target.value })}
+          >
+            {MARKER_SHAPES.map((s) => (
+              <option key={s.v} value={s.v}>
+                {s.l}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function TabWarehouses() {
   const [rows, setRows] = useState<Warehouse[] | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [geo, setGeo] = useState(false);
+  const [markers, setMarkers] = useState<Record<string, string>>(MARKER_DEFAULTS);
+  const [markersBusy, setMarkersBusy] = useState(false);
+  const [markersSaved, setMarkersSaved] = useState(false);
 
   async function geocode() {
     if (!draft?.address.trim()) return;
@@ -64,9 +135,42 @@ export function TabWarehouses() {
     const j = await fetch("/api/admin/warehouses").then((r) => r.json());
     setRows(j.ok ? j.warehouses : []);
   }
+  async function loadMarkers() {
+    const j = await fetch("/api/admin/settings").then((r) => r.json()).catch(() => null);
+    if (j?.ok && j.settings) {
+      const s = j.settings as Record<string, string>;
+      setMarkers(
+        Object.fromEntries(
+          Object.keys(MARKER_DEFAULTS).map((k) => [k, s[k] || MARKER_DEFAULTS[k]])
+        ) as Record<string, string>
+      );
+    }
+  }
   useEffect(() => {
     refresh();
+    loadMarkers();
   }, []);
+
+  async function saveMarkers() {
+    setMarkersBusy(true);
+    setMarkersSaved(false);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ patch: markers }),
+      });
+      const j = await res.json();
+      if (res.ok && j.ok) {
+        setMarkersSaved(true);
+        setTimeout(() => setMarkersSaved(false), 2500);
+      } else {
+        alert(`Ошибка: ${j.error ?? res.status}`);
+      }
+    } finally {
+      setMarkersBusy(false);
+    }
+  }
 
   async function save() {
     if (!draft) return;
@@ -128,13 +232,58 @@ export function TabWarehouses() {
     <div className="space-y-4">
       <div className="card space-y-1">
         <div className="flex items-center gap-2 text-base font-bold">
-          <WarehouseIcon className="h-5 w-5 text-brand" /> Склады (точки получения)
+          <WarehouseIcon className="h-5 w-5 text-brand" /> Локации
         </div>
         <p className="text-sm text-ink-mute dark:text-paper-mute">
-          Точки, откуда курьер забирает заказы. Координаты нужны для построения
-          маршрута. Скопируйте их из 2ГИС/Google Карт (правый клик на точке →
-          координаты) и вставьте в поле «Координаты».
+          Точки, откуда курьер забирает заказы, и оформление меток на карте
+          (офис, курьер, клиент). Координаты нужны для маршрута — скопируйте их
+          из 2ГИС/Google Карт (правый клик на точке → координаты).
         </p>
+      </div>
+
+      {/* Метки на карте — цвет и форма для офиса, курьера и клиента. */}
+      <div className="card space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-base font-bold">
+            <MapPin className="h-5 w-5 text-brand" /> Метки на карте
+          </div>
+          <button className="btn-primary !px-4 !py-2 text-sm" onClick={saveMarkers} disabled={markersBusy}>
+            {markersBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : markersSaved ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {markersSaved ? "Сохранено" : "Сохранить"}
+          </button>
+        </div>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          Цвет и форма меток на карте доставок. Склады используют свой цвет (в
+          карточке склада ниже).
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <MarkerEditor
+            title="Офис"
+            colorKey="office_color"
+            markers={markers}
+            onChange={(p) => setMarkers((m) => ({ ...m, ...p }))}
+          />
+          <MarkerEditor
+            title="Курьер"
+            colorKey="courier_color"
+            shapeKey="courier_shape"
+            markers={markers}
+            onChange={(p) => setMarkers((m) => ({ ...m, ...p }))}
+          />
+          <MarkerEditor
+            title="Клиент"
+            colorKey="client_color"
+            shapeKey="client_shape"
+            markers={markers}
+            onChange={(p) => setMarkers((m) => ({ ...m, ...p }))}
+          />
+        </div>
       </div>
 
       {rows.map((w) => (

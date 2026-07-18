@@ -62,7 +62,7 @@ const TABS: TabDef[] = [
   { key: "customers", label: "Клиенты", Icon: Contact },
   { key: "deliveries", label: "Доставки", Icon: Truck },
   { key: "couriers", label: "Курьеры", Icon: Bike },
-  { key: "warehouses", label: "Склады", Icon: Warehouse },
+  { key: "warehouses", label: "Локации", Icon: Warehouse },
   { key: "content", label: "Контент", Icon: FileText },
   { key: "images", label: "Картинки", Icon: ImageIcon },
   { key: "theme", label: "Дизайн", Icon: Palette },

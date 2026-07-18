@@ -7,13 +7,6 @@ import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
 const ANALOGS_MIN = 0;
 const ANALOGS_MAX = 10;
 
-const SHAPE_OPTIONS = [
-  { v: "circle", l: "Круг" },
-  { v: "square", l: "Квадрат" },
-  { v: "triangle", l: "Треугольник" },
-  { v: "diamond", l: "Ромб" },
-];
-
 const YESNO_OPTIONS = [
   { v: "on", l: "Да" },
   { v: "off", l: "Нет" },
@@ -23,7 +16,7 @@ const FIELDS: {
   key: string;
   label: string;
   hint?: string;
-  kind?: "number" | "text" | "color" | "shape" | "select";
+  kind?: "number" | "text" | "select";
   options?: { v: string; l: string }[];
   def?: string;
 }[] = [
@@ -42,11 +35,6 @@ const FIELDS: {
   { key: "pickup_hours", label: "Часы самовывоза" },
   { key: "office_lat", label: "Офис: широта (для метки на карте)", hint: "скопируйте из 2ГИС, напр. 51.1605" },
   { key: "office_lng", label: "Офис: долгота", hint: "напр. 71.4704" },
-  { key: "office_color", label: "Цвет офиса на карте", kind: "color", def: "#16A34A" },
-  { key: "courier_color", label: "Метка курьера: цвет", kind: "color", def: "#E10600" },
-  { key: "courier_shape", label: "Метка курьера: форма", kind: "shape", def: "circle" },
-  { key: "client_color", label: "Метка клиента: цвет", kind: "color", def: "#2563EB" },
-  { key: "client_shape", label: "Метка клиента: форма", kind: "shape", def: "circle" },
   { key: "manager_phone_display", label: "Телефон менеджера (как показывать)" },
   { key: "manager_whatsapp_e164", label: "WhatsApp менеджера (E.164 без +, напр. 77000000000)" },
   { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)" },
@@ -263,24 +251,7 @@ export function TabSettings() {
           {FIELDS.map((f) => (
             <div key={f.key} className={f.kind === "text" || !f.kind ? "sm:col-span-2" : ""}>
               <label className="label">{f.label}</label>
-              {f.kind === "color" ? (
-                <input
-                  type="color"
-                  className="h-10 w-16 cursor-pointer rounded-lg border border-paper-mute bg-transparent dark:border-ink-mute"
-                  value={draft[f.key] || f.def || "#16A34A"}
-                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-                />
-              ) : f.kind === "shape" ? (
-                <select
-                  className="input"
-                  value={draft[f.key] || f.def || "circle"}
-                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-                >
-                  {SHAPE_OPTIONS.map((o) => (
-                    <option key={o.v} value={o.v}>{o.l}</option>
-                  ))}
-                </select>
-              ) : f.kind === "select" ? (
+              {f.kind === "select" ? (
                 <select
                   className="input"
                   value={draft[f.key] ?? f.def ?? ""}
