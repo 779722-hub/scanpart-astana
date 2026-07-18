@@ -60,13 +60,25 @@ const CAR_MAKES = new Set([
   "KENWORTH", "FREIGHTLINER", "HINO", "FUSO", "KAMAZ", "КАМАЗ", "MAZ", "МАЗ",
 ]);
 
-/** Первая ЗНАКОМАЯ марка авто из применимости, иначе пусто. */
+// Схлопываем разные формы одной марки в одну.
+const MAKE_CANON: Record<string, string> = {
+  VW: "VOLKSWAGEN",
+  MB: "MERCEDES-BENZ",
+  MERCEDES: "MERCEDES-BENZ",
+  LAND: "LANDROVER",
+  RANGEROVER: "LANDROVER",
+  CHEVY: "CHEVROLET",
+  ALFA: "ALFAROMEO",
+  VAZ: "ВАЗ",
+  GWM: "GREATWALL",
+};
+
+/** Первая ЗНАКОМАЯ марка авто из применимости (канонизированная), иначе пусто. */
 function firstMake(applicability: string): string {
   const tokens = applicability.toUpperCase().split(/[^A-ZА-ЯЁ0-9-]+/).filter(Boolean);
   for (const raw of tokens) {
-    if (CAR_MAKES.has(raw)) return raw;
-    const base = raw.split("-")[0]; // «HYUNDAI-KIA» → «HYUNDAI»
-    if (base && CAR_MAKES.has(base)) return base;
+    const base = CAR_MAKES.has(raw) ? raw : raw.split("-")[0]; // «HYUNDAI-KIA» → «HYUNDAI»
+    if (base && CAR_MAKES.has(base)) return MAKE_CANON[base] ?? base;
   }
   return "";
 }
