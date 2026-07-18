@@ -7,11 +7,11 @@ import { cldUrl } from "@/lib/cloudinary-url";
  * например `part:41060EG090`. Так переиспользуется вся инфраструктура —
  * загрузка, CDN, кэш, ревалидация — без новых таблиц.
  *
- * Поставщики чистого фото товара нам не отдают (проверено: Phaeton PhotoItem
- * пустой, у Shate-M поля нет, Autotrade с вотермаркой). Поэтому фото —
- * ручное (владелец грузит) или из внешней OEM-базы (TecDoc, если задан ключ).
- * Autotrade-картинки не используются вообще, так что вотермарки перекупщика
- * тут появиться неоткуда.
+ * Автоматический источник — каталог Shate-M (`/api/v1/articles/{id}` +
+ * `/api/v1/contents/search`): заводское фото/схема по артикулу, бренд
+ * производителя, без надписей поставщика. Резолвится лениво в маршруте
+ * `/api/part-photo` (см. [[lib/shatem/images.ts]]). Ручной слот `part:` имеет
+ * приоритет, а если фото нигде нет — подставляется логотип.
  */
 const PART_SLOT_PREFIX = "part:";
 
@@ -35,4 +35,15 @@ export async function getPartPhotoMap(): Promise<Record<string, string>> {
 /** Слот для фото конкретного артикула. */
 export function partPhotoSlot(article: string): string {
   return PART_SLOT_PREFIX + normPartKey(article);
+}
+
+/**
+ * URL прокси-картинки детали для `<img src>`. Сам маршрут решает: ручной слот
+ * `part:` → фото из каталога Shate-M по артикулу → наш логотип (фолбэк).
+ * CDN Vercel кэширует ответ по этому URL, так что резолв идёт лениво и один раз.
+ */
+export function partPhotoUrl(article: string, brand?: string): string {
+  const p = new URLSearchParams({ a: article });
+  if (brand) p.set("b", brand);
+  return `/api/part-photo?${p.toString()}`;
 }
