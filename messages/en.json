@@ -127,84 +127,38 @@
     "title": "How the service works",
     "intro": "Tell us your car and we show what actually fits it. Original and analogs in one list, with price and stock at our warehouse in Astana. No phone calls, no «send us a photo of the part».",
     "ctaVin": "Find by VIN",
-    "sections": [
-      {
-        "title": "Four ways to find a part",
-        "items": [
-          {
-            "title": "By VIN — the most precise way",
-            "body": "A VIN opens the manufacturer catalog, so we show parts for your exact build, not roughly similar ones. We accept a VIN of any length: on older, Japanese and Korean cars the body number is often shorter than 17 characters. If the VIN is unreadable, pick the make and model by hand."
-          },
-          {
-            "title": "Photograph your registration — the VIN fills itself in",
-            "body": "No retyping 17 characters and worrying about O versus 0. Photograph the document right in the browser or add an existing photo from your gallery — the VIN is recognised automatically (on the Kazakh registration it is field No. 5). It copes with glare and with poor light. If one character comes out wrong, fix it without retyping everything."
-          },
-          {
-            "title": "By part number",
-            "body": "Know the part number? Enter it. We show the original and analogs available in Astana. If the number does not fit your car, we warn you before you buy, not after."
-          },
-          {
-            "title": "By name — or just say it out loud",
-            "body": "Type front brake pads — or tap the button and speak. We match against your car catalog, not by guessing from words: ask for an oil filter and you get the filter, not its bracket."
-          }
-        ]
-      },
-      {
-        "title": "What the answer shows",
-        "items": [
-          {
-            "title": "The original number (OEM) for your car",
-            "body": "We show the factory number for your specific car, so it is easy to check and hard to get wrong."
-          },
-          {
-            "title": "Original and analogs side by side",
-            "body": "One list: the original plus analogs from different makers. You see where you would overpay and where the same thing costs less — the list sorts by price."
-          },
-          {
-            "title": "Stock and price right away",
-            "body": "We show what is physically on the shelf in Astana, with quantity and final price. We sell only from stock — if it is in the list, it is there."
-          },
-          {
-            "title": "Whether it fits your car",
-            "body": "Every item is marked: fits, compatibility unconfirmed, or not for your car. So you do not buy the wrong thing and drive back to return it."
-          },
-          {
-            "title": "Related products",
-            "body": "Below the list — what the same repair usually needs: greases, fasteners, kits. So you do not come back for a small part."
-          }
-        ]
-      },
-      {
-        "title": "Delivery and payment",
-        "items": [
-          {
-            "title": "Express delivery across Astana in 2–4 hours",
-            "body": "Our courier brings it, fee {price} KZT. Order window: {expressHours}."
-          },
-          {
-            "title": "Pickup — free",
-            "body": "{pickupAddress}. You can collect it {pickupHours}."
-          },
-          {
-            "title": "Payment only after we confirm the part is in stock",
-            "body": "After you order, our manager contacts you, confirms the item and its availability in the warehouse, and takes payment."
-          }
-        ]
-      },
-      {
-        "title": "Your account",
-        "items": [
-          {
-            "title": "All your cars in one place",
-            "body": "Save several cars and switch between them in one tap — every page shows which one the search is for. No more hunting for the VIN."
-          },
-          {
-            "title": "Order history",
-            "body": "Past orders stay at hand: repeat any item with one button — no need to search again."
-          }
-        ]
-      }
-    ]
+    "s1_title": "Four ways to find a part",
+    "s1_i1_title": "By VIN — the most precise way",
+    "s1_i1_body": "A VIN opens the manufacturer catalog, so we show parts for your exact build, not roughly similar ones. We accept a VIN of any length: on older, Japanese and Korean cars the body number is often shorter than 17 characters. If the VIN is unreadable, pick the make and model by hand.",
+    "s1_i2_title": "Photograph your registration — the VIN fills itself in",
+    "s1_i2_body": "No retyping 17 characters and worrying about O versus 0. Photograph the document right in the browser or add an existing photo from your gallery — the VIN is recognised automatically (on the Kazakh registration it is field No. 5). It copes with glare and with poor light. If one character comes out wrong, fix it without retyping everything.",
+    "s1_i3_title": "By part number",
+    "s1_i3_body": "Know the part number? Enter it. We show the original and analogs available in Astana. If the number does not fit your car, we warn you before you buy, not after.",
+    "s1_i4_title": "By name — or just say it out loud",
+    "s1_i4_body": "Type front brake pads — or tap the button and speak. We match against your car catalog, not by guessing from words: ask for an oil filter and you get the filter, not its bracket.",
+    "s2_title": "What the answer shows",
+    "s2_i1_title": "The original number (OEM) for your car",
+    "s2_i1_body": "We show the factory number for your specific car, so it is easy to check and hard to get wrong.",
+    "s2_i2_title": "Original and analogs side by side",
+    "s2_i2_body": "One list: the original plus analogs from different makers. You see where you would overpay and where the same thing costs less — the list sorts by price.",
+    "s2_i3_title": "Stock and price right away",
+    "s2_i3_body": "We show what is physically on the shelf in Astana, with quantity and final price. We sell only from stock — if it is in the list, it is there.",
+    "s2_i4_title": "Whether it fits your car",
+    "s2_i4_body": "Every item is marked: fits, compatibility unconfirmed, or not for your car. So you do not buy the wrong thing and drive back to return it.",
+    "s2_i5_title": "Related products",
+    "s2_i5_body": "Below the list — what the same repair usually needs: greases, fasteners, kits. So you do not come back for a small part.",
+    "s3_title": "Delivery and payment",
+    "s3_i1_title": "Express delivery across Astana in 2–4 hours",
+    "s3_i1_body": "Our courier brings it, fee {price} KZT. Order window: {expressHours}.",
+    "s3_i2_title": "Pickup — free",
+    "s3_i2_body": "{pickupAddress}. You can collect it {pickupHours}.",
+    "s3_i3_title": "Payment only after we confirm the part is in stock",
+    "s3_i3_body": "After you order, our manager contacts you, confirms the item and its availability in the warehouse, and takes payment.",
+    "s4_title": "Your account",
+    "s4_i1_title": "All your cars in one place",
+    "s4_i1_body": "Save several cars and switch between them in one tap — every page shows which one the search is for. No more hunting for the VIN.",
+    "s4_i2_title": "Order history",
+    "s4_i2_body": "Past orders stay at hand: repeat any item with one button — no need to search again."
   },
   "errors": {
     "serviceUnavailable": "Service temporarily unavailable. Please try again later.",
