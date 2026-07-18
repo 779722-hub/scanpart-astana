@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPartPhotoMap, normPartKey } from "@/lib/parts/photos";
-import { resolvePartImageDataUri } from "@/lib/shatem/images";
+import { resolvePartImageDataUri, resolvePartImageDebug } from "@/lib/shatem/images";
+import { getCurrentUser } from "@/lib/auth/guards";
 
 export const runtime = "nodejs";
 
@@ -33,9 +34,15 @@ function decodeDataUri(uri: string): { buf: Buffer; type: string } | null {
 export async function GET(req: NextRequest) {
   const a = (req.nextUrl.searchParams.get("a") ?? "").trim();
   const b = (req.nextUrl.searchParams.get("b") ?? "").trim();
-  const debug =
-    process.env.DIAG_TOKEN &&
-    req.nextUrl.searchParams.get("debug") === process.env.DIAG_TOKEN;
+  // Debug доступен по DIAG_TOKEN или под админ-сессией.
+  let debug = false;
+  if (req.nextUrl.searchParams.get("debug") != null) {
+    const tok = req.nextUrl.searchParams.get("debug");
+    if (process.env.DIAG_TOKEN && tok === process.env.DIAG_TOKEN) debug = true;
+    else if (await getCurrentUser().catch(() => null)) debug = true;
+  }
+  if (debug)
+    return NextResponse.json(await resolvePartImageDebug(a, b || undefined));
   if (!a) return logoRedirect(req);
 
   // 1) Ручной слот — владелец загрузил фото сам.
