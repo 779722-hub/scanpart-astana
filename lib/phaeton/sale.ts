@@ -79,9 +79,12 @@ function parseSaleOut(html: string): SaleItem[] {
       const rowHtml = r[4];
       const city = clean(/<td>\s*([^<]+?)\s*<\/td>/i.exec(rowHtml)?.[1] ?? "");
       if (!/астана/i.test(city)) continue;
-      const priceRaw = toNum(r[1]);
+      // Скидочная цена — в data-artificial-price (если >0), иначе обычная
+      // data-price; data-original-price — старая (для зачёркивания и %).
+      const artificial = toNum(/data-artificial-price="([^"]*)"/i.exec(rowHtml)?.[1]);
+      const orig = toNum(/data-original-price="([^"]*)"/i.exec(rowHtml)?.[1]);
+      const priceRaw = artificial > 0 ? artificial : toNum(r[1]);
       if (priceRaw <= 0) continue;
-      const oldRaw = toNum(/data-original-price="([^"]*)"/i.exec(rowHtml)?.[1]);
       items.push({
         brand,
         article,
@@ -89,7 +92,7 @@ function parseSaleOut(html: string): SaleItem[] {
         applicability,
         make: firstMake(applicability),
         priceRaw,
-        oldPrice: oldRaw > priceRaw ? oldRaw : null,
+        oldPrice: orig > priceRaw ? orig : null,
         deliveryDays: toNum(r[2]),
         available: toNum(r[3]),
       });
