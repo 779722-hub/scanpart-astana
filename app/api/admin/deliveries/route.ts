@@ -64,6 +64,7 @@ const putSchema = z.object({
   warehouseIds: z.array(z.string()).default([]),
   courierId: z.string().default(""),
   status: z.string().optional(),
+  note: z.string().max(1000).optional(),
 });
 
 const toNum = (v: unknown): number | null => {
@@ -122,6 +123,7 @@ export async function PUT(req: NextRequest) {
     handoverCode: existing?.handoverCode ?? "",
     deliveredAt: existing?.deliveredAt ?? "",
     routeTarget: existing?.routeTarget ?? "",
+    note: p.note ?? existing?.note ?? "",
   };
   await upsertDelivery(delivery);
 

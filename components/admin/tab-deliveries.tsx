@@ -23,6 +23,7 @@ interface Delivery {
   status: DeliveryStatus;
   deliveredAt: string;
   routeTarget?: string;
+  note?: string;
 }
 interface Courier { id: string; name: string }
 interface Warehouse { id: string; name: string; address: string; lat: number | null; lng: number | null; sourceCode: string; color: string; pickupMinutes: number }
@@ -358,6 +359,7 @@ export function TabDeliveries() {
           warehouseIds: draft.warehouseIds,
           courierId: draft.courierId,
           status: draft.status,
+          note: draft.note ?? "",
         }),
       });
       const j = await res.json();
@@ -429,6 +431,7 @@ export function TabDeliveries() {
       id: d.id, customerName: d.customerName, phone: d.phone, whatsapp: d.whatsapp,
       address: d.address, latlng: d.lat != null && d.lng != null ? `${d.lat}, ${d.lng}` : "",
       items: d.items, warehouseIds: d.warehouseIds, courierId: d.courierId, status: d.status,
+      note: d.note ?? "",
     });
   }
 
@@ -618,6 +621,11 @@ export function TabDeliveries() {
             </div>
           </div>
           <div className="whitespace-pre-line text-sm">{d.items}</div>
+          {d.note && (
+            <div className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+              📝 {d.note}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3 text-xs text-ink-mute dark:text-paper-mute">
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{d.address || "нет адреса"}{d.lat == null && " (нет координат)"}</span>
             {d.courierId ? (
@@ -688,15 +696,26 @@ export function TabDeliveries() {
           </summary>
           <div className="mt-3 space-y-2">
             {done.slice().reverse().map((d) => (
-              <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
-                <span className="flex items-center gap-2">
-                  <span className="font-semibold">{d.customerName || d.address || "—"}</span>
-                  <span className="text-ink-mute dark:text-paper-mute">{d.items}</span>
-                </span>
-                <span className="whitespace-nowrap text-xs text-ink-mute dark:text-paper-mute">
-                  {d.courierId ? courierName(d.courierId) : "—"}
-                  {d.deliveredAt ? ` · ${new Date(d.deliveredAt).toLocaleString("ru")}` : ""}
-                </span>
+              <div key={d.id} className="rounded-2xl bg-paper-soft px-3 py-2 text-sm dark:bg-ink-mute">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold">{d.customerName || d.address || "—"}</div>
+                    <div className="whitespace-pre-line text-xs text-ink-mute dark:text-paper-mute">{d.items}</div>
+                    {d.note && (
+                      <div className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        📝 {d.note}
+                      </div>
+                    )}
+                    <div className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
+                      {d.courierId ? courierName(d.courierId) : "—"}
+                      {d.deliveredAt ? ` · ${new Date(d.deliveredAt).toLocaleString("ru")}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex flex-none gap-2">
+                    <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => editFrom(d)}>Изменить</button>
+                    <button className="btn-secondary !px-3 !py-1.5 text-xs text-brand" onClick={() => remove(d.id)} title="Удалить"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -737,7 +756,8 @@ export function TabDeliveries() {
             <div><label className="label">Координаты (широта, долгота)</label><input className="input" placeholder="51.16, 71.47" value={draft.latlng} onChange={(e) => setDraft({ ...draft, latlng: e.target.value })} /></div>
           </div>
           <div><label className="label">Адрес</label><input className="input" value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} /></div>
-          <div><label className="label">Что везём</label><input className="input" value={draft.items} onChange={(e) => setDraft({ ...draft, items: e.target.value })} placeholder="Колодки, фильтр…" /></div>
+          <div><label className="label">Что везём</label><textarea className="input min-h-[4.5rem]" value={draft.items} onChange={(e) => setDraft({ ...draft, items: e.target.value })} placeholder={"1) Колодки — склад Т3\n2) Фильтр — склад Р1"} /></div>
+          <div><label className="label">Примечание</label><textarea className="input min-h-[3.5rem]" value={draft.note ?? ""} onChange={(e) => setDraft({ ...draft, note: e.target.value })} placeholder="Комментарий к доставке (необязательно)" /></div>
           <div>
             <label className="label">Забрать со складов</label>
             <div className="flex flex-wrap gap-2">
