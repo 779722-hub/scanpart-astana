@@ -74,10 +74,21 @@ async function yandexGeocode(
   }
 }
 
+// Nominatim просит не чаще 1 запроса/сек. Наш каскад делает несколько попыток
+// подряд — без задержки они упираются в лимит, и точный (house-level) результат
+// теряется, оставляя грубый street-level. Разносим вызовы во времени.
+let _lastNominatim = 0;
+async function throttleNominatim(): Promise<void> {
+  const wait = Math.max(0, 1100 - (Date.now() - _lastNominatim));
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  _lastNominatim = Date.now();
+}
+
 async function nominatim(
   query: string,
   bounded: boolean
 ): Promise<{ lat: number; lng: number; display: string } | null> {
+  await throttleNominatim();
   const url =
     `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1` +
     `&countrycodes=kz&accept-language=ru` +
