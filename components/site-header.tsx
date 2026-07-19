@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Car, ChevronRight } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
@@ -26,9 +27,16 @@ export async function SiteHeader() {
   const btnCls =
     "inline-flex min-h-[36px] flex-none items-center gap-1 rounded-2xl bg-brand px-3 py-1 text-xs font-semibold text-white transition hover:bg-brand-600 sm:min-h-0 sm:text-sm";
 
+  // В админке контент растянут на всю ширину — шапку тоже тянем во всю ширину,
+  // чтобы логотип/меню и полоса авто совпадали по краям с сайдбаром и данными.
+  // На витрине оставляем центрированный контейнер max-w-6xl.
+  const pathname = headers().get("x-pathname") ?? "";
+  const isAdmin = /\/admin(\/|$)/.test(pathname);
+  const rowCls = isAdmin ? "w-full px-3 sm:px-4" : "mx-auto max-w-6xl px-3 sm:px-6";
+
   return (
     <header className="sticky top-0 z-40 border-b border-paper-mute/60 bg-paper/80 backdrop-blur dark:border-ink-mute/60 dark:bg-ink/80">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
+      <div className={`flex h-14 items-center justify-between gap-2 sm:h-16 sm:gap-3 ${rowCls}`}>
         <BrandLink
           locale={locale}
           className="group flex min-w-0 items-center gap-1.5 font-bold tracking-tight sm:gap-2"
@@ -62,7 +70,7 @@ export async function SiteHeader() {
           visible so the customer knows which car they're searching for and can
           switch it in one tap. Без подписи: машина и так читается по значку,
           а лишнее слово ело ширину на телефоне. Значок — в высоту логотипа. */}
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 border-t border-paper-mute/50 px-3 py-1.5 text-sm sm:px-6 dark:border-ink-mute/50">
+      <div className={`flex items-center justify-between gap-2 border-t border-paper-mute/50 py-1.5 text-sm dark:border-ink-mute/50 ${rowCls}`}>
         {vehicle?.make ? (
           <>
             <span className="flex min-w-0 items-center gap-2 text-ink-mute dark:text-paper-mute">

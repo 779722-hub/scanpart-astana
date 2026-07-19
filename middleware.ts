@@ -53,7 +53,11 @@ export default function middleware(req: NextRequest) {
     }
   }
 
-  return intlMiddleware(req);
+  // Пробрасываем путь в заголовке, чтобы серверные компоненты (шапка) могли
+  // отличить админку от витрины и подстроить вёрстку (полная ширина в админке).
+  const res = intlMiddleware(req);
+  res.headers.set("x-pathname", pathname);
+  return res;
 }
 
 export const config = {
