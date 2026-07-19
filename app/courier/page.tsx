@@ -109,6 +109,7 @@ export default function CourierPage() {
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [geo, setGeo] = useState<{ status: "idle" | "ok" | "denied" | "error"; at: string }>({ status: "idle", at: "" });
   const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapFull, setMapFull] = useState(false);
 
   const nowHm = () => new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
@@ -463,14 +464,48 @@ export default function CourierPage() {
         </div>
       )}
 
-      {showMap && (
-        <DeliveryMap
-          couriers={mapMe}
-          warehouses={mapPickups}
-          drops={mapDrops}
-          routeGeometry={route?.geometry ?? null}
-          className="mb-4 h-72 w-full overflow-hidden rounded-2xl"
-        />
+      {showMap && !mapFull && (
+        <div className="mb-4">
+          <div className="mb-1.5 flex justify-end">
+            <button
+              onClick={() => setMapFull(true)}
+              className="text-sm font-semibold text-brand underline"
+            >
+              ⛶ Карта на весь экран
+            </button>
+          </div>
+          <DeliveryMap
+            couriers={mapMe}
+            warehouses={mapPickups}
+            drops={mapDrops}
+            routeGeometry={route?.geometry ?? null}
+            className="h-72 w-full overflow-hidden rounded-2xl"
+          />
+        </div>
+      )}
+
+      {/* Карта на весь экран — курьеру виден весь путь целиком. */}
+      {showMap && mapFull && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-paper dark:bg-ink">
+          <div className="flex items-center justify-between gap-2 border-b border-paper-mute px-4 py-3 dark:border-ink-mute">
+            <span className="font-semibold">
+              Маршрут{route ? ` · ${route.totalKm} км · ${route.totalMinutes} мин` : ""}
+            </span>
+            <button
+              onClick={() => setMapFull(false)}
+              className="btn-secondary !px-3 !py-2 text-sm"
+            >
+              ✕ Свернуть
+            </button>
+          </div>
+          <DeliveryMap
+            couriers={mapMe}
+            warehouses={mapPickups}
+            drops={mapDrops}
+            routeGeometry={route?.geometry ?? null}
+            className="w-full flex-1"
+          />
+        </div>
       )}
 
       {deliveries.length > 0 && (!route || route.stops.length === 0) && (
