@@ -35,6 +35,7 @@ export async function saveCourier(input: {
   id?: string;
   name: string;
   phone: string;
+  whatsapp?: string;
   login: string;
   password?: string;
   active?: boolean;
@@ -45,6 +46,7 @@ export async function saveCourier(input: {
     id,
     name: input.name.trim(),
     phone: input.phone.trim(),
+    whatsapp: input.whatsapp?.trim() ?? "",
     login: input.login.trim(),
     passwordHash,
     active: input.active ?? true,

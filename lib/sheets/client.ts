@@ -672,7 +672,7 @@ export async function readCouriers(): Promise<Courier[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${COURIERS_SHEET}!A2:G`,
+    range: `${COURIERS_SHEET}!A2:H`,
   });
   return (data.values ?? [])
     .map((r) => ({
@@ -682,6 +682,7 @@ export async function readCouriers(): Promise<Courier[]> {
       login: String(r[3] ?? "").trim(),
       passwordHash: String(r[4] ?? ""),
       active: String(r[5] ?? "").toLowerCase() !== "false",
+      whatsapp: String(r[7] ?? "").trim(),
     }))
     .filter((c) => c.id);
 }
@@ -705,11 +706,11 @@ export async function upsertCourier(c: Courier): Promise<void> {
   if (rowIdx === -1) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: id,
-      range: `${COURIERS_SHEET}!A:G`,
+      range: `${COURIERS_SHEET}!A:H`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [
-          [c.id, c.name, c.phone, c.login, c.passwordHash, c.active ? "true" : "false", new Date().toISOString()],
+          [c.id, c.name, c.phone, c.login, c.passwordHash, c.active ? "true" : "false", new Date().toISOString(), c.whatsapp ?? ""],
         ],
       },
     });
@@ -721,6 +722,7 @@ export async function upsertCourier(c: Courier): Promise<void> {
     { range: `${COURIERS_SHEET}!C${rowNumber}`, values: [[c.phone]] },
     { range: `${COURIERS_SHEET}!D${rowNumber}`, values: [[c.login]] },
     { range: `${COURIERS_SHEET}!F${rowNumber}`, values: [[c.active ? "true" : "false"]] },
+    { range: `${COURIERS_SHEET}!H${rowNumber}`, values: [[c.whatsapp ?? ""]] },
   ];
   if (c.passwordHash) updates.push({ range: `${COURIERS_SHEET}!E${rowNumber}`, values: [[c.passwordHash]] });
   await sheets.spreadsheets.values.batchUpdate({
@@ -942,7 +944,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "color",
     "markup",
   ],
-  Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at"],
+  Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at", "whatsapp"],
   CourierLocations: ["courier_id", "lat", "lng", "updated_at"],
   Deliveries: [
     "id",

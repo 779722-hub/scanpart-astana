@@ -23,6 +23,7 @@ const putSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(2).max(80),
   phone: z.string().min(4).max(30),
+  whatsapp: z.string().max(30).optional(),
   login: z.string().min(3).max(40),
   password: z.string().min(4).max(100).optional(),
   active: z.boolean().optional(),
@@ -42,7 +43,7 @@ export async function PUT(req: NextRequest) {
   const c = await saveCourier(parsed.data);
   return NextResponse.json({
     ok: true,
-    courier: { id: c.id, name: c.name, phone: c.phone, login: c.login, active: c.active },
+    courier: { id: c.id, name: c.name, phone: c.phone, whatsapp: c.whatsapp, login: c.login, active: c.active },
   });
 }
 

@@ -4,6 +4,7 @@ export interface Courier {
   id: string;
   name: string;
   phone: string;
+  whatsapp?: string;
   login: string;
   passwordHash: string;
   active: boolean;

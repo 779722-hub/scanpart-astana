@@ -7,11 +7,12 @@ interface Courier {
   id: string;
   name: string;
   phone: string;
+  whatsapp?: string;
   login: string;
   active: boolean;
 }
-type Draft = { id?: string; name: string; phone: string; login: string; password: string; active: boolean };
-const empty: Draft = { name: "", phone: "", login: "", password: "", active: true };
+type Draft = { id?: string; name: string; phone: string; whatsapp: string; login: string; password: string; active: boolean };
+const empty: Draft = { name: "", phone: "", whatsapp: "", login: "", password: "", active: true };
 
 export function TabCouriers() {
   const [rows, setRows] = useState<Courier[] | null>(null);
@@ -37,6 +38,7 @@ export function TabCouriers() {
           id: draft.id,
           name: draft.name,
           phone: draft.phone,
+          whatsapp: draft.whatsapp || undefined,
           login: draft.login,
           password: draft.password || undefined,
           active: draft.active,
@@ -105,9 +107,9 @@ export function TabCouriers() {
             </div>
           </div>
           <div className="flex gap-2">
-            {c.phone && (
+            {(c.whatsapp || c.phone) && (
               <a
-                href={`https://wa.me/${c.phone.replace(/\D/g, "")}`}
+                href={`https://wa.me/${(c.whatsapp || c.phone).replace(/\D/g, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary !px-3 !py-2 text-sm text-emerald-600"
@@ -124,7 +126,7 @@ export function TabCouriers() {
             </button>
             <button
               className="btn-secondary !px-3 !py-2 text-sm"
-              onClick={() => setDraft({ id: c.id, name: c.name, phone: c.phone, login: c.login, password: "", active: c.active })}
+              onClick={() => setDraft({ id: c.id, name: c.name, phone: c.phone, whatsapp: c.whatsapp ?? "", login: c.login, password: "", active: c.active })}
             >
               Изменить
             </button>
@@ -146,6 +148,10 @@ export function TabCouriers() {
             <div>
               <label className="label">Телефон</label>
               <input className="input" inputMode="tel" placeholder="+77051112233" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">WhatsApp <span className="text-ink-mute dark:text-paper-mute">(пусто = как телефон)</span></label>
+              <input className="input" inputMode="tel" placeholder="+77051112233" value={draft.whatsapp} onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} />
             </div>
             <div>
               <label className="label">Логин</label>
