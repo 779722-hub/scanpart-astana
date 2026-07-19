@@ -16,7 +16,7 @@ const FIELDS: {
   key: string;
   label: string;
   hint?: string;
-  kind?: "number" | "text" | "select";
+  kind?: "number" | "text" | "select" | "textarea";
   options?: { v: string; l: string }[];
   def?: string;
 }[] = [
@@ -34,6 +34,12 @@ const FIELDS: {
   { key: "photo_size_shatem", label: "Размер фото Shate-M при открытии, px", hint: "по умолч. 400 (низкое разрешение — мельче, чтобы не мылилось)", kind: "number" },
   { key: "sale_enabled", label: "Раздел «Распродажа» (скидочные товары Астаны)", kind: "select", options: YESNO_OPTIONS, def: "off" },
   { key: "sale_markup_percent", label: "Наценка для распродажи, %", hint: "пусто = как общая наценка", kind: "number" },
+  {
+    key: "footer_links",
+    label: "Ссылки в подвале — колонка «Информация»",
+    hint: "По одной на строку: «Название | ссылка». Напр. «Доставка курьерам | /ru/courier» или «Instagram | https://instagram.com/…». Пусто — колонка не показывается.",
+    kind: "textarea",
+  },
   { key: "express_delivery_price", label: "Стоимость экспресс-доставки, ₸", kind: "number" },
   { key: "express_hours", label: "Часы работы экспресс-доставки" },
   { key: "pickup_address", label: "Адрес самовывоза / офиса (куда курьер везёт самовывоз)" },
@@ -279,7 +285,7 @@ export function TabSettings() {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FIELDS.map((f) => (
-            <div key={f.key} className={f.kind === "text" || !f.kind ? "sm:col-span-2" : ""}>
+            <div key={f.key} className={f.kind === "text" || f.kind === "textarea" || !f.kind ? "sm:col-span-2" : ""}>
               <label className="label">{f.label}</label>
               {f.kind === "select" ? (
                 <select
@@ -291,6 +297,12 @@ export function TabSettings() {
                     <option key={o.v} value={o.v}>{o.l}</option>
                   ))}
                 </select>
+              ) : f.kind === "textarea" ? (
+                <textarea
+                  className="input min-h-[120px] font-mono text-sm"
+                  value={draft[f.key] ?? ""}
+                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                />
               ) : (
                 <input
                   className="input"

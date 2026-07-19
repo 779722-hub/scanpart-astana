@@ -9,12 +9,22 @@ export async function SiteFooter() {
   const tb = await getTranslations("brand");
   const year = new Date().getFullYear();
 
-  const [saleOn, phone, wa, hours] = await Promise.all([
+  const [saleOn, phone, wa, hours, footerLinksRaw] = await Promise.all([
     getSetting("sale_enabled").then((v) => v === "on").catch(() => false),
     getSetting("manager_phone_display").catch(() => ""),
     getSetting("manager_whatsapp_e164").catch(() => ""),
     getSetting("express_hours").catch(() => ""),
+    getSetting("footer_links").catch(() => ""),
   ]);
+
+  // Доп. ссылки из админки: по строке «Название | ссылка».
+  const customLinks = (footerLinksRaw ?? "")
+    .split("\n")
+    .map((line) => {
+      const [label, href] = line.split("|").map((s) => s.trim());
+      return label && href ? { label, href } : null;
+    })
+    .filter((x): x is { label: string; href: string } => x !== null);
 
   const linkCls =
     "text-ink-mute transition hover:text-brand dark:text-paper-mute dark:hover:text-brand";
@@ -30,7 +40,7 @@ export async function SiteFooter() {
       </div>
 
       <div className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 lg:grid-cols-5">
           {/* Бренд */}
           <div className="col-span-2 sm:col-span-1">
             <div className="text-lg font-bold tracking-tight text-ink dark:text-paper">
@@ -86,6 +96,26 @@ export async function SiteFooter() {
               <li className="text-ink-mute dark:text-paper-mute">Астана</li>
             </ul>
           </nav>
+
+          {/* Доп. ссылки из админки. */}
+          {customLinks.length > 0 && (
+            <nav className="text-sm">
+              <div className={headCls}>Информация</div>
+              <ul className="space-y-2">
+                {customLinks.map((l) =>
+                  l.href.startsWith("http") ? (
+                    <li key={l.href}>
+                      <a href={l.href} target="_blank" rel="noreferrer" className={linkCls}>{l.label}</a>
+                    </li>
+                  ) : (
+                    <li key={l.href}>
+                      <Link href={l.href} className={linkCls}>{l.label}</Link>
+                    </li>
+                  )
+                )}
+              </ul>
+            </nav>
+          )}
         </div>
 
         <div className="mt-10 border-t border-paper-mute/60 pt-6 text-center text-sm text-ink-mute sm:text-left dark:border-ink-mute/60 dark:text-paper-mute">
