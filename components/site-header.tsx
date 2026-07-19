@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
-import { Car, ChevronRight, Tag } from "lucide-react";
+import { Car, ChevronRight } from "lucide-react";
 import { LocaleSwitcher } from "./locale-switcher";
 import { CartButton } from "./cart-button";
 import { AccountButton } from "./account-button";
@@ -8,7 +8,6 @@ import { BrandLink } from "./brand-link";
 import { getThemeMap, getImageSlot, imageAlt } from "@/lib/content";
 import { cldUrl } from "@/lib/cloudinary-url";
 import { getSession } from "@/lib/session";
-import { getSetting } from "@/lib/sheets/settings";
 
 export async function SiteHeader() {
   const locale = await getLocale();
@@ -23,7 +22,6 @@ export async function SiteHeader() {
   const session = await getSession();
   const vehicle = session.vehicle;
   const isCustomer = Boolean(session.customer);
-  const saleOn = (await getSetting("sale_enabled").catch(() => "off")) === "on";
   const vinHref = `/${locale}/search/vin`;
   const btnCls =
     "inline-flex min-h-[36px] flex-none items-center gap-1 rounded-2xl bg-brand px-3 py-1 text-xs font-semibold text-white transition hover:bg-brand-600 sm:min-h-0 sm:text-sm";
@@ -54,16 +52,6 @@ export async function SiteHeader() {
           <span className="hidden truncate sm:block sm:text-xl">{logoText}</span>
         </BrandLink>
         <div className="flex flex-none items-center gap-1 sm:gap-2">
-          {saleOn && (
-            <Link
-              href={`/${locale}/sale`}
-              title="Распродажа"
-              className="inline-flex items-center gap-1 rounded-2xl bg-brand/10 px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/20 sm:text-sm"
-            >
-              <Tag className="h-4 w-4" />
-              <span className="hidden sm:inline">Распродажа</span>
-            </Link>
-          )}
           <LocaleSwitcher />
           <CartButton />
           <AccountButton signedIn={isCustomer} />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Phone } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSetting } from "@/lib/sheets/settings";
 
@@ -54,7 +55,7 @@ export async function SiteFooter() {
             <ul className="space-y-2">
               <li><Link href={`/${locale}/info`} className={linkCls}>{t("btnInfo")}</Link></li>
               {saleOn && (
-                <li><Link href={`/${locale}/sale`} className="font-semibold text-brand transition hover:text-brand-600">Распродажа</Link></li>
+                <li><Link href={`/${locale}/sale`} className={linkCls}>Распродажа</Link></li>
               )}
               <li><Link href={`/${locale}/cart`} className={linkCls}>Корзина</Link></li>
             </ul>
@@ -65,7 +66,14 @@ export async function SiteFooter() {
             <div className={headCls}>Контакты</div>
             <ul className="space-y-2">
               {phone && (
-                <li><a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className={linkCls}>{phone}</a></li>
+                <li>
+                  <a
+                    href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-paper-mute px-3 py-1.5 text-ink-mute transition hover:border-ink-mute hover:text-ink dark:border-ink-mute dark:text-paper-mute dark:hover:text-paper"
+                  >
+                    <Phone className="h-3.5 w-3.5" /> Позвонить
+                  </a>
+                </li>
               )}
               {wa && (
                 <li>
