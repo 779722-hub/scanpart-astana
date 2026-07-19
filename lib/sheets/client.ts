@@ -759,11 +759,14 @@ export async function readCourierLocations(): Promise<CourierLocation[]> {
     spreadsheetId: spreadsheetId(),
     range: `${COURIER_LOC_SHEET}!A1:D`,
   });
+  // Локаль таблицы пишет дробную часть через запятую («51,1345»), а Number()
+  // такое не парсит → координаты терялись. Меняем запятую на точку.
+  const num = (v: unknown) => Number(String(v ?? "").trim().replace(",", "."));
   return (data.values ?? [])
     .map((r) => ({
       courierId: String(r[0] ?? "").trim(),
-      lat: Number(r[1]),
-      lng: Number(r[2]),
+      lat: num(r[1]),
+      lng: num(r[2]),
       updatedAt: String(r[3] ?? ""),
     }))
     .filter((l) => l.courierId && Number.isFinite(l.lat) && Number.isFinite(l.lng));
