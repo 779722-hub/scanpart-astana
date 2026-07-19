@@ -96,6 +96,16 @@ export default async function InfoPage({
         ))}
       </div>
 
+      {/* Дисклеймер о точности — редактируется в CMS (info.disclaimer*). */}
+      <div className="mt-8 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:p-5 dark:border-amber-700/50 dark:bg-amber-900/15">
+        <div className="font-semibold text-amber-900 dark:text-amber-100">
+          {t("disclaimerTitle")}
+        </div>
+        <p className="mt-1 text-pretty text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+          {t("disclaimerBody")}
+        </p>
+      </div>
+
       <div className="mt-10 flex flex-col gap-3 sm:flex-row">
         <Link href={`/${locale}/search/vin`} className="btn-primary">
           {t("ctaVin")}

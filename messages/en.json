@@ -140,6 +140,8 @@
   "info": {
     "title": "How the service works",
     "intro": "Tell us your car and we show what actually fits it. Original and analogs in one list, with price and stock at our warehouse in Astana. No phone calls, no «send us a photo of the part».",
+    "disclaimerTitle": "Part-matching accuracy is the buyer's responsibility",
+    "disclaimerBody": "We match parts using the most accurate auto-parts catalogue, but very rarely part numbers can be updated or overlap. Please double-check the part number by your car's VIN or in catalogues before ordering — it will save your time.",
     "ctaVin": "Find by VIN",
     "s1_title": "Four ways to find a part",
     "s1_i1_title": "By VIN — the most precise way",
