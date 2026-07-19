@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
-  Image as ImageIcon,
   Palette,
   Settings,
   Package,
@@ -15,7 +14,6 @@ import {
   ClipboardList,
   Warehouse,
   Truck,
-  Bike,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -37,7 +35,6 @@ import { TabSearchLog } from "./tab-search-log";
 type TabKey =
   | "dashboard"
   | "content"
-  | "images"
   | "theme"
   | "settings"
   | "aliases"
@@ -46,7 +43,6 @@ type TabKey =
   | "customers"
   | "warehouses"
   | "deliveries"
-  | "couriers"
   | "users";
 
 interface TabDef {
@@ -61,10 +57,8 @@ const TABS: TabDef[] = [
   { key: "orders", label: "Заказы", Icon: Package },
   { key: "customers", label: "Клиенты", Icon: Contact },
   { key: "deliveries", label: "Доставки", Icon: Truck },
-  { key: "couriers", label: "Курьеры", Icon: Bike },
   { key: "warehouses", label: "Локации", Icon: Warehouse },
   { key: "content", label: "Контент", Icon: FileText },
-  { key: "images", label: "Картинки", Icon: ImageIcon },
   { key: "theme", label: "Дизайн", Icon: Palette },
   { key: "aliases", label: "Словарь поиска", Icon: BookOpen },
   { key: "search-log", label: "Что искали", Icon: ClipboardList },
@@ -138,8 +132,13 @@ export function AdminShell({
           <TabDashboard onOpenOrders={() => setTab("orders")} />
         )}
         {tab === "content" && <TabContent />}
-        {tab === "images" && <TabImages />}
-        {tab === "theme" && <TabTheme />}
+        {/* «Картинки» переехали сюда — управление изображениями логичнее в «Дизайне». */}
+        {tab === "theme" && (
+          <div className="space-y-4">
+            <TabTheme />
+            <TabImages />
+          </div>
+        )}
         {tab === "settings" && <TabSettings />}
         {tab === "aliases" && <TabAliases />}
         {tab === "search-log" && <TabSearchLog />}
@@ -147,9 +146,23 @@ export function AdminShell({
         {tab === "customers" && <TabCustomers />}
         {tab === "warehouses" && <TabWarehouses />}
         {tab === "deliveries" && <TabDeliveries />}
-        {tab === "couriers" && <TabCouriers />}
+        {/* «Курьеры» переехали в «Доступы»: доступ менеджеров и доступ курьеров —
+            в одном месте, но разделены. */}
         {tab === "users" && user.role === "owner" && (
-          <TabUsers currentEmail={user.email} />
+          <div className="space-y-6">
+            <div>
+              <div className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-mute dark:text-paper-mute">
+                Менеджеры и владельцы
+              </div>
+              <TabUsers currentEmail={user.email} />
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-mute dark:text-paper-mute">
+                Курьеры
+              </div>
+              <TabCouriers />
+            </div>
+          </div>
         )}
       </div>
     </div>
