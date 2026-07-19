@@ -23,7 +23,7 @@ interface Delivery {
   deliveredAt: string;
 }
 interface Courier { id: string; name: string }
-interface Warehouse { id: string; name: string; lat: number | null; lng: number | null; sourceCode: string; color: string }
+interface Warehouse { id: string; name: string; address: string; lat: number | null; lng: number | null; sourceCode: string; color: string; pickupMinutes: number }
 interface OrderItem {
   rowNumber: number;
   clientName: string;
@@ -78,6 +78,21 @@ const STATUS_COLOR: Record<DeliveryStatus, string> = {
 function etaClock(min: number): string {
   const d = new Date(Date.now() + min * 60000);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Ориентировочный расчёт цепочки маршрута для карточки доставки. Средняя
+// городская скорость 22 км/ч уже закладывает пробки; коэффициент 1.35
+// переводит прямую (Haversine) в примерную длину по дорогам.
+const CITY_SPEED_KMH = 22;
+const ROAD_FACTOR = 1.35;
+const R_KM = 6371;
+function havKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R_KM * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 export function TabDeliveries() {
@@ -185,6 +200,16 @@ export function TabDeliveries() {
     const m = new Map(warehouses.map((w) => [w.id, w.name]));
     return (id: string) => m.get(id) || id;
   }, [warehouses]);
+
+  const whById = useMemo(() => {
+    const m = new Map(warehouses.map((w) => [w.id, w]));
+    return (id: string) => m.get(id) || null;
+  }, [warehouses]);
+
+  const liveById = useMemo(() => {
+    const m = new Map(live.map((c) => [c.id, c]));
+    return (id: string) => m.get(id) || null;
+  }, [live]);
 
   // We only operate in Astana — never plot a point outside the city, even if a
   // stale coordinate lingers in the sheet.
@@ -509,15 +534,35 @@ export function TabDeliveries() {
           <div className="text-sm">{d.items}</div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-ink-mute dark:text-paper-mute">
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{d.address || "нет адреса"}{d.lat == null && " (нет координат)"}</span>
-            <span>курьер: {d.courierId ? courierName(d.courierId) : "не назначен"}</span>
+            {d.courierId ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+                <Truck className="h-3 w-3" /> курьер: {courierName(d.courierId)}
+              </span>
+            ) : (
+              <span className="text-brand">курьер не назначен</span>
+            )}
             {d.warehouseIds.length > 0 && <span>склады: {d.warehouseIds.map(whName).join(", ")}</span>}
             <button
               onClick={() => suggest(d.id)}
               className="inline-flex items-center gap-1 rounded-xl border border-brand/40 px-2 py-1 font-semibold text-brand"
             >
-              <RouteIcon className="h-3.5 w-3.5" /> подобрать курьера
+              <RouteIcon className="h-3.5 w-3.5" /> {d.courierId ? "Поменять курьера" : "Подобрать курьера"}
             </button>
           </div>
+
+          {/* Цепочка маршрута: курьер → склад(ы) → клиент (когда курьер назначен). */}
+          {d.courierId && (
+            <DeliveryChain
+              delivery={d}
+              warehouses={d.warehouseIds.map(whById).filter((w): w is Warehouse => w != null)}
+              courierLoc={(() => {
+                const lc = liveById(d.courierId);
+                return lc?.location && inAstana(lc.location.lat, lc.location.lng)
+                  ? { lat: lc.location.lat, lng: lc.location.lng }
+                  : null;
+              })()}
+            />
+          )}
 
           {suggestFor === d.id && (
             <div className="space-y-1 rounded-2xl bg-paper-soft px-3 py-2 dark:bg-ink-mute">
@@ -683,6 +728,100 @@ function MapLegend({
         <span key={w.id} className="inline-flex items-center gap-1">{swatch(w.color || "#F59E0B")} {w.name}</span>
       ))}
       {office && <span className="inline-flex items-center gap-1">{swatch(office.color || "#16A34A")} офис</span>}
+    </div>
+  );
+}
+
+/**
+ * Цепочка маршрута под карточкой доставки: курьер → склад(ы) → клиент, с
+ * ориентировочным расстоянием и временем на каждом отрезке (с учётом пробок)
+ * и временем получения запчастей на складе. Считается на клиенте по прямой ×
+ * дорожный коэффициент — это оценка «на глаз», не навигатор.
+ */
+function DeliveryChain({
+  delivery,
+  warehouses,
+  courierLoc,
+}: {
+  delivery: Delivery;
+  warehouses: Warehouse[];
+  courierLoc: { lat: number; lng: number } | null;
+}) {
+  type Node = {
+    kind: "courier" | "pickup" | "dropoff";
+    title: string;
+    sub?: string;
+    lat: number | null;
+    lng: number | null;
+    waitMin?: number;
+  };
+  const nodes: Node[] = [
+    { kind: "courier", title: "Курьер", sub: courierLoc ? "текущее местоположение" : "нет геопозиции", lat: courierLoc?.lat ?? null, lng: courierLoc?.lng ?? null },
+    ...warehouses.map<Node>((w) => ({ kind: "pickup", title: w.name, sub: w.address || undefined, lat: w.lat, lng: w.lng, waitMin: w.pickupMinutes })),
+    { kind: "dropoff", title: delivery.customerName || "Клиент", sub: delivery.address || undefined, lat: delivery.lat, lng: delivery.lng, waitMin: 5 },
+  ];
+
+  // Отрезки считаем от последнего узла, у которого есть координаты.
+  let prev: { lat: number; lng: number } | null = null;
+  let totalKm = 0;
+  let totalMin = 0;
+  const legs = nodes.map((n) => {
+    let legKm: number | null = null;
+    let legMin: number | null = null;
+    if (n.lat != null && n.lng != null) {
+      if (prev) {
+        legKm = havKm(prev, { lat: n.lat, lng: n.lng }) * ROAD_FACTOR;
+        legMin = (legKm / CITY_SPEED_KMH) * 60;
+        totalKm += legKm;
+        totalMin += legMin;
+      }
+      prev = { lat: n.lat, lng: n.lng };
+    }
+    if (n.waitMin) totalMin += n.waitMin;
+    return { legKm, legMin };
+  });
+
+  const routable = nodes.every((n) => n.lat != null && n.lng != null);
+
+  return (
+    <div className="rounded-2xl bg-paper-soft px-3 py-2.5 dark:bg-ink-mute">
+      <div className="space-y-0">
+        {nodes.map((n, i) => {
+          const leg = legs[i];
+          const dotColor =
+            n.kind === "courier" ? "bg-brand" : n.kind === "pickup" ? "bg-amber-500" : "bg-blue-600";
+          return (
+            <div key={i}>
+              {i > 0 && (
+                <div className="ml-[5px] flex items-center gap-2 border-l-2 border-dashed border-paper-mute py-1 pl-4 text-xs text-ink-mute dark:border-ink dark:text-paper-mute">
+                  {leg.legKm != null ? (
+                    <span>↓ ≈ {leg.legKm.toFixed(1)} км · {Math.max(1, Math.round(leg.legMin!))} мин</span>
+                  ) : (
+                    <span className="text-amber-600">↓ нет координат — отрезок не посчитать</span>
+                  )}
+                </div>
+              )}
+              <div className="flex items-start gap-2.5">
+                <span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${dotColor}`} />
+                <div className="min-w-0 leading-tight">
+                  <div className="text-sm font-semibold">
+                    {n.title}
+                    {n.waitMin && n.kind === "pickup" ? (
+                      <span className="ml-2 font-normal text-ink-mute dark:text-paper-mute">· на складе ~{n.waitMin} мин</span>
+                    ) : null}
+                  </div>
+                  {n.sub && <div className="truncate text-xs text-ink-mute dark:text-paper-mute">{n.sub}</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {routable && (
+        <div className="mt-2 border-t border-paper-mute/60 pt-2 text-right text-xs font-semibold dark:border-ink/60">
+          Итого ≈ {totalKm.toFixed(1)} км · ~{Math.round(totalMin)} мин · прибытие ~{etaClock(totalMin)} <span className="font-normal text-ink-mute dark:text-paper-mute">(с учётом пробок и склада)</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -154,6 +154,9 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
         const leaflet = mod.default;
         leafletRef.current = leaflet;
         const map = leaflet.map(containerRef.current).setView([ASTANA.lat, ASTANA.lng], ASTANA.zoom);
+        // Мы работаем в Казахстане — убираем украинский флажок из стандартной
+        // подписи Leaflet, ставим казахстанский.
+        map.attributionControl.setPrefix('🇰🇿 Leaflet');
         leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "© OpenStreetMap",
           maxZoom: 19,
