@@ -196,8 +196,10 @@ export function AdminShell({ locale, user }: { locale: string; user: AuthedUser 
         </div>
       )}
 
-      {/* Основная область — на всю ширину */}
-      <main className="min-w-0 flex-1">
+      {/* Основная область — на всю ширину. overflow-x-clip не даёт широкому
+          контенту вылезать за экран на телефоне (сайдбар — сосед, его sticky
+          это не ломает). */}
+      <main className="min-w-0 flex-1 overflow-x-clip">
         <header className="mb-4 flex items-center gap-3">
           <button
             className="rounded-xl border border-paper-mute p-2 lg:hidden dark:border-ink-mute"
@@ -213,9 +215,13 @@ export function AdminShell({ locale, user }: { locale: string; user: AuthedUser 
 
         {/* Заказы и доставки на одной странице: на широких экранах — рядом. */}
         {tab === "operations" && (
-          <div className="grid items-start gap-4 min-[1600px]:grid-cols-2">
-            <TabOrders />
-            <TabDeliveries />
+          <div className="grid min-w-0 items-start gap-4 min-[1600px]:grid-cols-2">
+            <div className="min-w-0">
+              <TabOrders />
+            </div>
+            <div className="min-w-0">
+              <TabDeliveries />
+            </div>
           </div>
         )}
 
