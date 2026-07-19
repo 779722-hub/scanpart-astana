@@ -16,7 +16,7 @@ export interface CourierPlan {
   sorted: Delivery[]; // active deliveries in the order they should be done
 }
 
-const STATUS_RANK: Record<string, number> = { en_route: 0, picking: 1, assigned: 2 };
+const STATUS_RANK: Record<string, number> = { en_route: 0, picking: 1, accepted: 2, assigned: 3 };
 
 /**
  * @param active   the courier's active deliveries (assigned/picking/en_route)

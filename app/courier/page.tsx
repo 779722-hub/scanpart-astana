@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DeliveryMap } from "@/components/admin/delivery-map";
+import { DeliveryMap, type MarkerShape } from "@/components/admin/delivery-map";
 
 interface Courier {
   id: string;
   name: string;
   phone: string;
 }
+interface MarkerCfg { courierColor: string; courierShape: MarkerShape }
 type DeliveryStatus =
   | "assigned"
+  | "accepted"
   | "picking"
   | "en_route"
   | "delivered"
@@ -47,7 +49,8 @@ interface RoutePlan {
 }
 
 const STATUS_RU: Record<DeliveryStatus, string> = {
-  assigned: "Назначена",
+  assigned: "Новая — примите",
+  accepted: "Принял, выдвигаюсь",
   picking: "Забираю со склада",
   en_route: "В пути к клиенту",
   delivered: "Вручена",
@@ -110,6 +113,7 @@ export default function CourierPage() {
   const [geo, setGeo] = useState<{ status: "idle" | "ok" | "denied" | "error"; at: string }>({ status: "idle", at: "" });
   const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapFull, setMapFull] = useState(false);
+  const [markers, setMarkers] = useState<MarkerCfg>({ courierColor: "#E10600", courierShape: "circle" });
 
   // Мои рейсы (выполненные доставки) + заработок.
   interface Trip { date: string; address: string; customerName: string; items: string }
@@ -151,8 +155,9 @@ export default function CourierPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await apiFetch<{ courier: Courier }>("/api/courier/me");
+        const r = await apiFetch<{ courier: Courier; markers?: MarkerCfg }>("/api/courier/me");
         setCourier(r.courier);
+        if (r.markers) setMarkers(r.markers);
       } catch {
         setCourier(null);
       } finally {
@@ -278,7 +283,7 @@ export default function CourierPage() {
 
   async function act(
     d: Delivery,
-    action: "start" | "enroute" | "deliver"
+    action: "accept" | "start" | "enroute" | "deliver"
   ) {
     try {
       const res = await apiFetch<{
@@ -375,7 +380,9 @@ export default function CourierPage() {
   const mapDrops = stopsWithGeo
     .filter((s) => s.kind === "dropoff")
     .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }));
-  const mapMe = myPos ? [{ id: "me", name: "Вы", lat: myPos.lat, lng: myPos.lng, stale: false }] : [];
+  // Метка курьера как на карте владельца: цвет/форма из настроек, серым когда
+  // GPS не подтверждён (stale=true → карта красит в серый).
+  const mapMe = myPos ? [{ id: "me", name: "Вы", lat: myPos.lat, lng: myPos.lng, stale: geo.status !== "ok" }] : [];
   const nextStop = route && route.stops.length > 0 ? route.stops[0] : null;
   const showMap = mapMe.length + mapPickups.length + mapDrops.length > 0;
 
@@ -494,6 +501,8 @@ export default function CourierPage() {
             warehouses={mapPickups}
             drops={mapDrops}
             routeGeometry={route?.geometry ?? null}
+            courierColor={markers.courierColor}
+            courierShape={markers.courierShape}
             className="h-72 w-full overflow-hidden rounded-2xl"
           />
         </div>
@@ -518,6 +527,8 @@ export default function CourierPage() {
             warehouses={mapPickups}
             drops={mapDrops}
             routeGeometry={route?.geometry ?? null}
+            courierColor={markers.courierColor}
+            courierShape={markers.courierShape}
             className="w-full flex-1"
           />
         </div>
@@ -583,9 +594,17 @@ export default function CourierPage() {
               {d.status === "assigned" && (
                 <button
                   className="btn-primary grow !px-4 !py-2 text-sm"
+                  onClick={() => act(d, "accept")}
+                >
+                  Принять доставку
+                </button>
+              )}
+              {d.status === "accepted" && (
+                <button
+                  className="btn-primary grow !px-4 !py-2 text-sm"
                   onClick={() => act(d, "start")}
                 >
-                  Забрать со склада
+                  Забрал со склада
                 </button>
               )}
               {d.status === "picking" && (

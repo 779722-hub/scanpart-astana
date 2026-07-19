@@ -11,7 +11,7 @@ import { buildRoute, type RouteDelivery, type RouteWarehouse } from "@/lib/deliv
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ACTIVE = new Set(["assigned", "picking", "en_route"]);
+const ACTIVE = new Set(["assigned", "accepted", "picking", "en_route"]);
 
 /**
  * Recommend which courier should take a delivery: the one whose route grows the

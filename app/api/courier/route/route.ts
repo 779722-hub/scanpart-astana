@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const active = allDeliveries.filter(
     (d) =>
       d.courierId === courier.id &&
-      (d.status === "assigned" || d.status === "picking" || d.status === "en_route")
+      (d.status === "assigned" || d.status === "accepted" || d.status === "picking" || d.status === "en_route")
   );
 
   // Courier's live position from the app (?lat=&lng=).

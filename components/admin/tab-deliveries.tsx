@@ -77,11 +77,12 @@ const emptyDraft: Draft = {
   items: "", warehouseIds: [], courierId: "",
 };
 
-const ACTIVE_STATUSES = new Set<DeliveryStatus>(["new", "assigned", "picking", "en_route"]);
+const ACTIVE_STATUSES = new Set<DeliveryStatus>(["new", "assigned", "accepted", "picking", "en_route"]);
 
 const STATUS_COLOR: Record<DeliveryStatus, string> = {
   new: "bg-paper-soft text-ink-mute dark:bg-ink-mute",
   assigned: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200",
+  accepted: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200",
   picking: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200",
   en_route: "bg-brand/10 text-brand",
   delivered: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",

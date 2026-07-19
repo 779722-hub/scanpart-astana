@@ -11,11 +11,12 @@ import { notifyDelivery } from "@/lib/delivery/notify-telegram";
 export const runtime = "nodejs";
 
 const schema = z.object({
-  action: z.enum(["start", "enroute", "deliver", "cancel"]),
+  action: z.enum(["accept", "start", "enroute", "deliver", "cancel"]),
   code: z.string().optional(),
 });
 
 const TARGET: Record<z.infer<typeof schema>["action"], DeliveryStatus> = {
+  accept: "accepted",
   start: "picking",
   enroute: "en_route",
   deliver: "delivered",

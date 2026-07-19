@@ -120,6 +120,10 @@ export async function geocodeAddress(
   // Город в запрос (через пробел, без запятой — Nominatim так надёжнее), если
   // менеджер его не указал.
   const withCity = ASTANA_RE.test(base) ? base : `Астана ${base}`;
+  // Без названия города: bounded-поиск и так ограничен Астаной, а лишний токен
+  // «Астана» иногда мешает Nominatim найти дом (эмпирически «проспект
+  // Республики 68» находится, а «Астана проспект Республики 68» — нет).
+  const cityStripped = withCity.replace(/^\s*(?:астан[аеуы]?|нур-?султан[ае]?|целиноград[ае]?)\s*/i, "").trim();
   // Улица без номера дома — запасной вариант, если точный дом не находится.
   const streetOnly = withCity.replace(/\s+\d+[а-я]?$/i, "").trim();
 
@@ -132,10 +136,9 @@ export async function geocodeAddress(
 
   // 2) Бесплатный Nominatim: точный адрес строго в Астане → он же без жёсткой
   // рамки → только улица. Первый результат внутри Астаны побеждает.
-  const attempts: Array<[string, boolean]> = [
-    [withCity, true],
-    [withCity, false],
-  ];
+  const attempts: Array<[string, boolean]> = [];
+  if (cityStripped && cityStripped !== withCity) attempts.push([cityStripped, true]);
+  attempts.push([withCity, true], [withCity, false]);
   if (streetOnly && streetOnly !== withCity) attempts.push([streetOnly, true]);
 
   for (const [query, bounded] of attempts) {

@@ -12,7 +12,7 @@ import { buildRoute } from "@/lib/delivery/route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ACTIVE = new Set(["assigned", "picking", "en_route"]);
+const ACTIVE = new Set(["assigned", "accepted", "picking", "en_route"]);
 
 export async function GET() {
   const guard = await requireAuth();

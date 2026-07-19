@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const active = deliveries.filter(
       (d) =>
         d.courierId === courierId &&
-        (d.status === "assigned" || d.status === "picking" || d.status === "en_route")
+        (d.status === "assigned" || d.status === "accepted" || d.status === "picking" || d.status === "en_route")
     );
     const loc = locations.find((l) => l.courierId === courierId);
     const start = loc && isInAstana(loc.lat, loc.lng) ? { lat: loc.lat, lng: loc.lng } : null;

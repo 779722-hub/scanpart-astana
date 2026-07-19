@@ -15,6 +15,7 @@ export interface Courier {
 export type DeliveryStatus =
   | "new" // created, no courier yet
   | "assigned" // courier assigned, not started
+  | "accepted" // courier accepted the job and is heading out (принял, выдвигается)
   | "picking" // collecting from warehouses
   | "en_route" // heading to the customer (handover code issued)
   | "delivered" // handed over + code confirmed
@@ -23,6 +24,7 @@ export type DeliveryStatus =
 export const DELIVERY_STATUSES: DeliveryStatus[] = [
   "new",
   "assigned",
+  "accepted",
   "picking",
   "en_route",
   "delivered",
@@ -32,6 +34,7 @@ export const DELIVERY_STATUSES: DeliveryStatus[] = [
 export const STATUS_LABEL_RU: Record<DeliveryStatus, string> = {
   new: "Новая",
   assigned: "Назначена",
+  accepted: "Принял, выдвигается",
   picking: "Забирает со склада",
   en_route: "В пути к клиенту",
   delivered: "Вручена",
@@ -41,7 +44,8 @@ export const STATUS_LABEL_RU: Record<DeliveryStatus, string> = {
 /** Allowed forward transitions the courier/manager may apply. */
 const NEXT: Record<DeliveryStatus, DeliveryStatus[]> = {
   new: ["assigned", "canceled"],
-  assigned: ["picking", "canceled"],
+  assigned: ["accepted", "canceled"],
+  accepted: ["picking", "canceled"],
   picking: ["en_route", "canceled"],
   en_route: ["delivered", "canceled"],
   delivered: [],
