@@ -85,24 +85,11 @@ export default async function HomePage({
     },
   ];
 
+  // Тексты редактируются в Админке → Контент (группа «Главная», ключи home.why*).
   const features = [
-    {
-      Icon: MapPin,
-      title: "100% наличие в Астане",
-      text: "Показываем то, что физически на полке — без обещаний доставки из других городов.",
-    },
-    {
-      Icon: Shield,
-      title: "По оригинальному номеру",
-      text: "Мы подберём проверенные аналоги от надёжных производителей.",
-    },
-    {
-      // Про экспресс-доставку рассказано ниже, рядом с самовывозом — здесь
-      // о том, ради чего сервис вообще нужен.
-      Icon: Sparkles,
-      title: "Автоматический поиск",
-      text: "Самый удобный подбор запчастей — без знания технических особенностей и каталогов.",
-    },
+    { Icon: MapPin, title: t("why1Title"), text: t("why1Body") },
+    { Icon: Shield, title: t("why2Title"), text: t("why2Body") },
+    { Icon: Sparkles, title: t("why3Title"), text: t("why3Body") },
   ];
 
   const steps = [
@@ -224,7 +211,7 @@ export default async function HomePage({
       {/* FEATURES */}
       <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Почему мы
+          {t("whyTitle")}
         </h2>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {features.map(({ Icon, title, text }) => (

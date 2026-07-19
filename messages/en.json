@@ -21,7 +21,14 @@
     "btnName": "By name",
     "btnNameDesc": "e.g. front brake pads",
     "btnInfo": "How it works",
-    "btnInfoDesc": "Service guide"
+    "btnInfoDesc": "Service guide",
+    "whyTitle": "Why us",
+    "why1Title": "In stock in Astana",
+    "why1Body": "We show what's physically on the shelf — no promises of delivery from other cities.",
+    "why2Title": "By the original number",
+    "why2Body": "We'll find proven analogues from reliable manufacturers.",
+    "why3Title": "Automatic search",
+    "why3Body": "The easiest way to find parts — no technical knowledge or catalogues required."
   },
   "vin": {
     "title": "Search by VIN",
