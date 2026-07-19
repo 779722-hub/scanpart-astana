@@ -111,6 +111,19 @@ export default function CourierPage() {
   const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapFull, setMapFull] = useState(false);
 
+  // Мои рейсы (выполненные доставки) + заработок.
+  interface Trip { date: string; address: string; customerName: string; items: string }
+  const [hist, setHist] = useState<{ trips: number; rate: number; earned: number; list: Trip[] } | null>(null);
+  const [histOpen, setHistOpen] = useState(false);
+  const loadHistory = useCallback(async () => {
+    try {
+      const j = await apiFetch<{ trips: number; rate: number; earned: number; list: Trip[] }>("/api/courier/history");
+      setHist(j);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const nowHm = () => new Date().toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
   // Post the current position immediately (on load, on each action, manually).
@@ -190,9 +203,10 @@ export default function CourierPage() {
   useEffect(() => {
     if (!courier) return;
     loadRoute();
+    loadHistory();
     const t = setInterval(() => loadRoute(true), 25000);
     return () => clearInterval(t);
-  }, [courier, loadRoute]);
+  }, [courier, loadRoute, loadHistory]);
 
   // Stream the courier's position to the backend (throttled to ~30s) while the
   // route view is open, so the manager sees them live.
@@ -281,6 +295,7 @@ export default function CourierPage() {
         alert("Код готов. Нажмите зелёную кнопку «Отправить код клиенту в WhatsApp».");
       }
       await loadRoute();
+      if (action === "deliver") await loadHistory();
     } catch (e) {
       const msg = (e as Error).message;
       alert(
@@ -620,6 +635,52 @@ export default function CourierPage() {
           </div>
         ))}
       </div>
+
+      {/* Мои рейсы — сколько выполнено и заработок, с адресами. */}
+      {hist && (
+        <div className="mt-5">
+          <button
+            onClick={() => setHistOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-2xl bg-paper-soft px-4 py-3 text-left dark:bg-ink-mute"
+          >
+            <span className="font-bold">
+              🧾 Мои рейсы: {hist.trips}
+              {hist.rate > 0 && (
+                <span className="ml-2 font-semibold text-emerald-600">
+                  · заработано {new Intl.NumberFormat("ru-RU").format(hist.earned)} ₸
+                </span>
+              )}
+            </span>
+            <span className="text-sm text-ink-mute dark:text-paper-mute">{histOpen ? "скрыть" : "показать"}</span>
+          </button>
+          {histOpen && (
+            <div className="mt-2 space-y-2">
+              {hist.rate > 0 && (
+                <div className="px-1 text-xs text-ink-mute dark:text-paper-mute">
+                  Ставка за рейс: {new Intl.NumberFormat("ru-RU").format(hist.rate)} ₸ · всего рейсов {hist.trips} ={" "}
+                  <b className="text-ink dark:text-paper">{new Intl.NumberFormat("ru-RU").format(hist.earned)} ₸</b>
+                </div>
+              )}
+              {hist.list.length === 0 ? (
+                <p className="px-1 text-sm text-ink-mute dark:text-paper-mute">Выполненных рейсов пока нет.</p>
+              ) : (
+                hist.list.map((t, i) => (
+                  <div key={i} className="rounded-xl border border-paper-mute px-3 py-2 text-sm dark:border-ink-mute">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{t.customerName || "—"}</span>
+                      <span className="whitespace-nowrap text-xs text-ink-mute dark:text-paper-mute">
+                        {t.date ? new Date(t.date).toLocaleDateString("ru", { day: "2-digit", month: "2-digit", year: "2-digit" }) : ""}
+                      </span>
+                    </div>
+                    {t.address && <div className="text-xs text-ink-mute dark:text-paper-mute">📍 {t.address}</div>}
+                    {t.items && <div className="truncate text-xs text-ink-mute dark:text-paper-mute">{t.items}</div>}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }

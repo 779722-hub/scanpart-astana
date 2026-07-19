@@ -56,6 +56,7 @@ interface Pin {
   size: number;
   permanent: boolean; // keep the label always visible (warehouses / office)
   shape: MarkerShape;
+  z: number; // higher = drawn on top (курьер должен быть поверх складов/офиса)
 }
 
 function buildPins(props: DeliveryMapProps): Pin[] {
@@ -64,18 +65,19 @@ function buildPins(props: DeliveryMapProps): Pin[] {
   const clientColor = props.clientColor || BLUE;
   const clientShape = props.clientShape || "circle";
   const pins: Pin[] = [];
-  for (const c of props.couriers) {
-    // Courier is the point managers look for → big, always labelled.
-    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : courierColor, hint: "Курьер", size: 22, permanent: true, shape: courierShape });
-  }
   for (const w of props.warehouses) {
-    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true, shape: "circle" });
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true, shape: "circle", z: 200 });
   }
   if (props.office) {
-    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true, shape: "circle" });
+    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true, shape: "circle", z: 200 });
   }
   for (const d of props.drops) {
-    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: d.color || clientColor, hint: "Клиент", size: 16, permanent: false, shape: clientShape });
+    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: d.color || clientColor, hint: "Клиент", size: 16, permanent: false, shape: clientShape, z: 300 });
+  }
+  for (const c of props.couriers) {
+    // Courier is the point managers look for → big, always labelled, и всегда
+    // ПОВЕРХ склада/офиса/клиента (иначе метка склада перекрывает курьера).
+    pins.push({ lat: c.lat, lng: c.lng, name: c.name, color: c.stale ? GRAY : courierColor, hint: "Курьер", size: 22, permanent: true, shape: courierShape, z: 1000 });
   }
   return pins;
 }
@@ -218,7 +220,7 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
         iconAnchor: [half, half],
         html: markerHtml(p.color, p.size, p.shape),
       });
-      const marker = leaflet.marker([p.lat, p.lng], { icon });
+      const marker = leaflet.marker([p.lat, p.lng], { icon, zIndexOffset: p.z });
       if (p.permanent) {
         marker.bindTooltip(p.name, { permanent: true, direction: "top", offset: [0, -half], className: "font-semibold" });
       } else {
@@ -251,6 +253,7 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
       const marker = new mapgl.Marker(map, {
         coordinates: [p.lng, p.lat],
         label: { text: `${p.hint}: ${p.name}` },
+        zIndex: p.z,
       });
       gisObjectsRef.current.push(marker);
     }

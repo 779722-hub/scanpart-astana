@@ -672,8 +672,12 @@ export async function readCouriers(): Promise<Courier[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${COURIERS_SHEET}!A2:H`,
+    range: `${COURIERS_SHEET}!A2:I`,
   });
+  const rate = (v: unknown) => {
+    const n = Number(String(v ?? "").trim().replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  };
   return (data.values ?? [])
     .map((r) => ({
       id: String(r[0] ?? "").trim(),
@@ -683,6 +687,7 @@ export async function readCouriers(): Promise<Courier[]> {
       passwordHash: String(r[4] ?? ""),
       active: String(r[5] ?? "").toLowerCase() !== "false",
       whatsapp: String(r[7] ?? "").trim(),
+      ratePerTrip: rate(r[8]),
     }))
     .filter((c) => c.id);
 }
@@ -706,11 +711,11 @@ export async function upsertCourier(c: Courier): Promise<void> {
   if (rowIdx === -1) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: id,
-      range: `${COURIERS_SHEET}!A:H`,
+      range: `${COURIERS_SHEET}!A:I`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [
-          [c.id, c.name, c.phone, c.login, c.passwordHash, c.active ? "true" : "false", new Date().toISOString(), c.whatsapp ?? ""],
+          [c.id, c.name, c.phone, c.login, c.passwordHash, c.active ? "true" : "false", new Date().toISOString(), c.whatsapp ?? "", String(c.ratePerTrip ?? 0)],
         ],
       },
     });
@@ -723,6 +728,7 @@ export async function upsertCourier(c: Courier): Promise<void> {
     { range: `${COURIERS_SHEET}!D${rowNumber}`, values: [[c.login]] },
     { range: `${COURIERS_SHEET}!F${rowNumber}`, values: [[c.active ? "true" : "false"]] },
     { range: `${COURIERS_SHEET}!H${rowNumber}`, values: [[c.whatsapp ?? ""]] },
+    { range: `${COURIERS_SHEET}!I${rowNumber}`, values: [[String(c.ratePerTrip ?? 0)]] },
   ];
   if (c.passwordHash) updates.push({ range: `${COURIERS_SHEET}!E${rowNumber}`, values: [[c.passwordHash]] });
   await sheets.spreadsheets.values.batchUpdate({
@@ -949,7 +955,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "color",
     "markup",
   ],
-  Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at", "whatsapp"],
+  Couriers: ["id", "name", "phone", "login", "password_hash", "active", "created_at", "whatsapp", "rate_per_trip"],
   CourierLocations: ["courier_id", "lat", "lng", "updated_at"],
   Deliveries: [
     "id",

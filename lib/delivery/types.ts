@@ -8,6 +8,8 @@ export interface Courier {
   login: string;
   passwordHash: string;
   active: boolean;
+  /** Ставка за один выполненный рейс (доставку), ₸. 0 = не задана. */
+  ratePerTrip: number;
 }
 
 export type DeliveryStatus =

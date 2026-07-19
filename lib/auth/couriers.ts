@@ -39,6 +39,7 @@ export async function saveCourier(input: {
   login: string;
   password?: string;
   active?: boolean;
+  ratePerTrip?: number;
 }): Promise<Courier> {
   const id = input.id?.trim() || slugCourierId(input.name, input.login);
   const passwordHash = input.password ? await hash(input.password) : "";
@@ -50,6 +51,7 @@ export async function saveCourier(input: {
     login: input.login.trim(),
     passwordHash,
     active: input.active ?? true,
+    ratePerTrip: Number.isFinite(input.ratePerTrip) ? Math.max(0, Math.round(input.ratePerTrip as number)) : 0,
   };
   await upsertCourier(courier);
   return courier;
