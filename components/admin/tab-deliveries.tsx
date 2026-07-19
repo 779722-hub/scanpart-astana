@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, CheckCircle2, Maximize2, X, ClipboardList } from "lucide-react";
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
@@ -166,6 +166,38 @@ export function TabDeliveries() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Автоопределение координат «откуда/куда» один раз при открытии вкладки:
+  // геокодим офис и доставки без координат, чтобы маршрут строился сам, без
+  // ручных кнопок. «Где сейчас» (курьер) приходит с GPS телефона.
+  const healedRef = useRef(false);
+  useEffect(() => {
+    if (healedRef.current || !rows) return;
+    healedRef.current = true;
+    (async () => {
+      let changed = false;
+      if (office?.address && (office.lat == null || office.lng == null)) {
+        const g = await fetch(`/api/admin/geocode?q=${encodeURIComponent(office.address)}`)
+          .then((r) => r.json())
+          .catch(() => null);
+        if (g?.ok) {
+          await fetch("/api/admin/settings", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ patch: { office_lat: String(g.lat), office_lng: String(g.lng) } }),
+          }).catch(() => {});
+          changed = true;
+        }
+      }
+      const needGeo = rows.some((d) => ACTIVE_STATUSES.has(d.status) && d.address.trim() && d.lat == null);
+      if (needGeo) {
+        await fetch("/api/admin/deliveries/regeocode", { method: "POST" }).catch(() => {});
+        changed = true;
+      }
+      if (changed) await refresh();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, office]);
 
   // Poll live courier positions; refresh the focused route alongside so its
   // road line follows the courier as they move.

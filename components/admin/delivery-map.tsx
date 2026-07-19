@@ -84,8 +84,9 @@ function buildPins(props: DeliveryMapProps): Pin[] {
 function markerHtml(color: string, size: number, shape: MarkerShape): string {
   const border = "border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)";
   if (shape === "triangle") {
-    // clip-path triangle; drop-shadow gives the outline.
-    return `<div style="width:${size}px;height:${size}px;background:${color};clip-path:polygon(50% 0,100% 100%,0 100%);filter:drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px rgba(0,0,0,.4))"></div>`;
+    // SVG-треугольник с белой обводкой и тёмной тенью — как у кружков, иначе
+    // жёлтый треугольник теряется на карте.
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display:block;filter:drop-shadow(0 0 1px rgba(0,0,0,.55))"><polygon points="12,2.5 22,21.5 2,21.5" fill="${color}" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>`;
   }
   const radius = shape === "circle" ? "50%" : "3px";
   const transform = shape === "diamond" ? "transform:rotate(45deg);" : "";

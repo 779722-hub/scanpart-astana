@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck, Plus } from "lucide-react";
+import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck, Plus, Car } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
 
 const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
@@ -372,6 +372,23 @@ export function TabOrders() {
                     {g.phone} · {g.orderType}
                     {g.address ? ` · ${g.address}` : ""}
                   </div>
+                  {/* Авто клиента и VIN — рядом с именем/телефоном, вся
+                      информация о клиенте в одном месте. */}
+                  {(g.vehicle || g.vin) && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm [overflow-wrap:anywhere]">
+                      <span className="inline-flex items-center gap-1 font-semibold">
+                        <Car className="h-4 w-4 flex-none text-brand" /> {g.vehicle || "Авто"}
+                      </span>
+                      {g.vin && (
+                        <span className="text-ink-mute dark:text-paper-mute">
+                          VIN{" "}
+                          <code className="rounded bg-paper-soft px-1 font-mono text-ink dark:bg-ink dark:text-paper">
+                            {g.vin}
+                          </code>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <select
                   className="input !w-auto !py-2 text-sm"
@@ -534,13 +551,6 @@ export function TabOrders() {
                       Добавить
                     </button>
                   </div>
-                </div>
-              )}
-
-              {g.vin && (
-                <div className="mt-2 text-xs text-ink-mute dark:text-paper-mute [overflow-wrap:anywhere]">
-                  Авто: {g.vehicle} · VIN{" "}
-                  <code className="rounded bg-paper-soft px-1 font-mono text-ink dark:bg-ink dark:text-paper">{g.vin}</code>
                 </div>
               )}
 
