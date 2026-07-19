@@ -22,7 +22,7 @@ interface SaleItem {
 
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(n);
 
-type Sort = "make" | "price-asc" | "price-desc" | "discount";
+type Sort = "make" | "price-asc" | "price-desc";
 
 export function SaleList({ locale }: { locale: string }) {
   const cart = useCart();
@@ -65,7 +65,6 @@ export function SaleList({ locale }: { locale: string }) {
   const sortOptions: { v: Sort; l: string }[] = useMemo(
     () => [
       { v: "make", l: "По марке авто" },
-      { v: "discount", l: "По скидке" },
       { v: "price-asc", l: "Сначала дешёвые" },
       { v: "price-desc", l: "Сначала дорогие" },
     ],
