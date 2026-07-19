@@ -108,9 +108,13 @@ export function TechpassScanButton({
         </button>
       </div>
       {busy && (
-        <p className="mt-2 flex items-center gap-2 text-sm text-ink-mute dark:text-paper-mute">
-          <Loader2 className="h-4 w-4 animate-spin" /> Распознаём…
-        </p>
+        <div className="mt-3 flex items-center gap-3 rounded-2xl border border-brand/30 bg-brand/5 px-4 py-3">
+          <Loader2 className="h-6 w-6 flex-none animate-spin text-brand" />
+          <div className="leading-tight">
+            <div className="text-base font-bold text-ink dark:text-paper">Распознаём VIN…</div>
+            <div className="text-sm text-ink-mute dark:text-paper-mute">Подождите несколько секунд</div>
+          </div>
+        </div>
       )}
       {msg && <p className="mt-2 text-sm text-brand">{msg}</p>}
     </div>
