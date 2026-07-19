@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   for (const p of paths.slice(0, 12)) {
     try {
       const r = await catalogGet<unknown>(p);
-      out[p] = JSON.stringify(r).slice(0, 500);
+      out[p] = JSON.stringify(r).slice(0, 60000);
     } catch (e) {
       out[p] = `err: ${(e as Error).message.slice(0, 140)}`;
     }
