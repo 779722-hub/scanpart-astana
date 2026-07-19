@@ -92,14 +92,8 @@ export default async function HomePage({
     { Icon: Sparkles, title: t("why3Title"), text: t("why3Body") },
   ];
 
-  const steps = [
-    { n: 1, text: "Введите VIN, парт-номер или название запчасти" },
-    { n: 2, text: "Получите цены и наличие со склада в Астане" },
-    { n: 3, text: "Добавьте в корзину и оформите заказ" },
-    { n: 4, text: "Менеджер свяжется с вами для подтверждения и оплаты" },
-    { n: 5, text: "Самовывоз на следующий день или экспресс-доставка нашим курьером" },
-    { n: 6, text: "Получаете запчасть. Не подошла — поможем с возвратом или обменом" },
-  ];
+  // Тексты редактируются в Админке → Контент (группа «Главная», ключи home.how*).
+  const steps = [1, 2, 3, 4, 5, 6].map((n) => ({ n, text: t(`how${n}`) }));
 
   return (
     <div className="relative isolate">
@@ -194,7 +188,7 @@ export default async function HomePage({
       {/* HOW IT WORKS */}
       <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Как это работает
+          {t("howTitle")}
         </h2>
         {/* 5 шагов: в 4 колонки последний уезжал в отдельный ряд один */}
         <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

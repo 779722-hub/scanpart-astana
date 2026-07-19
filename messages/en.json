@@ -28,7 +28,14 @@
     "why2Title": "By the original number",
     "why2Body": "We'll find proven analogues from reliable manufacturers.",
     "why3Title": "Automatic search",
-    "why3Body": "The easiest way to find parts — no technical knowledge or catalogues required."
+    "why3Body": "The easiest way to find parts — no technical knowledge or catalogues required.",
+    "howTitle": "How it works",
+    "how1": "Enter a VIN, part number or part name",
+    "how2": "Get prices and availability from our Astana warehouse",
+    "how3": "Add to cart and place an order",
+    "how4": "A manager contacts you to confirm and take payment",
+    "how5": "Next-day pickup or express delivery by our courier",
+    "how6": "You get the part. Doesn't fit — we'll help with a return or exchange"
   },
   "vin": {
     "title": "Search by VIN",
