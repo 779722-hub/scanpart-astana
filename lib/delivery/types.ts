@@ -71,4 +71,10 @@ export interface Delivery {
   status: DeliveryStatus;
   handoverCode: string; // 4-digit, issued when en_route; "" otherwise
   deliveredAt: string; // ISO when delivered
+  /**
+   * Текущая цель маршрута курьера: id склада, куда он едет сейчас, либо
+   * "client" когда едет к клиенту, либо "" (ещё не выехал). Точки маршрута
+   * ДО цели считаются пройденными (зелёные), сама цель — активная (жёлтая).
+   */
+  routeTarget: string;
 }

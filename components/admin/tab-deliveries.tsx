@@ -22,6 +22,7 @@ interface Delivery {
   courierId: string;
   status: DeliveryStatus;
   deliveredAt: string;
+  routeTarget?: string;
 }
 interface Courier { id: string; name: string }
 interface Warehouse { id: string; name: string; address: string; lat: number | null; lng: number | null; sourceCode: string; color: string; pickupMinutes: number }
@@ -51,7 +52,7 @@ interface OrderGroup {
 }
 interface Office { address: string; lat: number | null; lng: number | null; color: string }
 interface Suggestion { courierId: string; courierName: string; activeCount: number; addedMinutes: number; addedKm: number; totalMinutes: number }
-interface RouteStop { kind: "pickup" | "dropoff"; label: string; etaMinutes: number; legKm: number }
+interface RouteStop { kind: "pickup" | "dropoff"; refId: string; label: string; lat: number; lng: number; etaMinutes: number; legKm: number }
 interface Route { stops: RouteStop[]; totalKm: number; totalMinutes: number; geometry?: [number, number][] | null }
 interface LiveCourier {
   id: string;
@@ -261,16 +262,33 @@ export function TabDeliveries() {
   // stale coordinate lingers in the sheet.
   const inAstana = (lat: number, lng: number) => lat >= 50.95 && lat <= 51.4 && lng >= 71.1 && lng <= 71.8;
 
+  // Прогресс маршрута сфокусированного курьера: обводки складов/клиента и
+  // жёлтый активный отрезок — то же, что видит курьер в приложении.
+  const focusedDelivery = selected ? (rows ?? []).find((d) => d.courierId === selected && ACTIVE_STATUSES.has(d.status)) : undefined;
+  const focusStops = route?.stops ?? [];
+  const fTarget = focusedDelivery?.routeTarget ?? "";
+  const fTargetIdx = fTarget ? focusStops.findIndex((s) => (s.kind === "dropoff" ? "client" : s.refId) === fTarget) : -1;
+  const fRing = (i: number): "done" | "target" | undefined =>
+    i < 0 || fTargetIdx < 0 ? undefined : i < fTargetIdx ? "done" : i === fTargetIdx ? "target" : undefined;
+  const pickupIdxById = new Map<string, number>();
+  focusStops.forEach((s, i) => { if (s.kind === "pickup") pickupIdxById.set(s.refId, i); });
+  const dropIdx = focusStops.findIndex((s) => s.kind === "dropoff");
+  const fCourierLoc = selected ? live.find((c) => c.id === selected)?.location : null;
+  const fTargetStop = fTargetIdx >= 0 ? focusStops[fTargetIdx] : null;
+  const adminActiveLeg = fCourierLoc && fTargetStop && fTargetStop.lat && fTargetStop.lng
+    ? { from: { lat: fCourierLoc.lat, lng: fCourierLoc.lng }, to: { lat: fTargetStop.lat, lng: fTargetStop.lng } }
+    : null;
+
   // Map data derived from live + deliveries + warehouses.
   const mapCouriers: MapCourier[] = live
     .filter((c) => c.location && inAstana(c.location.lat, c.location.lng))
     .map((c) => ({ id: c.id, name: c.name, lat: c.location!.lat, lng: c.location!.lng, stale: isStale(c.location!.updatedAt, now) }));
   const mapWarehouses: MapPoint[] = warehouses
     .filter((w) => w.lat != null && w.lng != null && inAstana(w.lat, w.lng))
-    .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number, color: w.color }));
+    .map((w) => ({ id: w.id, name: w.name, lat: w.lat as number, lng: w.lng as number, color: w.color, ring: pickupIdxById.has(w.id) ? fRing(pickupIdxById.get(w.id)!) : undefined }));
   const mapDrops: MapPoint[] = (rows ?? [])
     .filter((d) => ACTIVE_STATUSES.has(d.status) && d.lat != null && d.lng != null && inAstana(d.lat as number, d.lng as number))
-    .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number }));
+    .map((d) => ({ id: d.id, name: d.customerName || d.address, lat: d.lat as number, lng: d.lng as number, ring: focusedDelivery && d.id === focusedDelivery.id ? fRing(dropIdx) : undefined }));
   const officePoint: MapPoint | null =
     office && office.lat != null && office.lng != null && inAstana(office.lat, office.lng)
       ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng, color: office.color }
@@ -452,6 +470,7 @@ export function TabDeliveries() {
             drops={mapDrops}
             office={officePoint}
             routeGeometry={selected ? route?.geometry ?? null : null}
+            activeLeg={adminActiveLeg}
             courierColor={markers.courierColor}
             courierShape={markers.courierShape}
             clientColor={markers.clientColor}
@@ -494,6 +513,7 @@ export function TabDeliveries() {
             drops={mapDrops}
             office={officePoint}
             routeGeometry={selected ? route?.geometry ?? null : null}
+            activeLeg={adminActiveLeg}
             courierColor={markers.courierColor}
             courierShape={markers.courierShape}
             clientColor={markers.clientColor}

@@ -826,6 +826,7 @@ function rowToDelivery(r: unknown[]): Delivery {
     status: (String(r[11] ?? "new").trim() || "new") as DeliveryStatus,
     handoverCode: String(r[12] ?? ""),
     deliveredAt: String(r[13] ?? ""),
+    routeTarget: String(r[14] ?? "").trim(),
   };
 }
 
@@ -845,6 +846,7 @@ function deliveryToRow(d: Delivery): (string | number)[] {
     d.status,
     d.handoverCode,
     d.deliveredAt,
+    d.routeTarget ?? "",
   ];
 }
 
@@ -852,7 +854,7 @@ export async function readDeliveries(): Promise<Delivery[]> {
   const sheets = sheetsClient();
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${DELIVERIES_SHEET}!A2:N`,
+    range: `${DELIVERIES_SHEET}!A2:O`,
   });
   return (data.values ?? []).map(rowToDelivery).filter((d) => d.id);
 }
@@ -868,7 +870,7 @@ export async function upsertDelivery(d: Delivery): Promise<void> {
   if (rowIdx === -1) {
     await sheets.spreadsheets.values.append({
       spreadsheetId: id,
-      range: `${DELIVERIES_SHEET}!A:N`,
+      range: `${DELIVERIES_SHEET}!A:O`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [deliveryToRow(d)] },
     });
@@ -876,7 +878,7 @@ export async function upsertDelivery(d: Delivery): Promise<void> {
   }
   await sheets.spreadsheets.values.update({
     spreadsheetId: id,
-    range: `${DELIVERIES_SHEET}!A${rowIdx + 1}:N${rowIdx + 1}`,
+    range: `${DELIVERIES_SHEET}!A${rowIdx + 1}:O${rowIdx + 1}`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [deliveryToRow(d)] },
   });
@@ -972,6 +974,7 @@ const SHEET_HEADERS: Record<string, string[]> = {
     "status",
     "handover_code",
     "delivered_at",
+    "route_target",
   ],
 };
 

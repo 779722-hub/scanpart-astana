@@ -121,6 +121,7 @@ export async function PUT(req: NextRequest) {
     status,
     handoverCode: existing?.handoverCode ?? "",
     deliveredAt: existing?.deliveredAt ?? "",
+    routeTarget: existing?.routeTarget ?? "",
   };
   await upsertDelivery(delivery);
 

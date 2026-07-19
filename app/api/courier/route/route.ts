@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
     items: d.items,
     warehouseIds: d.warehouseIds,
     status: d.status,
+    routeTarget: d.routeTarget,
     seq: i + 1,
     locked: plan.current ? d.id !== plan.current.id : false,
     waLink: d.status === "en_route" && d.handoverCode ? handoverWaLink(d, d.handoverCode) : undefined,

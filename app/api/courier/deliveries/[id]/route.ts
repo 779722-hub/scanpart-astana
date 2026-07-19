@@ -11,11 +11,12 @@ import { notifyDelivery } from "@/lib/delivery/notify-telegram";
 export const runtime = "nodejs";
 
 const schema = z.object({
-  action: z.enum(["accept", "start", "enroute", "deliver", "cancel"]),
+  action: z.enum(["accept", "start", "enroute", "deliver", "cancel", "target"]),
   code: z.string().optional(),
+  target: z.string().max(60).optional(), // для action "target": id склада или "client"
 });
 
-const TARGET: Record<z.infer<typeof schema>["action"], DeliveryStatus> = {
+const TARGET: Record<Exclude<z.infer<typeof schema>["action"], "target">, DeliveryStatus> = {
   accept: "accepted",
   start: "picking",
   enroute: "en_route",
@@ -40,6 +41,15 @@ export async function PATCH(
   const d = await getDelivery(params.id);
   if (!d || d.courierId !== courier.id) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
+  // «target»: курьер отметил, куда едет сейчас (склад-id или "client"). Это не
+  // смена статуса — только активная точка маршрута (жёлтая на карте у него и у
+  // владельца). Точки до цели в маршруте считаются пройденными (зелёные).
+  if (parsed.data.action === "target") {
+    d.routeTarget = (parsed.data.target ?? "").trim();
+    await upsertDelivery(d);
+    return NextResponse.json({ ok: true, routeTarget: d.routeTarget });
   }
 
   // One order at a time: can't start the next while another is being handled.

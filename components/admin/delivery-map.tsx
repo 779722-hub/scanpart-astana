@@ -23,6 +23,7 @@ export interface MapPoint {
   lat: number;
   lng: number;
   color?: string; // custom marker colour (hex); falls back to the kind default
+  ring?: "done" | "target"; // прогресс: пройдено (зелёная обводка) / цель (жёлтая)
 }
 export type MarkerShape = "circle" | "square" | "triangle" | "diamond";
 
@@ -32,6 +33,8 @@ export interface DeliveryMapProps {
   drops: MapPoint[];
   office?: MapPoint | null; // pickup/office point (Республика 68), shown green
   routeGeometry?: [number, number][] | null;
+  /** Активный отрезок «куда едет курьер сейчас» — рисуется жёлтым. */
+  activeLeg?: { from: { lat: number; lng: number }; to: { lat: number; lng: number } } | null;
   courierColor?: string;
   courierShape?: MarkerShape;
   clientColor?: string;
@@ -57,7 +60,11 @@ interface Pin {
   permanent: boolean; // keep the label always visible (warehouses / office)
   shape: MarkerShape;
   z: number; // higher = drawn on top (курьер должен быть поверх складов/офиса)
+  ring?: "done" | "target";
 }
+
+const RING_DONE = "#16A34A"; // пройдено — зелёный
+const RING_TARGET = "#EAB308"; // едет сюда — жёлтый
 
 function buildPins(props: DeliveryMapProps): Pin[] {
   const courierColor = props.courierColor || RED;
@@ -66,13 +73,13 @@ function buildPins(props: DeliveryMapProps): Pin[] {
   const clientShape = props.clientShape || "circle";
   const pins: Pin[] = [];
   for (const w of props.warehouses) {
-    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true, shape: "circle", z: 200 });
+    pins.push({ lat: w.lat, lng: w.lng, name: w.name, color: w.color || AMBER, hint: "Склад", size: 22, permanent: true, shape: "circle", z: 200, ring: w.ring });
   }
   if (props.office) {
-    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true, shape: "circle", z: 200 });
+    pins.push({ lat: props.office.lat, lng: props.office.lng, name: props.office.name, color: props.office.color || GREEN, hint: "Офис", size: 24, permanent: true, shape: "circle", z: 200, ring: props.office.ring });
   }
   for (const d of props.drops) {
-    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: d.color || clientColor, hint: "Клиент", size: 16, permanent: false, shape: clientShape, z: 300 });
+    pins.push({ lat: d.lat, lng: d.lng, name: d.name, color: d.color || clientColor, hint: "Клиент", size: 16, permanent: false, shape: clientShape, z: 300, ring: d.ring });
   }
   for (const c of props.couriers) {
     // Courier is the point managers look for → big, always labelled, и всегда
@@ -83,8 +90,11 @@ function buildPins(props: DeliveryMapProps): Pin[] {
 }
 
 /** Inline HTML for a coloured marker of the given shape. */
-function markerHtml(color: string, size: number, shape: MarkerShape): string {
-  const border = "border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)";
+function markerHtml(color: string, size: number, shape: MarkerShape, ring?: "done" | "target"): string {
+  const ringColor = ring === "done" ? RING_DONE : ring === "target" ? RING_TARGET : null;
+  const shadow = ringColor
+    ? `0 0 0 3px ${ringColor},0 0 0 5px rgba(0,0,0,.25)`
+    : "0 0 0 1px rgba(0,0,0,.35)";
   if (shape === "triangle") {
     // SVG-треугольник с белой обводкой и тёмной тенью — как у кружков, иначе
     // жёлтый треугольник теряется на карте.
@@ -92,7 +102,7 @@ function markerHtml(color: string, size: number, shape: MarkerShape): string {
   }
   const radius = shape === "circle" ? "50%" : "3px";
   const transform = shape === "diamond" ? "transform:rotate(45deg);" : "";
-  return `<div style="width:${size}px;height:${size}px;background:${color};border-radius:${radius};${transform}${border}"></div>`;
+  return `<div style="width:${size}px;height:${size}px;background:${color};border-radius:${radius};${transform}border:2px solid #fff;box-shadow:${shadow}"></div>`;
 }
 
 function loadMapgl(): Promise<any> {
@@ -190,7 +200,7 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
     if (twogisKey) drawGis(props);
     else drawLeaflet(props);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.couriers, props.warehouses, props.drops, props.office, props.routeGeometry]);
+  }, [props.couriers, props.warehouses, props.drops, props.office, props.routeGeometry, props.activeLeg]);
 
   // Keep the map sized to its container (fullscreen toggle, responsive).
   useEffect(() => {
@@ -218,7 +228,7 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
         className: "",
         iconSize: [p.size, p.size],
         iconAnchor: [half, half],
-        html: markerHtml(p.color, p.size, p.shape),
+        html: markerHtml(p.color, p.size, p.shape, p.ring),
       });
       const marker = leaflet.marker([p.lat, p.lng], { icon, zIndexOffset: p.z });
       if (p.permanent) {
@@ -232,6 +242,20 @@ export function DeliveryMap(props: DeliveryMapProps): JSX.Element {
     if (data.routeGeometry && data.routeGeometry.length > 1) {
       const latlngs = data.routeGeometry.map(([lng, lat]) => [lat, lng] as [number, number]);
       leaflet.polyline(latlngs, { color: RED, weight: 4 }).addTo(layer);
+    }
+
+    // Активный отрезок «куда едет сейчас» — жёлтый, поверх маршрута.
+    if (data.activeLeg) {
+      const { from, to } = data.activeLeg;
+      leaflet
+        .polyline(
+          [
+            [from.lat, from.lng],
+            [to.lat, to.lng],
+          ],
+          { color: RING_TARGET, weight: 5, opacity: 0.95 }
+        )
+        .addTo(layer);
     }
 
     if (pins.length > 0 && !fittedRef.current) {

@@ -27,6 +27,7 @@ interface Delivery {
   items: string;
   warehouseIds: string[];
   status: DeliveryStatus;
+  routeTarget?: string;
   waLink?: string;
   seq?: number;
   locked?: boolean;
@@ -313,6 +314,21 @@ export default function CourierPage() {
     }
   }
 
+  // Курьер отмечает, куда едет сейчас: точка на карте желтеет, пройденные —
+  // зелёные, у него и у владельца. Плюс сразу открываем навигатор на эту точку.
+  async function goToStop(deliveryId: string, stopKind: "pickup" | "dropoff", refId: string) {
+    const t = stopKind === "dropoff" ? "client" : refId;
+    try {
+      await apiFetch(`/api/courier/deliveries/${deliveryId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "target", target: t }),
+      });
+      await loadRoute(true);
+    } catch {
+      /* ignore */
+    }
+  }
+
   // Open a driving route from the courier's position to the delivery in 2GIS.
   const navLink = (d: Delivery) => {
     if (d.lat && d.lng) {
@@ -373,16 +389,30 @@ export default function CourierPage() {
     );
   }
 
-  const stopsWithGeo = route ? route.stops.filter((s) => s.lat && s.lng) : [];
-  const mapPickups = stopsWithGeo
-    .filter((s) => s.kind === "pickup")
-    .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }));
-  const mapDrops = stopsWithGeo
-    .filter((s) => s.kind === "dropoff")
-    .map((s) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng }));
+  // Текущая доставка (первая незаблокированная) и её активная цель маршрута.
+  const currentDelivery = deliveries.find((d) => !d.locked) ?? deliveries[0] ?? null;
+  const target = currentDelivery?.routeTarget ?? "";
+  const stops = route?.stops ?? [];
+  const stopKey = (s: RouteStop) => (s.kind === "dropoff" ? "client" : s.refId);
+  const targetIndex = target ? stops.findIndex((s) => stopKey(s) === target) : -1;
+  const ringFor = (i: number): "done" | "target" | undefined =>
+    targetIndex < 0 ? undefined : i < targetIndex ? "done" : i === targetIndex ? "target" : undefined;
+
+  const indexed = stops.map((s, i) => ({ s, i })).filter(({ s }) => s.lat && s.lng);
+  const mapPickups = indexed
+    .filter(({ s }) => s.kind === "pickup")
+    .map(({ s, i }) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng, ring: ringFor(i) }));
+  const mapDrops = indexed
+    .filter(({ s }) => s.kind === "dropoff")
+    .map(({ s, i }) => ({ id: s.refId, name: s.label, lat: s.lat, lng: s.lng, ring: ringFor(i) }));
   // Метка курьера как на карте владельца: цвет/форма из настроек, серым когда
   // GPS не подтверждён (stale=true → карта красит в серый).
   const mapMe = myPos ? [{ id: "me", name: "Вы", lat: myPos.lat, lng: myPos.lng, stale: geo.status !== "ok" }] : [];
+  // Активный отрезок «куда еду сейчас»: от курьера к выбранной точке.
+  const targetStop = targetIndex >= 0 ? stops[targetIndex] : null;
+  const activeLeg = myPos && targetStop && targetStop.lat && targetStop.lng
+    ? { from: myPos, to: { lat: targetStop.lat, lng: targetStop.lng } }
+    : null;
   const nextStop = route && route.stops.length > 0 ? route.stops[0] : null;
   const showMap = mapMe.length + mapPickups.length + mapDrops.length > 0;
 
@@ -439,27 +469,43 @@ export default function CourierPage() {
 
       {route && route.stops.length > 0 && (
         <div className="card mb-4">
-          <div className="mb-2 font-extrabold">
+          <div className="mb-1 font-extrabold">
             Маршрут ({route.totalKm} км · {route.totalMinutes} мин)
           </div>
-          <div className="space-y-2">
-            {route.stops.map((st, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span
-                  className={`chip ${
-                    st.kind === "pickup"
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-brand/10 text-brand"
-                  }`}
+          <div className="mb-2 text-xs text-ink-mute dark:text-paper-mute">
+            Нажмите точку — «еду сюда»: на карте загорится жёлтым, пройденные станут зелёными.
+          </div>
+          <div className="space-y-1.5">
+            {route.stops.map((st, i) => {
+              const state = ringFor(i); // done | target | undefined
+              const rowCls =
+                state === "target"
+                  ? "border-amber-400 bg-amber-50 dark:bg-amber-900/20"
+                  : state === "done"
+                    ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/15"
+                    : "border-paper-mute dark:border-ink-mute";
+              return (
+                <button
+                  key={i}
+                  onClick={() => currentDelivery && goToStop(currentDelivery.id, st.kind, st.refId)}
+                  className={`flex w-full items-center gap-2 rounded-xl border px-2 py-1.5 text-left transition ${rowCls}`}
                 >
-                  {st.kind === "pickup" ? "Склад" : "Клиент"}
-                </span>
-                <span className="flex-1 truncate">{st.label}</span>
-                <span className="text-ink-mute dark:text-paper-mute">
-                  ~{etaClock(st.etaMinutes)}
-                </span>
-              </div>
-            ))}
+                  <span
+                    className={`chip ${
+                      st.kind === "pickup" ? "bg-amber-100 text-amber-800" : "bg-brand/10 text-brand"
+                    }`}
+                  >
+                    {st.kind === "pickup" ? "Склад" : "Клиент"}
+                  </span>
+                  <span className="flex-1 truncate">
+                    {st.label}
+                    {state === "done" && <span className="ml-1 text-emerald-600">✓</span>}
+                    {state === "target" && <span className="ml-1 font-semibold text-amber-600">← еду</span>}
+                  </span>
+                  <span className="text-ink-mute dark:text-paper-mute">~{etaClock(st.etaMinutes)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -501,6 +547,7 @@ export default function CourierPage() {
             warehouses={mapPickups}
             drops={mapDrops}
             routeGeometry={route?.geometry ?? null}
+            activeLeg={activeLeg}
             courierColor={markers.courierColor}
             courierShape={markers.courierShape}
             className="h-72 w-full overflow-hidden rounded-2xl"
@@ -527,6 +574,7 @@ export default function CourierPage() {
             warehouses={mapPickups}
             drops={mapDrops}
             routeGeometry={route?.geometry ?? null}
+            activeLeg={activeLeg}
             courierColor={markers.courierColor}
             courierShape={markers.courierShape}
             className="w-full flex-1"
