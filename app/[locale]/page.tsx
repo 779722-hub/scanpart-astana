@@ -12,6 +12,7 @@ import {
   Phone,
   Clock,
   CheckCircle2,
+  MessageCircle,
 } from "lucide-react";
 import type { Metadata } from "next";
 import { getImageSlot, imageAlt } from "@/lib/content";
@@ -280,18 +281,29 @@ export default async function HomePage({
                 <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
                 Заберёте {settings?.pickupHours ?? "завтра 14:00–18:00"}
               </li>
-              {settings?.managerPhoneDisplay && (
-                <li className="flex items-start gap-2">
-                  <Phone className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
-                  <a
-                    href={`tel:${settings.managerPhoneDisplay.replace(/\D/g, "")}`}
-                    className="font-semibold underline"
-                  >
-                    {settings.managerPhoneDisplay}
-                  </a>
-                </li>
-              )}
             </ul>
+            {(settings?.managerPhoneDisplay || settings?.managerWhatsappE164) && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {settings?.managerPhoneDisplay && (
+                  <a
+                    href={`tel:${settings.managerPhoneDisplay.replace(/[^\d+]/g, "")}`}
+                    className="inline-flex items-center gap-1.5 rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-600"
+                  >
+                    <Phone className="h-4 w-4" /> Позвонить
+                  </a>
+                )}
+                {settings?.managerWhatsappE164 && (
+                  <a
+                    href={`https://wa.me/${settings.managerWhatsappE164.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                  >
+                    <MessageCircle className="h-4 w-4" /> Написать в WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
