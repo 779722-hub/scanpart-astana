@@ -34,18 +34,6 @@ export async function vehicleByVin(vin: string): Promise<ShatemVehicle | null> {
   return res.vehicles?.[0] ?? null;
 }
 
-/** VIN-alt — идентификация по Frame-номеру (номер кузова, японские авто).
- * Laximo принимает Frame разбитым на префикс (модель) + серию через
- * firstFrame/twoFrame, а не через vin. */
-export async function vehicleByFrame(
-  firstFrame: string,
-  twoFrame: string
-): Promise<ShatemAutoByVinResponse> {
-  return catalogGet<ShatemAutoByVinResponse>(
-    `${P}/AutoByVin?vin=&catalogId=&ssd=&firstFrame=${q(firstFrame)}&twoFrame=${q(twoFrame)}`
-  );
-}
-
 /** Step 2 — vehicle → quick-group tree. */
 async function vinGroups(v: ShatemVehicle): Promise<ShatemGroupNode[]> {
   const res = await catalogGet<ShatemVinGroupsResponse>(

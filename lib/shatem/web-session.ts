@@ -95,12 +95,3 @@ export async function catalogGet<T>(path: string): Promise<T> {
   }
   return (await res.json()) as T;
 }
-
-/** Authenticated GET returning raw text (для разведки страниц/бандлов). */
-export async function catalogGetText(path: string): Promise<{ status: number; text: string }> {
-  const j = await ensureSession();
-  const res = await fetch(`${WEB}${path}`, {
-    headers: { accept: "text/html,*/*", cookie: j.header() },
-  });
-  return { status: res.status, text: await res.text() };
-}
