@@ -554,7 +554,7 @@ export default function CourierPage() {
               ) : null}
             </div>
             <div className="text-lg font-extrabold">{d.customerName}</div>
-            <div className="text-base">{d.items}</div>
+            <div className="whitespace-pre-line text-base">{d.items}</div>
             <a
               href={navLink(d)}
               target="_blank"

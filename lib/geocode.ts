@@ -21,18 +21,57 @@ export function isInAstana(lat: number | null, lng: number | null): boolean {
  */
 function cleanAddress(q: string): string {
   return q
+    .replace(/^\s*(?:г\.|гор\.|город\b)\s*/i, "") // «г. Астана» / «г.Астана» → убрать префикс города
     .replace(/\bкв\.?\s*\d+[а-я]?/gi, "") // квартиру Nominatim не находит — убираем
     .replace(/\bквартира\s*\d+[а-я]?/gi, "")
-    .replace(/\bдом\s*/gi, "")
+    .replace(/\bдом\s+/gi, "")
     .replace(/\bд\.?\s*(?=\d)/gi, "") // «д.9» / «д 9» → «9»
     .replace(/\bпр-?кт\.?\s/gi, "проспект ")
     .replace(/\bпр\.?\s/gi, "проспект ")
     .replace(/\bул\.?\s/gi, "улица ")
     .replace(/\bмкр\.?\s/gi, "микрорайон ")
-    .replace(/\s*,\s*/g, ", ")
+    .replace(/,/g, " ") // запятые → пробелы: Nominatim так надёжнее находит дом
     .replace(/\s{2,}/g, " ")
-    .replace(/,\s*$/g, "")
     .trim();
+}
+
+/**
+ * Яндекс.Геокодер — лучшее качество для русских адресов Казахстана. Работает
+ * только если задан ключ YANDEX_GEOCODER_KEY (бесплатно ~1000 запросов/сутки).
+ * Ограничиваем область Астаной (bbox + rspn=1).
+ */
+async function yandexGeocode(
+  query: string
+): Promise<{ lat: number; lng: number; display: string } | null> {
+  const key = (process.env.YANDEX_GEOCODER_KEY ?? "").trim();
+  if (!key) return null;
+  const url =
+    `https://geocode-maps.yandex.ru/1.x/?format=json&lang=ru_RU&results=1` +
+    `&bbox=71.10,50.95~71.80,51.40&rspn=1` +
+    `&apikey=${encodeURIComponent(key)}&geocode=${encodeURIComponent(query)}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const member = j?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
+    const pos = member?.Point?.pos as string | undefined; // "lon lat"
+    if (!pos) return null;
+    const [lonS, latS] = pos.split(" ");
+    const lat = Number(latS);
+    const lng = Number(lonS);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return {
+      lat: Math.round(lat * 1e6) / 1e6,
+      lng: Math.round(lng * 1e6) / 1e6,
+      display: member?.metaDataProperty?.GeocoderMetaData?.text ?? "",
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 async function nominatim(
@@ -78,14 +117,21 @@ export async function geocodeAddress(
 ): Promise<{ lat: number; lng: number; display: string } | null> {
   const base = cleanAddress((q ?? "").trim());
   if (base.length < 3) return null;
-  // Город в запрос, если менеджер его не указал.
-  const withCity = ASTANA_RE.test(base) ? base : `Астана, ${base}`;
+  // Город в запрос (через пробел, без запятой — Nominatim так надёжнее), если
+  // менеджер его не указал.
+  const withCity = ASTANA_RE.test(base) ? base : `Астана ${base}`;
   // Улица без номера дома — запасной вариант, если точный дом не находится.
   const streetOnly = withCity.replace(/\s+\d+[а-я]?$/i, "").trim();
 
   // Пробуем по очереди: точный адрес строго в Астане → он же без жёсткой рамки
   // (на случай кривой рамки OSM) → только улица. Первый результат внутри Астаны
   // побеждает; всё вне города отбрасываем (мы работаем только в Астане).
+  // 1) Яндекс (если есть ключ) — самое точное по русским адресам КЗ.
+  const y = await yandexGeocode(withCity);
+  if (y && isInAstana(y.lat, y.lng)) return y;
+
+  // 2) Бесплатный Nominatim: точный адрес строго в Астане → он же без жёсткой
+  // рамки → только улица. Первый результат внутри Астаны побеждает.
   const attempts: Array<[string, boolean]> = [
     [withCity, true],
     [withCity, false],

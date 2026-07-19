@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck, Plus, Car } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
+import { groupItemsByWarehouse } from "@/lib/delivery/items";
 
 const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
 
@@ -71,6 +72,8 @@ export function TabOrders() {
   const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null);
   const [office, setOffice] = useState<{ address: string; lat: number | null; lng: number | null }>({ address: "", lat: null, lng: null });
   const [warehouses, setWarehouses] = useState<{ id: string; sourceCode: string }[]>([]);
+  const [couriers, setCouriers] = useState<{ id: string; name: string }[]>([]);
+  const [courierChoice, setCourierChoice] = useState<Record<string, string>>({}); // groupKey → courierId
 
   useEffect(() => {
     refresh();
@@ -78,6 +81,12 @@ export function TabOrders() {
       .then((r) => r.json())
       .then((j) => {
         if (j.ok) setWarehouses(j.warehouses);
+      })
+      .catch(() => {});
+    fetch("/api/admin/couriers")
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setCouriers(j.couriers);
       })
       .catch(() => {});
     fetch("/api/admin/settings")
@@ -182,17 +191,19 @@ export function TabOrders() {
   async function createDelivery(g: OrderGroup) {
     const isPickup = g.orderType === "Самовывоз";
     const dest = isPickup ? office.address || "офис (задайте адрес в Настройках)" : g.address || "адрес не указан";
+    const courierId = courierChoice[g.key] || "";
+    const courierName = courierId ? couriers.find((c) => c.id === courierId)?.name ?? "" : "";
     if (
       !confirm(
         `Создать ОДНУ доставку на весь заказ (${g.rows.length} поз.) для «${g.clientName || g.phone}»?\nКуда: ${dest}${
           isPickup ? "\n(самовывоз — курьер привозит в офис)" : ""
-        }\nКурьер соберёт по нужным складам и привезёт комплект. Курьера назначьте во вкладке «Доставки».`
+        }\nКурьер: ${courierName || "не назначен (назначите во вкладке «Доставки»)"}`
       )
     )
       return;
     setSaving(g.key);
     try {
-      const items = g.rows.map((r) => `${r.partName}${r.quantity > 1 ? ` ×${r.quantity}` : ""}`).join(", ");
+      const items = groupItemsByWarehouse(g.rows);
       // Union of the warehouses tied to each item's source code.
       const ids = new Set<string>();
       for (const r of g.rows) {
@@ -213,6 +224,7 @@ export function TabOrders() {
           lng: isPickup ? office.lng : undefined,
           items,
           warehouseIds,
+          courierId: courierId || undefined,
         }),
       });
       const j = await res.json();
@@ -220,7 +232,11 @@ export function TabOrders() {
         alert(`Ошибка: ${j.error}`);
         return;
       }
-      alert("Доставка на весь заказ создана. Откройте «Доставки»: проверьте склады, координаты и назначьте курьера.");
+      alert(
+        courierName
+          ? `Доставка создана и назначена на курьера «${courierName}». Проверьте склады и координаты во вкладке «Доставки».`
+          : "Доставка на весь заказ создана. Откройте «Доставки»: проверьте склады, координаты и назначьте курьера."
+      );
     } finally {
       setSaving(null);
     }
@@ -605,7 +621,22 @@ export function TabOrders() {
                 ) : (
                   <span className="text-xs text-ink-mute dark:text-paper-mute">WhatsApp не указан</span>
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {couriers.length > 0 && (
+                    <select
+                      className="input !w-auto !py-1.5 text-sm"
+                      value={courierChoice[g.key] ?? ""}
+                      onChange={(e) => setCourierChoice((cur) => ({ ...cur, [g.key]: e.target.value }))}
+                      title="Курьер для доставки"
+                    >
+                      <option value="">Курьер: не назначать</option>
+                      {couriers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     onClick={() => createDelivery(g)}
                     disabled={saving === g.key}

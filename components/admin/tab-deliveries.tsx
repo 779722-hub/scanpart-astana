@@ -5,6 +5,7 @@ import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, 
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 import { agoLabel, isStale } from "@/lib/delivery/live";
+import { groupItemsByWarehouse } from "@/lib/delivery/items";
 import { DeliveryMap, type MapCourier, type MapPoint, type MarkerShape } from "@/components/admin/delivery-map";
 
 interface Delivery {
@@ -26,6 +27,7 @@ interface Courier { id: string; name: string }
 interface Warehouse { id: string; name: string; address: string; lat: number | null; lng: number | null; sourceCode: string; color: string; pickupMinutes: number }
 interface OrderItem {
   rowNumber: number;
+  date: string;
   clientName: string;
   phone: string;
   whatsapp: string;
@@ -35,6 +37,17 @@ interface OrderItem {
   quantity: number;
   status: string;
   source: string;
+}
+// Заказ = одна корзина (один момент оформления + телефон). Позиций может быть
+// несколько — доставка на весь заказ одна.
+interface OrderGroup {
+  key: string;
+  clientName: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  orderType: string;
+  rows: OrderItem[];
 }
 interface Office { address: string; lat: number | null; lng: number | null; color: string }
 interface Suggestion { courierId: string; courierName: string; activeCount: number; addedMinutes: number; addedKm: number; totalMinutes: number }
@@ -262,26 +275,46 @@ export function TabDeliveries() {
       ? { id: "office", name: office.address || "Офис", lat: office.lat, lng: office.lng, color: office.color }
       : null;
 
-  // Prefill the delivery draft from an existing order. Самовывоз → the office
+  // Позиции заказов из /api/admin/orders приходят построчно — группируем в
+  // заказы (дата+телефон), как во вкладке «Заказы», чтобы заказ из 3 позиций
+  // был ОДНОЙ доставкой, а не тремя.
+  const orderGroups = useMemo<OrderGroup[]>(() => {
+    const map = new Map<string, OrderItem[]>();
+    for (const o of orders) {
+      const key = `${o.date}__${o.phone}`;
+      const arr = map.get(key);
+      if (arr) arr.push(o);
+      else map.set(key, [o]);
+    }
+    return Array.from(map.entries())
+      .map(([key, rows]) => {
+        const f = rows[0];
+        return { key, clientName: f.clientName, phone: f.phone, whatsapp: f.whatsapp, address: f.address, orderType: f.orderType, rows };
+      })
+      .sort((a, b) => b.key.localeCompare(a.key)); // новые сверху (ключ с датой)
+  }, [orders]);
+
+  // Prefill the delivery draft from a whole order group. Самовывоз → the office
   // address/coords (the courier brings the parcel to the office).
-  function prefillFromOrder(o: OrderItem) {
-    const isPickup = o.orderType === "Самовывоз";
-    const items = `${o.partName}${o.quantity > 1 ? ` ×${o.quantity}` : ""}`;
-    // Auto-pick the warehouse tied to the order's source code (Р1/М2/…);
-    // fall back to the only warehouse when there is just one.
-    const bySource = o.source ? warehouses.find((w) => w.sourceCode === o.source) : undefined;
-    const warehouseIds = bySource
-      ? [bySource.id]
-      : warehouses.length === 1
-        ? [warehouses[0].id]
-        : [];
+  function prefillFromGroup(g: OrderGroup) {
+    const isPickup = g.orderType === "Самовывоз";
+    const items = groupItemsByWarehouse(g.rows);
+    // Объединяем склады по кодам источников всех позиций (Р1/М2/…);
+    // если склад один — берём его.
+    const ids = new Set<string>();
+    for (const r of g.rows) {
+      const w = r.source ? warehouses.find((x) => x.sourceCode === r.source) : undefined;
+      if (w) ids.add(w.id);
+    }
+    let warehouseIds = Array.from(ids);
+    if (!warehouseIds.length && warehouses.length === 1) warehouseIds = [warehouses[0].id];
     setDraft((cur) => ({
       ...(cur ?? emptyDraft),
-      customerName: o.clientName,
-      phone: o.phone,
-      whatsapp: o.whatsapp,
+      customerName: g.clientName,
+      phone: g.phone,
+      whatsapp: g.whatsapp,
       items,
-      address: isPickup ? office?.address ?? "" : o.address,
+      address: isPickup ? office?.address ?? "" : g.address,
       latlng: isPickup && office?.lat != null && office?.lng != null ? `${office.lat}, ${office.lng}` : cur?.latlng ?? "",
       warehouseIds: warehouseIds.length ? warehouseIds : cur?.warehouseIds ?? [],
     }));
@@ -563,7 +596,7 @@ export function TabDeliveries() {
               <button className="btn-secondary !px-3 !py-2 text-sm text-brand" onClick={() => remove(d.id)}><Trash2 className="h-4 w-4" /></button>
             </div>
           </div>
-          <div className="text-sm">{d.items}</div>
+          <div className="whitespace-pre-line text-sm">{d.items}</div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-ink-mute dark:text-paper-mute">
             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{d.address || "нет адреса"}{d.lat == null && " (нет координат)"}</span>
             {d.courierId ? (
@@ -653,26 +686,26 @@ export function TabDeliveries() {
       {draft ? (
         <div className="card space-y-3">
           <div className="text-base font-bold">{draft.id ? "Изменить доставку" : "Новая доставка"}</div>
-          {!draft.id && orders.length > 0 && (
+          {!draft.id && orderGroups.length > 0 && (
             <div>
               <label className="label"><ClipboardList className="mr-1 inline h-4 w-4" />Взять из заказа</label>
               <select
                 className="input"
                 value=""
                 onChange={(e) => {
-                  const o = orders.find((x) => String(x.rowNumber) === e.target.value);
-                  if (o) prefillFromOrder(o);
+                  const g = orderGroups.find((x) => x.key === e.target.value);
+                  if (g) prefillFromGroup(g);
                 }}
               >
                 <option value="">— выберите заказ —</option>
-                {orders.slice().reverse().map((o) => (
-                  <option key={o.rowNumber} value={o.rowNumber}>
-                    #{o.rowNumber} · {clip(o.clientName || o.phone, 22)} · {clip(o.partName, 34)}{o.source ? ` · ${o.source}` : ""}{o.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
+                {orderGroups.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {clip(g.clientName || g.phone, 20)} · {g.rows.length} поз.: {clip(g.rows.map((r) => r.partName).join(", "), 38)}{g.orderType === "Самовывоз" ? " · самовывоз→офис" : ""}
                   </option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
-                Подставит клиента, адрес и товар. Склад проверьте и поменяйте ниже, если позиции нет в наличии.
+                Весь заказ (все позиции) станет одной доставкой. Склады проверьте ниже, если чего-то нет в наличии.
               </p>
             </div>
           )}
@@ -793,65 +826,93 @@ function DeliveryChain({
     { kind: "dropoff", title: delivery.customerName || "Клиент", sub: delivery.address || undefined, lat: delivery.lat, lng: delivery.lng, waitMin: 5 },
   ];
 
-  // Отрезки считаем от последнего узла, у которого есть координаты.
+  // Копим время от «сейчас»: приезд на точку и выезд после ожидания на складе.
+  // etaClock(min) переводит «минут от текущего момента» в часы:минуты.
   let prev: { lat: number; lng: number } | null = null;
+  let acc = 0;
   let totalKm = 0;
-  let totalMin = 0;
-  const legs = nodes.map((n) => {
+  const enriched = nodes.map((n, i) => {
     let legKm: number | null = null;
     let legMin: number | null = null;
-    if (n.lat != null && n.lng != null) {
+    let arrive: number | null = null;
+    let depart: number | null = null;
+    const has = n.lat != null && n.lng != null;
+    if (i === 0) {
+      if (has) { arrive = 0; prev = { lat: n.lat as number, lng: n.lng as number }; }
+    } else if (has) {
       if (prev) {
-        legKm = havKm(prev, { lat: n.lat, lng: n.lng }) * ROAD_FACTOR;
+        legKm = havKm(prev, { lat: n.lat as number, lng: n.lng as number }) * ROAD_FACTOR;
         legMin = (legKm / CITY_SPEED_KMH) * 60;
         totalKm += legKm;
-        totalMin += legMin;
+        acc += legMin;
+        arrive = acc;
       }
-      prev = { lat: n.lat, lng: n.lng };
+      prev = { lat: n.lat as number, lng: n.lng as number };
     }
-    if (n.waitMin) totalMin += n.waitMin;
-    return { legKm, legMin };
+    if (arrive != null && n.waitMin) { acc += n.waitMin; depart = acc; }
+    return { legKm, legMin, arrive, depart };
   });
 
   const routable = nodes.every((n) => n.lat != null && n.lng != null);
+  const deliveryMin = enriched[enriched.length - 1]?.arrive ?? null;
 
   return (
     <div className="rounded-2xl bg-paper-soft px-3 py-2.5 dark:bg-ink-mute">
       <div className="space-y-0">
         {nodes.map((n, i) => {
-          const leg = legs[i];
+          const e = enriched[i];
           const dotColor =
             n.kind === "courier" ? "bg-brand" : n.kind === "pickup" ? "bg-amber-500" : "bg-blue-600";
           return (
             <div key={i}>
               {i > 0 && (
                 <div className="ml-[5px] flex items-center gap-2 border-l-2 border-dashed border-paper-mute py-1 pl-4 text-xs text-ink-mute dark:border-ink dark:text-paper-mute">
-                  {leg.legKm != null ? (
-                    <span>↓ ≈ {leg.legKm.toFixed(1)} км · {Math.max(1, Math.round(leg.legMin!))} мин</span>
+                  {e.legKm != null ? (
+                    <span>↓ ≈ {e.legKm.toFixed(1)} км · {Math.max(1, Math.round(e.legMin!))} мин в пути</span>
                   ) : (
                     <span className="text-amber-600">↓ нет координат — отрезок не посчитать</span>
                   )}
                 </div>
               )}
-              <div className="flex items-start gap-2.5">
-                <span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${dotColor}`} />
-                <div className="min-w-0 leading-tight">
-                  <div className="text-sm font-semibold">
-                    {n.title}
-                    {n.waitMin && n.kind === "pickup" ? (
-                      <span className="ml-2 font-normal text-ink-mute dark:text-paper-mute">· на складе ~{n.waitMin} мин</span>
-                    ) : null}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${dotColor}`} />
+                  <div className="min-w-0 leading-tight">
+                    <div className="text-sm font-semibold">
+                      {n.title}
+                      {n.waitMin && n.kind === "pickup" ? (
+                        <span className="ml-2 font-normal text-ink-mute dark:text-paper-mute">· на складе ~{n.waitMin} мин</span>
+                      ) : null}
+                    </div>
+                    {n.sub && <div className="truncate text-xs text-ink-mute dark:text-paper-mute">{n.sub}</div>}
                   </div>
-                  {n.sub && <div className="truncate text-xs text-ink-mute dark:text-paper-mute">{n.sub}</div>}
+                </div>
+                {/* Время прибытия/выезда справа */}
+                <div className="flex-none text-right text-xs leading-tight">
+                  {n.kind === "courier" && e.arrive != null && (
+                    <div><span className="text-ink-mute dark:text-paper-mute">старт</span> <b>{etaClock(0)}</b></div>
+                  )}
+                  {n.kind === "pickup" && e.arrive != null && (
+                    <>
+                      <div><span className="text-ink-mute dark:text-paper-mute">приезд</span> <b>{etaClock(e.arrive)}</b></div>
+                      {e.depart != null && <div className="text-ink-mute dark:text-paper-mute">выезд {etaClock(e.depart)}</div>}
+                    </>
+                  )}
+                  {n.kind === "dropoff" && e.arrive != null && (
+                    <div><span className="text-ink-mute dark:text-paper-mute">доставка</span> <b className="text-emerald-600">{etaClock(e.arrive)}</b></div>
+                  )}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-      {routable && (
-        <div className="mt-2 border-t border-paper-mute/60 pt-2 text-right text-xs font-semibold dark:border-ink/60">
-          Итого ≈ {totalKm.toFixed(1)} км · ~{Math.round(totalMin)} мин · прибытие ~{etaClock(totalMin)} <span className="font-normal text-ink-mute dark:text-paper-mute">(с учётом пробок и склада)</span>
+      {routable && deliveryMin != null && (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-t border-paper-mute/60 pt-2 text-xs dark:border-ink/60">
+          <span className="text-ink-mute dark:text-paper-mute">Ориентировочно, с учётом пробок и времени на складе</span>
+          <span className="font-semibold">
+            Весь маршрут ≈ {totalKm.toFixed(1)} км · ~{Math.round(deliveryMin)} мин · доставка ~{etaClock(deliveryMin)}
+          </span>
         </div>
       )}
     </div>
