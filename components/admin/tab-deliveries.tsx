@@ -5,7 +5,7 @@ import { Loader2, Truck, Save, Trash2, Plus, MapPin, Route as RouteIcon, Radio, 
 import { STATUS_LABEL_RU, type DeliveryStatus } from "@/lib/delivery/types";
 import { parseLatLngPair } from "@/lib/delivery/warehouse";
 import { agoLabel, isStale } from "@/lib/delivery/live";
-import { groupItemsByWarehouse } from "@/lib/delivery/items";
+import { formatDeliveryItems } from "@/lib/delivery/items";
 import { DeliveryMap, type MapCourier, type MapPoint, type MarkerShape } from "@/components/admin/delivery-map";
 
 interface Delivery {
@@ -317,7 +317,7 @@ export function TabDeliveries() {
   // address/coords (the courier brings the parcel to the office).
   function prefillFromGroup(g: OrderGroup) {
     const isPickup = g.orderType === "Самовывоз";
-    const items = groupItemsByWarehouse(g.rows);
+    const items = formatDeliveryItems(g.rows);
     // Объединяем склады по кодам источников всех позиций (Р1/М2/…);
     // если склад один — берём его.
     const ids = new Set<string>();

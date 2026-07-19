@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Package, Search, Trash2, MessageCircle, Pencil, Save, X, Truck, Plus, Car } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/schemas";
-import { groupItemsByWarehouse } from "@/lib/delivery/items";
+import { formatDeliveryItems } from "@/lib/delivery/items";
 
 const ORDER_TYPES = ["Экспресс", "Самовывоз"] as const;
 
@@ -203,7 +203,7 @@ export function TabOrders() {
       return;
     setSaving(g.key);
     try {
-      const items = groupItemsByWarehouse(g.rows);
+      const items = formatDeliveryItems(g.rows);
       // Union of the warehouses tied to each item's source code.
       const ids = new Set<string>();
       for (const r of g.rows) {
