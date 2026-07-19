@@ -753,9 +753,11 @@ export interface CourierLocation {
 
 export async function readCourierLocations(): Promise<CourierLocation[]> {
   const sheets = sheetsClient();
+  // Читаем с A1 (а не A2): если у листа нет строки-заголовка, локации лежат с
+  // первой строки. Строка-заголовок (если есть) отфильтруется — lat="lat"→NaN.
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId: spreadsheetId(),
-    range: `${COURIER_LOC_SHEET}!A2:D`,
+    range: `${COURIER_LOC_SHEET}!A1:D`,
   });
   return (data.values ?? [])
     .map((r) => ({
