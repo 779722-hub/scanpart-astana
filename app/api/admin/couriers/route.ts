@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth/guards";
+import { requireAuth, requireRole } from "@/lib/auth/guards";
 import { listCouriers, saveCourier } from "@/lib/auth/couriers";
 import { deleteCourier, ensureSheetStructure } from "@/lib/sheets/client";
 
@@ -31,7 +31,7 @@ const putSchema = z.object({
 });
 
 export async function PUT(req: NextRequest) {
-  const guard = await requireAuth();
+  const guard = await requireRole("owner");
   if (guard instanceof NextResponse) return guard;
   const parsed = putSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const guard = await requireAuth();
+  const guard = await requireRole("owner");
   if (guard instanceof NextResponse) return guard;
   const { id } = (await req.json().catch(() => ({}))) as { id?: string };
   if (!id) return NextResponse.json({ ok: false, error: "no_id" }, { status: 400 });

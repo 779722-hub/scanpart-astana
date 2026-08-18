@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth, requireRole } from "@/lib/auth/guards";
+import { requireRole } from "@/lib/auth/guards";
 import { createUser, listAllUsers } from "@/lib/auth/users";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const guard = await requireAuth();
+  const guard = await requireRole("owner");
   if (guard instanceof NextResponse) return guard;
   const users = await listAllUsers();
   // Strip password hashes — never expose them.

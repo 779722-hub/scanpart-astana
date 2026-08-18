@@ -96,7 +96,10 @@ export async function GET() {
         ? "no-chat"
         : "ok";
 
-  const ok = phaetonOk;
+  // Uptime monitors poll this — reflect core health (Google Sheets: settings,
+  // orders, content), not Phaeton's unproxied root ping, which fails from
+  // Vercel→KZ as a false alarm even when the site is fully up.
+  const ok = sheetsConfigured ? sheetsOk : true;
   return NextResponse.json(
     {
       ok,

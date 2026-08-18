@@ -35,7 +35,15 @@
     "how3": "Add to cart and place an order",
     "how4": "A manager contacts you to confirm and take payment",
     "how5": "Next-day pickup or express delivery by our courier",
-    "how6": "You get the part. Doesn't fit — we'll help with a return or exchange"
+    "how6": "You get the part. Doesn't fit — we'll help with a return or exchange",
+    "deliveryTitle": "Express delivery",
+    "deliveryEta": "2 to 4 hours across Astana",
+    "deliveryOrderTime": "Order time",
+    "deliveryCourierAll": "Courier to every district of Astana",
+    "pickupTitle": "Pickup",
+    "pickupWhen": "Ready for pickup",
+    "callButton": "Call",
+    "whatsappButton": "Message on WhatsApp"
   },
   "vin": {
     "title": "Search by VIN",
@@ -135,7 +143,18 @@
     "successPickup": "You can pick up your order tomorrow between 14:00 and 18:00 at 68 Respublika Ave, Astana. Our manager will contact you shortly to confirm and take payment.",
     "openWhatsApp": "Open WhatsApp",
     "sending": "Sending…",
-    "errorGeneric": "Something went wrong. Please try again."
+    "errorGeneric": "Something went wrong. Please try again.",
+    "emptyTitle": "Your cart is empty",
+    "emptySubtitle": "Add parts from the search first.",
+    "toHome": "Home",
+    "successTitle": "Order created",
+    "successSubtitle": "Our manager will contact you shortly to confirm the order and take payment.",
+    "summaryParts": "Parts total",
+    "summaryExpress": "Express delivery (2 to 4 h)",
+    "summaryPickup": "Pickup ({hours})",
+    "free": "free",
+    "summaryTotal": "Total due",
+    "backToCart": "Back to cart"
   },
   "info": {
     "title": "How the service works",

@@ -12,6 +12,8 @@ const YESNO_OPTIONS = [
   { v: "off", l: "Нет" },
 ];
 
+const SECRET_PLACEHOLDER = "задано, введите новое чтобы заменить";
+
 const FIELDS: {
   key: string;
   label: string;
@@ -19,6 +21,7 @@ const FIELDS: {
   kind?: "number" | "text" | "select" | "textarea";
   options?: { v: string; l: string }[];
   def?: string;
+  secret?: boolean;
 }[] = [
   { key: "markup_percent", label: "Наценка, %", hint: `${MARKUP_MIN}–${MARKUP_MAX}`, kind: "number" },
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
@@ -48,7 +51,7 @@ const FIELDS: {
   { key: "office_lng", label: "Офис: долгота", hint: "напр. 71.4704" },
   { key: "manager_phone_display", label: "Телефон менеджера (как показывать)" },
   { key: "manager_whatsapp_e164", label: "WhatsApp менеджера (E.164 без +, напр. 77000000000)" },
-  { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)" },
+  { key: "telegram_bot_token", label: "Токен Telegram-бота (от @BotFather; можно вместо Vercel env)", secret: true },
   { key: "telegram_chat_id", label: "Telegram chat ID для уведомлений (можно определить кнопкой ниже)" },
   {
     key: "google_site_verification",
@@ -76,6 +79,7 @@ const AI_KEYS = [
 export function TabSettings() {
   const [map, setMap] = useState<Record<string, string> | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [secretsSet, setSecretsSet] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [tgBusy, setTgBusy] = useState<"" | "detect" | "test">("");
   const [tgMsg, setTgMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -163,6 +167,7 @@ export function TabSettings() {
         }
         setMap(j.settings);
         setDraft(j.settings);
+        setSecretsSet(j.secretsSet ?? {});
       })
       .catch(() => setMap({}));
   }, []);
@@ -178,6 +183,11 @@ export function TabSettings() {
   const dirty =
     FIELDS.some((f) => (map[f.key] ?? "") !== (draft[f.key] ?? "")) ||
     AI_KEYS.some((k) => (map[k] ?? "") !== (draft[k] ?? ""));
+
+  // Secret fields come back blanked from the server; show a "set" hint until the
+  // admin types a replacement (only a typed value is sent on save).
+  const secretPh = (key: string, fallback = "") =>
+    secretsSet[key] && !draft[key] ? SECRET_PLACEHOLDER : fallback;
 
   async function save() {
     setStatus("saving");
@@ -306,7 +316,9 @@ export function TabSettings() {
               ) : (
                 <input
                   className="input"
-                  type={f.kind === "number" ? "number" : "text"}
+                  type={f.kind === "number" ? "number" : f.secret ? "password" : "text"}
+                  autoComplete={f.secret ? "off" : undefined}
+                  placeholder={f.secret ? secretPh(f.key) : undefined}
                   value={draft[f.key] ?? ""}
                   onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
                 />
@@ -386,9 +398,10 @@ export function TabSettings() {
           <label className="label">Ключ Google Gemini (AI Studio, вид «AIza…»)</label>
           <input
             className="input"
+            type="password"
             value={draft.gemini_api_key ?? ""}
             onChange={(e) => setDraft({ ...draft, gemini_api_key: e.target.value })}
-            placeholder="AIza…"
+            placeholder={secretPh("gemini_api_key", "AIza…")}
             autoComplete="off"
           />
           <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
@@ -399,9 +412,10 @@ export function TabSettings() {
           <label className="label">Ключ OpenAI (вид «sk-…»)</label>
           <input
             className="input"
+            type="password"
             value={draft.openai_api_key ?? ""}
             onChange={(e) => setDraft({ ...draft, openai_api_key: e.target.value })}
-            placeholder="sk-…"
+            placeholder={secretPh("openai_api_key", "sk-…")}
             autoComplete="off"
           />
           <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">
@@ -412,9 +426,10 @@ export function TabSettings() {
           <label className="label">Ключ OpenRouter (вид «sk-or-…»)</label>
           <input
             className="input"
+            type="password"
             value={draft.openrouter_api_key ?? ""}
             onChange={(e) => setDraft({ ...draft, openrouter_api_key: e.target.value })}
-            placeholder="sk-or-…"
+            placeholder={secretPh("openrouter_api_key", "sk-or-…")}
             autoComplete="off"
           />
           <p className="mt-1 text-xs text-ink-mute dark:text-paper-mute">

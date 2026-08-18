@@ -79,12 +79,12 @@ export function OrderForm({
     return (
       <div className="card space-y-4 text-center">
         <ShoppingCart className="mx-auto h-12 w-12 text-ink-mute dark:text-paper-mute" />
-        <h1 className="text-2xl font-bold">Корзина пуста</h1>
+        <h1 className="text-2xl font-bold">{t("emptyTitle")}</h1>
         <p className="text-ink-mute dark:text-paper-mute">
-          Сначала добавьте позиции из поиска.
+          {t("emptySubtitle")}
         </p>
         <Link href={`/${locale}`} className="btn-primary inline-flex">
-          На главную
+          {t("toHome")}
         </Link>
       </div>
     );
@@ -131,11 +131,10 @@ export function OrderForm({
       <div className="card space-y-5">
         <div className="flex items-center gap-3 text-emerald-600">
           <CheckCircle2 className="h-9 w-9 flex-none" />
-          <h2 className="text-2xl font-bold sm:text-3xl">Заказ создан</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl">{t("successTitle")}</h2>
         </div>
         <p className="text-pretty text-lg font-semibold leading-relaxed">
-          Наш менеджер свяжется с вами в ближайшее время для уточнения заказа и
-          оплаты.
+          {t("successSubtitle")}
         </p>
         <p className="text-pretty text-sm leading-relaxed text-ink-mute dark:text-paper-mute">
           {message}
@@ -153,7 +152,7 @@ export function OrderForm({
         )}
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link href={`/${locale}`} className="btn-primary flex-1">
-            На главную
+            {t("toHome")}
           </Link>
           <Link href={`/${locale}/search/vin`} className="btn-secondary flex-1">
             {t("back")}
@@ -173,7 +172,7 @@ export function OrderForm({
           <Link
             href={`/${locale}/cart`}
             className="rounded-full p-2 text-ink-mute dark:text-paper-mute hover:bg-paper-soft dark:hover:bg-ink-mute"
-            title="Назад в корзину"
+            title={t("backToCart")}
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
@@ -196,7 +195,7 @@ export function OrderForm({
           <li className="border-t border-paper-mute/60 pt-2 text-xs dark:border-ink/40">
             <div className="flex justify-between">
               <span className="text-ink-mute dark:text-paper-mute">
-                Сумма запчастей
+                {t("summaryParts")}
               </span>
               <span className="font-semibold">{fmt(itemsTotal)} ₸</span>
             </div>
@@ -204,21 +203,21 @@ export function OrderForm({
               <span className="inline-flex items-center gap-1 text-ink-mute dark:text-paper-mute">
                 {kind === "express" ? (
                   <>
-                    <Truck className="h-3 w-3" /> Экспресс-доставка (от 2 до 4 ч)
+                    <Truck className="h-3 w-3" /> {t("summaryExpress")}
                   </>
                 ) : (
                   <>
-                    <Store className="h-3 w-3" /> Самовывоз ({settings.pickupHours})
+                    <Store className="h-3 w-3" /> {t("summaryPickup", { hours: settings.pickupHours })}
                   </>
                 )}
               </span>
               <span className="font-semibold">
-                {deliveryFee > 0 ? `${fmt(deliveryFee)} ₸` : "бесплатно"}
+                {deliveryFee > 0 ? `${fmt(deliveryFee)} ₸` : t("free")}
               </span>
             </div>
           </li>
           <li className="flex items-baseline justify-between border-t border-paper-mute/60 pt-2 text-base font-bold dark:border-ink/40">
-            <span>Итого к оплате</span>
+            <span>{t("summaryTotal")}</span>
             <span className="text-xl text-brand">{fmt(grandTotal)} ₸</span>
           </li>
         </ul>
@@ -295,7 +294,7 @@ export function OrderForm({
           </button>
           <Link href={`/${locale}/cart`} className="btn-secondary flex-1">
             <ChevronLeft className="h-4 w-4" />
-            Назад в корзину
+            {t("backToCart")}
           </Link>
         </div>
       </div>

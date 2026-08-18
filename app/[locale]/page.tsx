@@ -190,7 +190,7 @@ export default async function HomePage({
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
           {t("howTitle")}
         </h2>
-        {/* 5 шагов: в 4 колонки последний уезжал в отдельный ряд один */}
+        {/* 6 шагов: в 4 колонки последний уезжал в отдельный ряд один */}
         <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map((s) => (
             <li key={s.n} className="card flex items-start gap-3">
@@ -229,10 +229,10 @@ export default async function HomePage({
           <div className="card space-y-3">
             <div className="flex items-center gap-2 text-brand">
               <Truck className="h-5 w-5" />
-              <h3 className="text-lg font-bold">Экспресс-доставка</h3>
+              <h3 className="text-lg font-bold">{t("deliveryTitle")}</h3>
             </div>
             <p className="text-base font-bold text-ink dark:text-paper">
-              От 2 до 4 часов по Астане ·{" "}
+              {t("deliveryEta")} ·{" "}
               <span className="text-brand">
                 {settings?.expressDeliveryPrice ?? 4000} ₸
               </span>
@@ -240,11 +240,11 @@ export default async function HomePage({
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
-                Время заказа: {settings?.expressHours ?? "Пн–Сб 09:00–16:00"}
+                {t("deliveryOrderTime")}: {settings?.expressHours ?? "Пн–Сб 09:00–16:00"}
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
-                Курьер по всем районам Астаны
+                {t("deliveryCourierAll")}
               </li>
             </ul>
           </div>
@@ -252,7 +252,7 @@ export default async function HomePage({
           <div className="card space-y-3">
             <div className="flex items-center gap-2 text-brand">
               <MapPin className="h-5 w-5" />
-              <h3 className="text-lg font-bold">Самовывоз</h3>
+              <h3 className="text-lg font-bold">{t("pickupTitle")}</h3>
             </div>
             <ul className="space-y-2 text-sm">
               <li className="flex items-start gap-2">
@@ -261,7 +261,7 @@ export default async function HomePage({
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-4 w-4 flex-none text-ink-mute dark:text-paper-mute" />
-                Заберёте {settings?.pickupHours ?? "завтра 14:00–18:00"}
+                {t("pickupWhen")} {settings?.pickupHours ?? "завтра 14:00–18:00"}
               </li>
             </ul>
             {(settings?.managerPhoneDisplay || settings?.managerWhatsappE164) && (
@@ -271,7 +271,7 @@ export default async function HomePage({
                     href={`tel:${settings.managerPhoneDisplay.replace(/[^\d+]/g, "")}`}
                     className="inline-flex items-center gap-1.5 rounded-2xl bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-600"
                   >
-                    <Phone className="h-4 w-4" /> Позвонить
+                    <Phone className="h-4 w-4" /> {t("callButton")}
                   </a>
                 )}
                 {settings?.managerWhatsappE164 && (
@@ -281,7 +281,7 @@ export default async function HomePage({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
                   >
-                    <MessageCircle className="h-4 w-4" /> Написать в WhatsApp
+                    <MessageCircle className="h-4 w-4" /> {t("whatsappButton")}
                   </a>
                 )}
               </div>

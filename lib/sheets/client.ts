@@ -207,7 +207,7 @@ export async function listOrders(limit = 200): Promise<OrderListItem[]> {
   });
   const rows = data.values ?? [];
   return rows.slice(-limit).map((r, i) => ({
-    rowNumber: rows.length - limit + i + 2 > 1 ? rows.length - (rows.length - i - 1) + 1 : i + 2,
+    rowNumber: rows.length - Math.min(limit, rows.length) + i + 2,
     date: String(r[0] ?? ""),
     telegramId: String(r[1] ?? ""),
     clientName: String(r[2] ?? ""),
