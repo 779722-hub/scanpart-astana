@@ -51,11 +51,13 @@ export function ResultsList({
   q,
   strict = false,
   kind = "article",
+  anyCar = false,
 }: {
   locale: string;
   q: string;
   strict?: boolean;
   kind?: "article" | "name";
+  anyCar?: boolean;
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -83,6 +85,7 @@ export function ResultsList({
       try {
         const params = new URLSearchParams({ q, k: kind });
         if (strict) params.set("strict", "1");
+        if (anyCar) params.set("anycar", "1");
         const res = await fetch(`/api/search?${params.toString()}`);
         fast = await res.json();
         if (cancelled) return;
@@ -124,6 +127,7 @@ export function ResultsList({
       let ph: { ok?: boolean; offers?: PartOffer[] } | null = null;
       try {
         const pp = new URLSearchParams({ q, k: kind, phase: "phaeton" });
+        if (anyCar) pp.set("anycar", "1");
         const res = await fetch(`/api/search?${pp.toString()}`);
         ph = await res.json();
       } catch {
@@ -160,7 +164,7 @@ export function ResultsList({
     return () => {
       cancelled = true;
     };
-  }, [q, strict, kind]);
+  }, [q, strict, kind, anyCar]);
 
   if (state.kind === "loading") {
     return (

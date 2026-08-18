@@ -21,6 +21,7 @@ export function SearchInputForm({
   const t = useTranslations(kind);
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [anyCar, setAnyCar] = useState(false);
   const [loading, setLoading] = useState(false);
   const qRef = useDesktopAutoFocus<HTMLInputElement>();
 
@@ -29,6 +30,8 @@ export function SearchInputForm({
     if (!clean) return;
     setLoading(true);
     const params = new URLSearchParams({ q: clean, k: kind });
+    // Свободный поиск по номеру на любое авто — только для парт-номера.
+    if (kind === "article" && anyCar) params.set("anycar", "1");
     router.push(`/${locale}/results?${params.toString()}`);
   }
 
@@ -57,6 +60,19 @@ export function SearchInputForm({
           disabled={loading}
         />
       </div>
+
+      {kind === "article" && (
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink-mute dark:text-paper-mute">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 flex-none accent-brand"
+            checked={anyCar}
+            onChange={(e) => setAnyCar(e.target.checked)}
+            disabled={loading}
+          />
+          <span className="leading-relaxed">{t("anyCarLabel")}</span>
+        </label>
+      )}
 
       {voiceEnabled && (
         <VoiceSearchButton

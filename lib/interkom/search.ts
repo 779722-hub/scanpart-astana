@@ -36,6 +36,15 @@ export function segmentsForMake(make?: string): string[] {
 }
 
 /**
+ * Segments to query. «Any car» free number search forces ALL brand segments
+ * regardless of make (a part number from any brand catalog is found); otherwise
+ * the make's own segment(s).
+ */
+export function segmentsToQuery(opts: { make?: string; allSegments?: boolean }): string[] {
+  return opts.allSegments ? Object.values(INTERKOM_SEGMENTS) : segmentsForMake(opts.make);
+}
+
+/**
  * Parse an /opt/itemsSearch `data` HTML fragment into PartOffers, keeping ONLY
  * rows that are in stock («Доступен на складе» → icon `bi-patch-check
  * text-success`). Rows «нет на складе» (`bi-dash-circle text-danger`) and «в
@@ -112,13 +121,13 @@ export function parseInterkomRows(
  */
 export async function searchInterkomOffers(
   query: string,
-  opts: { markupPct: number; make?: string }
+  opts: { markupPct: number; make?: string; allSegments?: boolean }
 ): Promise<PartOffer[]> {
   if (!interkomConfigured()) return [];
   // The endpoint requires a search term of at least 4 characters.
   if (query.trim().length < 4) return [];
 
-  const segments = segmentsForMake(opts.make);
+  const segments = segmentsToQuery(opts);
   const responses = await Promise.allSettled(
     segments.map((segment) => {
       const body = `search=${encodeURIComponent(query)}&segment=${segment}`;

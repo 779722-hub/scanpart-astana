@@ -70,7 +70,8 @@
     "submit": "Search",
     "continueHint": "Enter the part number or a part name (e.g. 41060EG090 or \"front brake pads\").",
     "backHome": "Back to start",
-    "vinHint": "If you are not sure of the exact part number, it is safer to find the part by <link>your car's VIN</link>."
+    "vinHint": "If you are not sure of the exact part number, it is safer to find the part by <link>your car's VIN</link>.",
+    "anyCarLabel": "Search by number for any car (ignore my set car)"
   },
   "name": {
     "title": "Search by name",

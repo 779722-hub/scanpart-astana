@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { parseInterkomRows, segmentsForMake } from "../lib/interkom/search";
+import { parseInterkomRows, segmentsForMake, segmentsToQuery } from "../lib/interkom/search";
 import { INTERKOM_SEGMENTS } from "../lib/interkom/session";
 
 // Real /opt/itemsSearch `data` fragment captured from opt.interkom.kz
@@ -80,4 +80,18 @@ test("interkom: make → segment mapping", () => {
   // Unknown / no make → query all 8 segments.
   assert.equal(segmentsForMake("Toyota").length, 8);
   assert.equal(segmentsForMake(undefined).length, 8);
+});
+
+test("interkom: allSegments (anycar) forces all 8 segments regardless of make", () => {
+  const all = Object.values(INTERKOM_SEGMENTS);
+  // «Any car» ON with a NON-matching car set (Chevrolet) must still query all
+  // segments — a Chevrolet number would otherwise miss other brands' catalogs.
+  assert.deepEqual(segmentsToQuery({ make: "Chevrolet", allSegments: true }), all);
+  // No make + allSegments → all.
+  assert.deepEqual(segmentsToQuery({ allSegments: true }), all);
+  // Default (checkbox OFF) is unchanged: scoped to the make's own segment.
+  assert.deepEqual(segmentsToQuery({ make: "Chevrolet" }), [INTERKOM_SEGMENTS.CHEVROLET]);
+  assert.deepEqual(segmentsToQuery({ make: "Chevrolet", allSegments: false }), [
+    INTERKOM_SEGMENTS.CHEVROLET,
+  ]);
 });

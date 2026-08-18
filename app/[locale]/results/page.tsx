@@ -15,13 +15,14 @@ export default async function ResultsPage({
   searchParams,
 }: {
   params: { locale: string };
-  searchParams: { q?: string; k?: string; strict?: string };
+  searchParams: { q?: string; k?: string; strict?: string; anycar?: string };
 }) {
   unstable_setRequestLocale(locale);
   const t = await getTranslations("results");
   const q = (searchParams.q ?? "").trim();
   const strict = searchParams.strict === "1";
   const kind: "article" | "name" = searchParams.k === "name" ? "name" : "article";
+  const anyCar = kind === "article" && searchParams.anycar === "1";
 
   if (!q) {
     return (
@@ -52,7 +53,7 @@ export default async function ResultsPage({
           {t("newSearch")}
         </Link>
       </div>
-      <ResultsList locale={locale} q={q} strict={strict} kind={kind} />
+      <ResultsList locale={locale} q={q} strict={strict} kind={kind} anyCar={anyCar} />
     </section>
   );
 }

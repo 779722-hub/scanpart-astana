@@ -61,6 +61,11 @@ export async function GET(req: NextRequest) {
   // грузится клиентом отдельным фоновым запросом ?phase=phaeton и дописывается
   // в список. Быстрый путь НЕ обращается к Phaeton вовсе.
   const phase = req.nextUrl.searchParams.get("phase");
+  // «Свободный поиск по номеру на любое авто» (чек-бокс). Только для article:
+  // игнорируем установленное авто для проверки совместимости (не показываем
+  // fitWarning) и заставляем Interkom опрашивать ВСЕ сегменты брендов.
+  const anyCar =
+    kind === "article" && req.nextUrl.searchParams.get("anycar") === "1";
   if (!raw) {
     return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   }
@@ -410,7 +415,7 @@ export async function GET(req: NextRequest) {
       interkomEnabled && interkomTargets.length
         ? Promise.all(
             interkomTargets.map((code) =>
-              searchInterkomOffers(code, { markupPct, make: vehicle?.make }).catch((err) => {
+              searchInterkomOffers(code, { markupPct, make: vehicle?.make, allSegments: anyCar }).catch((err) => {
                 console.warn("[api/search] interkom lookup failed:", (err as Error).message);
                 return [] as PartOffer[];
               })
@@ -536,7 +541,7 @@ export async function GET(req: NextRequest) {
       | { make: string; model: string; year: string; level: "mismatch" | "unconfirmed"; needsVin?: boolean }
       | null = null;
     if (
-      kind === "article" && vehLabel && picked.length > 0 &&
+      kind === "article" && !anyCar && vehLabel && picked.length > 0 &&
       !picked.some((o) => o.compat === "match")
     ) {
       fitWarning = {
