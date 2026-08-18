@@ -1,5 +1,6 @@
 import { fetch as undiciFetch, ProxyAgent } from "undici";
 import { CookieJar } from "@/lib/shatem/cookie-jar";
+import { resolveProxyUrl } from "@/lib/proxy";
 
 /**
  * Autotrade (sklad.autotrade.kz) authenticated web session.
@@ -25,7 +26,7 @@ const TIMEOUT_MS = 12_000;
 
 let _proxyAgent: ProxyAgent | null = null;
 function proxyAgent(): ProxyAgent | undefined {
-  const url = process.env.AUTOTRADE_PROXY_URL || process.env.PHAETON_PROXY_URL;
+  const url = resolveProxyUrl("AUTOTRADE_PROXY_URL", "PHAETON_PROXY_URL");
   if (!url) return undefined;
   if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
   return _proxyAgent;

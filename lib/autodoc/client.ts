@@ -1,6 +1,7 @@
 import { fetch as undiciFetch, ProxyAgent } from "undici";
 import * as cheerio from "cheerio";
 import { LRUCache } from "lru-cache";
+import { resolveProxyUrl } from "@/lib/proxy";
 
 /**
  * Точечный прокси к autodoc.ru — тянем HTML страниц поиска / продукта,
@@ -32,7 +33,7 @@ function proxyAgent(): ProxyAgent | undefined {
   // По умолчанию используем тот же фиксированный IP что и для Phaeton
   // (Proxy6) — иначе при работе на Vercel мы будем стучаться с разных
   // адресов, что повышает шанс на бан со стороны Cloudflare.
-  const url = process.env.AUTODOC_PROXY_URL || process.env.PHAETON_PROXY_URL;
+  const url = resolveProxyUrl("AUTODOC_PROXY_URL", "PHAETON_PROXY_URL");
   if (!url) return undefined;
   if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
   return _proxyAgent;

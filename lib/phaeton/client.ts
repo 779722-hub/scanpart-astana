@@ -1,4 +1,5 @@
 import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { resolveProxyUrl } from "@/lib/proxy";
 import type {
   PhaetonBrandsResponse,
   PhaetonDictionaryResponse,
@@ -30,7 +31,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 let _proxyAgent: ProxyAgent | null = null;
 function proxyAgent(): ProxyAgent | undefined {
-  const url = process.env.PHAETON_PROXY_URL;
+  const url = resolveProxyUrl("PHAETON_PROXY_URL");
   if (!url) return undefined;
   if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
   return _proxyAgent;

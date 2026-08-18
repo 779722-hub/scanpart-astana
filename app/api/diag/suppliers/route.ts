@@ -9,6 +9,7 @@ import {
 import { searchShatemOffers } from "@/lib/shatem/search";
 import { searchAutotradeOffers } from "@/lib/autotrade/search";
 import { autotradeConfigured } from "@/lib/autotrade/session";
+import { resolveProxyUrl } from "@/lib/proxy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,7 +68,7 @@ async function probe(url: string, useProxy: boolean) {
   const tm = setTimeout(() => ctrl.abort(), 8000);
   const t0 = Date.now();
   try {
-    const proxyUrl = process.env.PHAETON_PROXY_URL;
+    const proxyUrl = resolveProxyUrl("PHAETON_PROXY_URL");
     const dispatcher =
       useProxy && proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
     const res = await uf(url, {
@@ -127,7 +128,8 @@ export async function GET(req: NextRequest) {
     PHAETON_API_KEY: Boolean(process.env.PHAETON_API_KEY),
     PHAETON_USER_GUID: Boolean(process.env.PHAETON_USER_GUID),
     PHAETON_CONTRAGENT_GUID: Boolean(process.env.PHAETON_CONTRAGENT_GUID),
-    PHAETON_PROXY_URL: Boolean(process.env.PHAETON_PROXY_URL),
+    PHAETON_PROXY_URL_raw_set: Boolean(process.env.PHAETON_PROXY_URL),
+    PHAETON_PROXY_URL_valid: Boolean(resolveProxyUrl("PHAETON_PROXY_URL")),
     PHAETON_ASTANA_WAREHOUSE_ID: Boolean(process.env.PHAETON_ASTANA_WAREHOUSE_ID),
     SHATEM_API_KEY: Boolean(process.env.SHATEM_API_KEY),
     SHATEM_BASE_URL: process.env.SHATEM_BASE_URL || "(default)",

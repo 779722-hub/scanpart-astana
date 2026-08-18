@@ -12,6 +12,7 @@
  */
 import { fetch as undiciFetch, ProxyAgent, type Response as UndiciResponse } from "undici";
 import { CookieJar } from "@/lib/shatem/cookie-jar";
+import { resolveProxyUrl } from "@/lib/proxy";
 
 const WEB = (process.env.PHAETON_SHOP_BASE || "https://shop.phaeton.kz").replace(/\/+$/, "");
 const UA =
@@ -20,7 +21,7 @@ const UA =
 
 let _proxy: ProxyAgent | null = null;
 function proxyAgent(): ProxyAgent | undefined {
-  const url = process.env.PHAETON_PROXY_URL;
+  const url = resolveProxyUrl("PHAETON_PROXY_URL");
   if (!url) return undefined;
   if (!_proxy) _proxy = new ProxyAgent(url);
   return _proxy;

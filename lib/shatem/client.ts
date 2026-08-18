@@ -6,6 +6,7 @@
  * + key come from env: SHATEM_BASE_URL, SHATEM_API_KEY.
  */
 import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { resolveProxyUrl } from "@/lib/proxy";
 import type {
   ShatemAuthResponse,
   ShatemArticleHit,
@@ -30,7 +31,7 @@ const TOKEN_SKEW_MS = 60_000; // refresh a minute before real expiry
  */
 let _proxyAgent: ProxyAgent | null = null;
 function proxyAgent(): ProxyAgent | undefined {
-  const url = process.env.SHATEM_PROXY_URL || process.env.PHAETON_PROXY_URL;
+  const url = resolveProxyUrl("SHATEM_PROXY_URL", "PHAETON_PROXY_URL");
   if (!url) return undefined;
   if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
   return _proxyAgent;
