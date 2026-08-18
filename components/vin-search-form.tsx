@@ -48,33 +48,59 @@ export function VinSearchForm({
   const [errorKind, setErrorKind] =
     useState<"invalid" | "notFound" | "generic">("invalid");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [refining, setRefining] = useState(false);
   const [editingVin, setEditingVin] = useState(false);
   const [vinDraft, setVinDraft] = useState("");
+
+  // Show the car + set it as the current session car. Also unblocks VIN-scoped
+  // name search, which reads the raw session VIN (not this decode).
+  async function commit(targetVin: string, json: { vin: string; vehicle: Vehicle }) {
+    setVehicle(json.vehicle);
+    setStatus("ok");
+    await fetch("/api/session/vin", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vin: json.vin, vehicle: json.vehicle }),
+    });
+    // Refresh server components (header vehicle bar) to show the new car.
+    router.refresh();
+  }
 
   // Resolve a VIN → vehicle, set it as the current car, and show the search
   // chooser (part-number + name). Shared by the form, the saved-car chips and
   // the auto-resolve on mount.
+  //
+  // Two-phase for an INSTANT first paint: a fast NHTSA decode (~0.4s) shows the
+  // make/model right away, then the accurate Shate-M/Laximo catalog binding
+  // (~11s) fills in / upgrades the model in the background.
   async function resolve(targetVin: string) {
     setVin(targetVin);
     setStatus("loading");
+    setRefining(false);
+    const enc = encodeURIComponent(targetVin);
     try {
-      const res = await fetch(`/api/vin?vin=${encodeURIComponent(targetVin)}`);
-      const json = await res.json();
-      if (res.ok && json.ok) {
-        setVehicle(json.vehicle);
-        setStatus("ok");
-        await fetch("/api/session/vin", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ vin: json.vin, vehicle: json.vehicle }),
-        });
-        // Refresh server components (header vehicle bar) to show the new car.
-        router.refresh();
-      } else {
-        setErrorKind(json.error === "invalid_format" ? "invalid" : "notFound");
+      // Phase 1 — fast NHTSA decode for immediate display.
+      const fast = await fetch(`/api/vin?vin=${enc}&fast=1`)
+        .then((r) => r.json())
+        .catch(() => null);
+      const shown = Boolean(fast?.ok);
+      if (shown) await commit(targetVin, fast);
+
+      // Phase 2 — precise Laximo catalog decode (slow). Upgrades the label, or
+      // resolves the car when NHTSA had no hit at all.
+      setRefining(true);
+      const full = await fetch(`/api/vin?vin=${enc}`)
+        .then((r) => r.json())
+        .catch(() => null);
+      setRefining(false);
+      if (full?.ok) {
+        await commit(targetVin, full);
+      } else if (!shown) {
+        setErrorKind(fast?.error === "invalid_format" ? "invalid" : "notFound");
         setStatus("error");
       }
     } catch {
+      setRefining(false);
       setErrorKind("generic");
       setStatus("error");
     }
@@ -152,7 +178,14 @@ export function VinSearchForm({
               <div className="text-2xl font-bold">
                 {vehicle.make} {vehicle.model}
               </div>
-              <div className="text-ink-mute dark:text-paper-mute">{vehicle.year}</div>
+              <div className="flex items-center gap-2 text-ink-mute dark:text-paper-mute">
+                {vehicle.year}
+                {refining && (
+                  <span className="inline-flex items-center gap-1 text-xs">
+                    <Loader2 className="h-3 w-3 animate-spin" /> уточняем модель…
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           {isVinAcceptable(vin) && !vin.startsWith("MANUAL") && (
@@ -339,12 +372,16 @@ function SavedCarChip({
   useEffect(() => {
     if (vin.startsWith("MANUAL")) return;
     let cancelled = false;
-    fetch(`/api/vin?vin=${encodeURIComponent(vin)}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled && j.ok) setVehicle(j.vehicle);
-      })
-      .catch(() => {});
+    const enc = encodeURIComponent(vin);
+    // Fast NHTSA label first, then upgrade with the accurate Laximo model.
+    const load = (fast: boolean) =>
+      fetch(`/api/vin?vin=${enc}${fast ? "&fast=1" : ""}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!cancelled && j.ok) setVehicle(j.vehicle);
+        })
+        .catch(() => {});
+    load(true).then(() => load(false));
     return () => {
       cancelled = true;
     };

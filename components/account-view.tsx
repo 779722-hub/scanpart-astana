@@ -579,18 +579,21 @@ function VinRow({
   const [vehicle, setVehicle] = useState<{ make: string; model: string; year: string } | null>(null);
   const [searching, setSearching] = useState(false);
 
-  // Resolve a human label ("NISSAN FX35/45") for the saved VIN. Full decode
-  // (Shate-M catalog) is needed for the model — NHTSA often lacks it. Manual
-  // entries have no decodable VIN.
+  // Resolve a human label ("NISSAN FX35/45") for the saved VIN. Show a fast
+  // NHTSA label instantly, then upgrade with the accurate Shate-M/Laximo model
+  // (NHTSA often lacks it) in the background. Manual entries aren't decodable.
   useEffect(() => {
     if (vin.startsWith("MANUAL")) return;
     let cancelled = false;
-    fetch(`/api/vin?vin=${encodeURIComponent(vin)}`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!cancelled && j.ok) setVehicle(j.vehicle);
-      })
-      .catch(() => {});
+    const enc = encodeURIComponent(vin);
+    const load = (fast: boolean) =>
+      fetch(`/api/vin?vin=${enc}${fast ? "&fast=1" : ""}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!cancelled && j.ok) setVehicle(j.vehicle);
+        })
+        .catch(() => {});
+    load(true).then(() => load(false));
     return () => {
       cancelled = true;
     };
