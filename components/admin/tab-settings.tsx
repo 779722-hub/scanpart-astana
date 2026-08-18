@@ -1,11 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, Mic, Tag, RefreshCw } from "lucide-react";
-import { MARKUP_MAX, MARKUP_MIN } from "@/lib/markup";
+import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, Mic, Tag, RefreshCw, Layers, Plus, Trash2 } from "lucide-react";
+import { MARKUP_MAX, MARKUP_MIN, PRICE_BRACKETS_MAX } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
 const ANALOGS_MAX = 10;
+
+// Одна строка таблицы диапазонов наценки (строковые поля для полей ввода).
+type BracketRow = { from: string; to: string; kind: "percent" | "fixed"; value: string };
+
+function parseBracketRows(json?: string): BracketRow[] {
+  if (!json || !json.trim()) return [];
+  try {
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((b) => ({
+      from: b?.from != null ? String(b.from) : "",
+      to: b?.to != null ? String(b.to) : "",
+      kind: b?.kind === "fixed" ? "fixed" : "percent",
+      value: b?.value != null ? String(b.value) : "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// Сериализация в JSON для настройки price_brackets. Пустое «До» = null («и выше»).
+// Строки без числового «От» или «Значение» отбрасываются.
+function serializeBracketRows(rows: BracketRow[]): string {
+  const arr = rows
+    .map((r) => ({
+      from: Number(r.from),
+      to: r.to.trim() === "" ? null : Number(r.to),
+      kind: r.kind,
+      value: Number(r.value),
+    }))
+    .filter((b) => Number.isFinite(b.from) && Number.isFinite(b.value));
+  return JSON.stringify(arr);
+}
 
 const YESNO_OPTIONS = [
   { v: "on", l: "Да" },
@@ -79,6 +112,7 @@ const AI_KEYS = [
 export function TabSettings() {
   const [map, setMap] = useState<Record<string, string> | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [brackets, setBrackets] = useState<BracketRow[]>([]);
   const [secretsSet, setSecretsSet] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [tgBusy, setTgBusy] = useState<"" | "detect" | "test">("");
@@ -167,6 +201,7 @@ export function TabSettings() {
         }
         setMap(j.settings);
         setDraft(j.settings);
+        setBrackets(parseBracketRows(j.settings.price_brackets));
         setSecretsSet(j.secretsSet ?? {});
       })
       .catch(() => setMap({}));
@@ -180,9 +215,39 @@ export function TabSettings() {
     );
   }
 
+  // Диапазоны наценки — сериализованный JSON. Обе стороны нормализуем через
+  // parse→serialize, чтобы разница в форматировании не считалась изменением.
+  const bracketsJson = serializeBracketRows(brackets);
+  const savedBracketsJson = serializeBracketRows(parseBracketRows(map.price_brackets));
+  const bracketsDirty = bracketsJson !== savedBracketsJson;
+
   const dirty =
     FIELDS.some((f) => (map[f.key] ?? "") !== (draft[f.key] ?? "")) ||
-    AI_KEYS.some((k) => (map[k] ?? "") !== (draft[k] ?? ""));
+    AI_KEYS.some((k) => (map[k] ?? "") !== (draft[k] ?? "")) ||
+    bracketsDirty;
+
+  // Проверка диапазонов: по возрастанию, без пересечений; «и выше» только в
+  // последней строке. Возвращает индексы проблемных строк (для подсветки).
+  const bracketIssues = new Set<number>();
+  {
+    let prevTo: number | null = 0;
+    let openSeen = false;
+    for (let i = 0; i < brackets.length; i++) {
+      const r = brackets[i];
+      const from = Number(r.from);
+      const to = r.to.trim() === "" ? null : Number(r.to);
+      if (r.from.trim() === "" || !Number.isFinite(from) || r.value.trim() === "" || !Number.isFinite(Number(r.value))) {
+        bracketIssues.add(i);
+        continue;
+      }
+      if (openSeen) bracketIssues.add(i); // строки после «и выше» недостижимы
+      if (prevTo !== null && from < prevTo) bracketIssues.add(i); // пересечение/не по возрастанию
+      if (to !== null && to <= from) bracketIssues.add(i); // «До» должно быть больше «От»
+      if (to === null) openSeen = true;
+      prevTo = to;
+    }
+  }
+  const hasBracketIssues = bracketIssues.size > 0;
 
   // Secret fields come back blanked from the server; show a "set" hint until the
   // admin types a replacement (only a typed value is sent on save).
@@ -202,6 +267,9 @@ export function TabSettings() {
         if ((map?.[k] ?? "") !== (draft[k] ?? "")) {
           patch[k] = draft[k] ?? "";
         }
+      }
+      if (bracketsDirty) {
+        patch.price_brackets = bracketsJson;
       }
       if (
         patch.markup_percent &&
@@ -337,6 +405,114 @@ export function TabSettings() {
         >
           {geoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />}
           Определить координаты офиса по адресу
+        </button>
+      </div>
+
+      {/* Наценка по диапазонам входящей цены */}
+      <div className="card space-y-3">
+        <div className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-brand" />
+          <h2 className="text-lg font-bold">Наценка по диапазонам цены</h2>
+        </div>
+        <p className="text-sm text-ink-mute dark:text-paper-mute">
+          Наценка зависит от входящей цены поставщика. Диапазоны — основной способ;
+          если цена не попала ни в один диапазон, применяется общая «Наценка, %»
+          из настроек выше. «От» — включительно, «До» — не включая. Оставьте «До»
+          пустым в последней строке — это значит «и выше».
+        </p>
+        {brackets.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-ink-mute dark:text-paper-mute">
+                  <th className="pb-1 pr-2 font-medium">От (₸)</th>
+                  <th className="pb-1 pr-2 font-medium">До (₸)</th>
+                  <th className="pb-1 pr-2 font-medium">Тип</th>
+                  <th className="pb-1 pr-2 font-medium">Значение</th>
+                  <th className="pb-1" />
+                </tr>
+              </thead>
+              <tbody>
+                {brackets.map((r, i) => (
+                  <tr key={i} className={bracketIssues.has(i) ? "bg-brand/5" : ""}>
+                    <td className="py-1 pr-2">
+                      <input
+                        className="input"
+                        type="number"
+                        value={r.from}
+                        onChange={(e) =>
+                          setBrackets(brackets.map((b, j) => (j === i ? { ...b, from: e.target.value } : b)))
+                        }
+                      />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <input
+                        className="input"
+                        type="number"
+                        placeholder="и выше"
+                        value={r.to}
+                        onChange={(e) =>
+                          setBrackets(brackets.map((b, j) => (j === i ? { ...b, to: e.target.value } : b)))
+                        }
+                      />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <select
+                        className="input"
+                        value={r.kind}
+                        onChange={(e) =>
+                          setBrackets(
+                            brackets.map((b, j) =>
+                              j === i ? { ...b, kind: e.target.value as "percent" | "fixed" } : b
+                            )
+                          )
+                        }
+                      >
+                        <option value="percent">%</option>
+                        <option value="fixed">₸</option>
+                      </select>
+                    </td>
+                    <td className="py-1 pr-2">
+                      <input
+                        className="input"
+                        type="number"
+                        value={r.value}
+                        onChange={(e) =>
+                          setBrackets(brackets.map((b, j) => (j === i ? { ...b, value: e.target.value } : b)))
+                        }
+                      />
+                    </td>
+                    <td className="py-1">
+                      <button
+                        type="button"
+                        className="btn-secondary !px-2 !py-2"
+                        onClick={() => setBrackets(brackets.filter((_, j) => j !== i))}
+                        aria-label="Удалить диапазон"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {hasBracketIssues && (
+          <p className="rounded-2xl bg-brand/10 px-4 py-3 text-sm text-brand">
+            Проверьте диапазоны: значения должны идти по возрастанию и не
+            пересекаться, «До» — больше «От», пустое «До» («и выше») — только в
+            последней строке.
+          </p>
+        )}
+        <button
+          type="button"
+          className="btn-secondary !px-3 !py-2 text-sm"
+          onClick={() => setBrackets([...brackets, { from: "", to: "", kind: "percent", value: "" }])}
+          disabled={brackets.length >= PRICE_BRACKETS_MAX}
+        >
+          <Plus className="h-4 w-4" />
+          Добавить диапазон
         </button>
       </div>
 

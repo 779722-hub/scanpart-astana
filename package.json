@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/catalog.test.ts tests/cookie-jar.test.ts tests/pick.test.ts tests/warehouse.test.ts tests/delivery.test.ts tests/live.test.ts tests/roadroute.test.ts tests/optimize.test.ts tests/vin.test.ts tests/seo.test.ts",
+    "test": "node --import tsx --test tests/catalog.test.ts tests/cookie-jar.test.ts tests/pick.test.ts tests/warehouse.test.ts tests/delivery.test.ts tests/live.test.ts tests/roadroute.test.ts tests/optimize.test.ts tests/vin.test.ts tests/seo.test.ts tests/markup.test.ts",
     "seed:content": "tsx scripts/seed-content.ts",
     "sheets:bootstrap": "tsx scripts/bootstrap-sheets.ts",
     "reset-password": "tsx scripts/reset-password.ts"

@@ -1,5 +1,5 @@
 import { unstable_cache, revalidateTag } from "next/cache";
-import { MARKUP_DEFAULT, clampMarkup } from "@/lib/markup";
+import { MARKUP_DEFAULT, clampMarkup, parsePriceBrackets, type PriceBracket } from "@/lib/markup";
 import { readSetting, writeSetting, readWarehouses } from "./client";
 
 const CACHE_TTL_MS = 60_000;
@@ -78,6 +78,17 @@ export async function setMarkupPercent(pct: number): Promise<number> {
   await writeSetting("markup_percent", String(clamped));
   invalidateSettings();
   return clamped;
+}
+
+// Диапазоны наценки по входящей цене (JSON в настройке price_brackets).
+// Читается через кэшированный readAll(); [] при отсутствии/невалидном значении.
+export async function getPriceBrackets(): Promise<PriceBracket[]> {
+  try {
+    const v = await getSetting("price_brackets");
+    return parsePriceBrackets(v ?? "");
+  } catch {
+    return [];
+  }
 }
 
 export const ANALOGS_MIN = 0;

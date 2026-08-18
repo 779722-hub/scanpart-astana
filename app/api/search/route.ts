@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
-import { applyMarkup } from "@/lib/markup";
-import { getMarkupPercent, getAnalogsMax, getWarehouseMarkupMap, getSetting } from "@/lib/sheets/settings";
+import { applyMarkup, applyBracketMarkup, type PriceBracket } from "@/lib/markup";
+import { getMarkupPercent, getAnalogsMax, getPriceBrackets, getSetting } from "@/lib/sheets/settings";
 import type {
   PartOffer,
   PhaetonBrandItem,
@@ -89,10 +89,10 @@ export async function GET(req: NextRequest) {
 
     // NB: Astana warehouse IDs come from Phaeton's /api/Dictionary, so we resolve
     // them ONLY inside the Phaeton phase below — the fast path never calls Phaeton.
-    const [markupPct, analogsMax, whMarkup, showOemSetting] = await Promise.all([
+    const [markupPct, analogsMax, brackets, showOemSetting] = await Promise.all([
       getMarkupPercent(),
       getAnalogsMax(),
-      getWarehouseMarkupMap().catch(() => ({} as Record<string, number>)),
+      getPriceBrackets().catch(() => [] as PriceBracket[]),
       getSetting("show_oem").catch(() => "on"),
     ]);
     // OEM display is on by default; admin can switch it off (too many variants).
@@ -105,11 +105,11 @@ export async function GET(req: NextRequest) {
     const showPhotos =
       (await getSetting("show_photos").catch(() => "off")) === "on";
 
-    // Global markup by default, overridden per warehouse (admin «Склады»).
+    // Наценка по диапазонам входящей цены (общая наценка — резерв). Единая для
+    // всех складов; по одной цене поставщика, а не по коду склада.
     const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
-    const codeOf = (o: PartOffer): string =>
-      o.sourceCode || SOURCE_CODE[o.source ?? "phaeton"] || "";
-    const markupForOffer = (o: PartOffer): number => whMarkup[codeOf(o)] ?? markupPct;
+    const priceFor = (o: PartOffer): number =>
+      applyBracketMarkup(o.priceRaw, brackets, markupPct);
 
     // Catalog (Shate-M Laximo) — name search for a known vehicle by VIN turns
     // the free-text name into concrete OEM part numbers for THIS car, which we
@@ -340,8 +340,8 @@ export async function GET(req: NextRequest) {
           };
         });
 
-      // Re-price with the warehouse markup (Р1 override or global).
-      for (const o of phaetonOffers) o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+      // Итоговая цена — по диапазонам входящей цены (резерв — общая наценка).
+      for (const o of phaetonOffers) o.priceFinal = priceFor(o);
 
       // Astana + in-stock now; word-match for name search (same as fast phase).
       const wantsWords = kind === "name" && queryTokens.length > 0;
@@ -431,9 +431,9 @@ export async function GET(req: NextRequest) {
 
     const allOffers: PartOffer[] = [...shatemOffers, ...autotradeOffers];
 
-    // Re-price every offer with its warehouse's markup. Done before the
-    // pick/sort so "cheapest" reflects the real customer price.
-    for (const o of allOffers) o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+    // Итоговая цена — по диапазонам входящей цены (резерв — общая наценка).
+    // До pick/sort, чтобы «дешевле» отражало реальную цену для клиента.
+    for (const o of allOffers) o.priceFinal = priceFor(o);
 
     // Tokenize query for the words-AND filter (name search only).
     const queryTokens = kind === "name" ? tokenize(raw) : [];
@@ -473,7 +473,7 @@ export async function GET(req: NextRequest) {
     const relatedSeen = new Set<string>();
     const relatedPayload = autotradeRelated
       .map((o) => {
-        o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+        o.priceFinal = priceFor(o);
         return o;
       })
       .filter((o) => {
