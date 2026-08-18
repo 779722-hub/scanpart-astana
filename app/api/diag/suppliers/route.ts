@@ -183,6 +183,33 @@ export async function GET(req: NextRequest) {
     return { configured: true, offers: offers.length };
   });
 
+  // Структура текущего прокси (пароль/логин скрыты) — чтобы понять, какой
+  // именно прокси-эндпоинт (host:port) настроен и жив ли формат URL.
+  let proxyShape: Record<string, unknown> = { present: false };
+  const rawProxy = resolveProxyUrl("PHAETON_PROXY_URL");
+  if (rawProxy) {
+    try {
+      const u = new URL(rawProxy);
+      proxyShape = {
+        present: true,
+        length: rawProxy.length,
+        scheme: u.protocol.replace(":", ""),
+        host: u.hostname,
+        port: u.port || "(default)",
+        hasAuth: Boolean(u.username),
+      };
+    } catch (e) {
+      proxyShape = {
+        present: true,
+        length: rawProxy.length,
+        parseError: mask((e as Error).message).slice(0, 120),
+        // Первые/последние символы для распознавания мусора (без утечки).
+        head: rawProxy.slice(0, 4),
+        tail: rawProxy.slice(-4),
+      };
+    }
+  }
+
   // Сырые пробы: отличить проблему прокси от прямой сети и контрольный хост.
   const probes = {
     telegram_direct: await probe("https://api.telegram.org/", false),
@@ -199,6 +226,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     query: q,
     env,
+    proxyShape,
     probes,
     phaeton: { warehouses: phaetonWarehouses, dictionary: phaetonDict, brands: phaetonBrands },
     shatem: {
