@@ -6,7 +6,12 @@ import type {
   PhaetonPricesResponse,
 } from "./types";
 
-const DEFAULT_TIMEOUT = 8_000;
+// 15s: большие ответы цен по ходовым артикулам (Phaeton отдаёт 300+ позиций,
+// ~220КБ) через прокси КЗ на «холодном» соединении не укладывались в 8с и
+// отбрасывались (ретрая на таймаут нет) — Phaeton/Р1 пропадал через раз.
+// 15с даёт им дойти, при этом худший случай холодного старта ограничен ~15с
+// (а не 40с, как было с 20с+ретрай). Тёплые вызовы ~1-3с — им запас не мешает.
+const DEFAULT_TIMEOUT = 15_000;
 const RETRY_ATTEMPTS = 2; // initial + 1 retry on transient failure
 const RETRY_DELAY_MS = 600;
 
