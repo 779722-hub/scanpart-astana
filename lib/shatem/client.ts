@@ -5,6 +5,7 @@
  * token in-module (single-flight) and re-auth on expiry or on a 401. Base URL
  * + key come from env: SHATEM_BASE_URL, SHATEM_API_KEY.
  */
+import { fetch as undiciFetch, ProxyAgent } from "undici";
 import type {
   ShatemAuthResponse,
   ShatemArticleHit,
@@ -19,6 +20,21 @@ import type {
 
 const DEFAULT_TIMEOUT = 20_000;
 const TOKEN_SKEW_MS = 60_000; // refresh a minute before real expiry
+
+/**
+ * On Vercel api.shate-m.kz is not reachable from the serverless egress region
+ * (direct calls time out). When a proxy is configured we route Shate-M through
+ * the same fixed-IP/residential proxy as Phaeton/Autotrade (a KZ exit reaches
+ * Shate-M fine). Dev keeps the direct path when no proxy env is set.
+ * Uses undici.fetch — the global fetch on Vercel can ignore `dispatcher`.
+ */
+let _proxyAgent: ProxyAgent | null = null;
+function proxyAgent(): ProxyAgent | undefined {
+  const url = process.env.SHATEM_PROXY_URL || process.env.PHAETON_PROXY_URL;
+  if (!url) return undefined;
+  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
+  return _proxyAgent;
+}
 
 function base(): string {
   return (process.env.SHATEM_BASE_URL || "https://api.shate-m.kz").replace(/\/+$/, "");
@@ -71,12 +87,18 @@ function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
     ...(init.body ? { "content-type": "application/json" } : {}),
     ...((init.headers as Record<string, string>) || {}),
   };
-  return fetch(`${base()}${path}`, {
-    ...init,
-    headers,
-    signal: ctrl.signal,
-    cache: "no-store",
-  }).finally(() => clearTimeout(tm));
+  const dispatcher = proxyAgent();
+  const url = `${base()}${path}`;
+  const p = dispatcher
+    ? undiciFetch(url, {
+        method: init.method,
+        body: init.body as string | undefined,
+        headers,
+        signal: ctrl.signal,
+        dispatcher,
+      })
+    : fetch(url, { ...init, headers, signal: ctrl.signal, cache: "no-store" });
+  return (p as Promise<Response>).finally(() => clearTimeout(tm));
 }
 
 /** Authenticated JSON call with one automatic re-auth on 401. */
