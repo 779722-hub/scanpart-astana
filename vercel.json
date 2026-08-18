@@ -1,6 +1,6 @@
 {
-  "regions": ["fra1"],
   "crons": [
-    { "path": "/api/cron/sale-sync", "schedule": "0 2 * * *" }
+    { "path": "/api/cron/sale-sync", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/warm", "schedule": "*/5 * * * *" }
   ]
 }
