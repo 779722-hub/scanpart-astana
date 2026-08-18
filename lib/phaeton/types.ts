@@ -85,7 +85,7 @@ export interface PartOffer {
   /** Article originally came from autodoc.ru catalog lookup, not Phaeton text search. */
   fromCatalog?: boolean;
   /** Which supplier this offer came from. Defaults to phaeton when unset. */
-  source?: "phaeton" | "shatem" | "autotrade";
+  source?: "phaeton" | "shatem" | "autotrade" | "interkom";
   /** Opaque supplier code (Р1/М2) exposed to the client; stored on the order. */
   sourceCode?: string;
   /** URL фото детали (ручное/OEM), если есть и включён показ фото. */

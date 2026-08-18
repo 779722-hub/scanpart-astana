@@ -60,6 +60,7 @@ const FIELDS: {
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
   { key: "show_oem", label: "Показывать OEM-номер оригинала в результатах", kind: "select", options: YESNO_OPTIONS, def: "on" },
   { key: "show_photos", label: "Показывать фото деталей в результатах", kind: "select", options: YESNO_OPTIONS, def: "off" },
+  { key: "interkom_enabled", label: "Поставщик Interkom (склад И6, Астана)", hint: "Логин/пароль задаются в переменных окружения. Включайте после проверки.", kind: "select", options: YESNO_OPTIONS, def: "off" },
   {
     key: "tecdoc_api_key",
     label: "Ключ TecDoc/RapidAPI для авто-фото (опционально)",

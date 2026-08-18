@@ -16,6 +16,8 @@ import { appendSearchLog } from "@/lib/sheets/client";
 import { searchShatemOffers } from "@/lib/shatem/search";
 import { searchAutotradeOffers, searchAutotradeRelated } from "@/lib/autotrade/search";
 import { autotradeConfigured } from "@/lib/autotrade/session";
+import { searchInterkomOffers } from "@/lib/interkom/search";
+import { interkomConfigured } from "@/lib/interkom/session";
 import { articlesByVinAndName, articlesByVehicleAndName } from "@/lib/shatem/catalog";
 import { pickPerSource, partKey } from "@/lib/search/pick";
 import { partPhotoUrl } from "@/lib/parts/photos";
@@ -105,9 +107,15 @@ export async function GET(req: NextRequest) {
     const showPhotos =
       (await getSetting("show_photos").catch(() => "off")) === "on";
 
+    // Interkom (И6) — new Astana supplier. Configured via env; gated behind an
+    // admin toggle (default off) until verified live in prod.
+    const interkomEnabled =
+      interkomConfigured() &&
+      (await getSetting("interkom_enabled").catch(() => "off")) === "on";
+
     // Наценка по диапазонам входящей цены (общая наценка — резерв). Единая для
     // всех складов; по одной цене поставщика, а не по коду склада.
-    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3" };
+    const SOURCE_CODE: Record<string, string> = { phaeton: "Р1", shatem: "М2", autotrade: "Т3", interkom: "И6" };
     const priceFor = (o: PartOffer): number =>
       applyBracketMarkup(o.priceRaw, brackets, markupPct);
 
@@ -394,6 +402,22 @@ export async function GET(req: NextRequest) {
           ).then((lists) => lists.flat())
         : Promise.resolve([]);
 
+    // Fourth supplier — Interkom (opt.interkom.kz, code И6). Article search
+    // prices the query; name search prices the catalog OEMs (capped for
+    // latency). Segment picked from the car make. Astana-only, fail-safe.
+    const interkomTargets = kind === "article" ? [raw] : catalogOems.slice(0, 3);
+    const interkomPromise: Promise<PartOffer[]> =
+      interkomEnabled && interkomTargets.length
+        ? Promise.all(
+            interkomTargets.map((code) =>
+              searchInterkomOffers(code, { markupPct, make: vehicle?.make }).catch((err) => {
+                console.warn("[api/search] interkom lookup failed:", (err as Error).message);
+                return [] as PartOffer[];
+              })
+            )
+          ).then((lists) => lists.flat())
+        : Promise.resolve([]);
+
     // «Сопутствующие товары» — Autotrade's own related products for an article
     // search. Shown in a separate section.
     const autotradeRelatedPromise: Promise<PartOffer[]> =
@@ -404,19 +428,21 @@ export async function GET(req: NextRequest) {
           })
         : Promise.resolve([]);
 
-    const [shatemOffers, autotradeOffers, autotradeRelated] = await Promise.all([
+    const [shatemOffers, autotradeOffers, interkomOffers, autotradeRelated] = await Promise.all([
       shatemPromise,
       autotradePromise,
+      interkomPromise,
       autotradeRelatedPromise,
     ]);
-    // Classify Shate-M / Autotrade offers against the vehicle (they arrive as
-    // "unknown"), so the fit check below sees their make hints too.
+    // Classify Shate-M / Autotrade / Interkom offers against the vehicle (they
+    // arrive as "unknown"), so the fit check below sees their make hints too.
     if (kind === "article" && vehicle?.make) {
       for (const o of shatemOffers) o.compat = classifyCompat(o.name, vehicle).compat;
       for (const o of autotradeOffers) o.compat = classifyCompat(o.name, vehicle).compat;
+      for (const o of interkomOffers) o.compat = classifyCompat(o.name, vehicle).compat;
     }
 
-    if (!shatemOffers.length && !autotradeOffers.length) {
+    if (!shatemOffers.length && !autotradeOffers.length && !interkomOffers.length) {
       // Nothing fast — Phaeton may still carry it, so the client keeps searching.
       logSearch(0);
       return NextResponse.json({
@@ -429,7 +455,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const allOffers: PartOffer[] = [...shatemOffers, ...autotradeOffers];
+    const allOffers: PartOffer[] = [...shatemOffers, ...autotradeOffers, ...interkomOffers];
 
     // Итоговая цена — по диапазонам входящей цены (резерв — общая наценка).
     // До pick/sort, чтобы «дешевле» отражало реальную цену для клиента.
