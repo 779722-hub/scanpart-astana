@@ -128,6 +128,12 @@ export function ResultsList({
       try {
         const pp = new URLSearchParams({ q, k: kind, phase: "phaeton" });
         if (anyCar) pp.set("anycar", "1");
+        // Name search: pass the fast phase's resolved catalog OEMs so the
+        // Phaeton phase prices them directly instead of re-running the slow
+        // (~15s) Laximo lookup. Article search resolves from the query itself.
+        if (kind === "name" && Array.isArray(fast.oem) && fast.oem.length) {
+          pp.set("oems", (fast.oem as string[]).join(","));
+        }
         const res = await fetch(`/api/search?${pp.toString()}`);
         ph = await res.json();
       } catch {

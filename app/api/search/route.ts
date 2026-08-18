@@ -158,23 +158,38 @@ export async function GET(req: NextRequest) {
             needsVin: true,
           }
         : null;
+    // Name-search Phaeton phase can receive the fast phase's already-resolved
+    // catalog OEMs via ?oems=<csv>, so we price them in Phaeton directly and
+    // skip the slow (~15s) Laximo catalog re-resolution. Capped to bound
+    // latency (matches the fast phase's `oem` slice). Falls back to
+    // re-resolution when absent/empty.
+    const providedOems =
+      phase === "phaeton" && kind === "name"
+        ? (req.nextUrl.searchParams.get("oems") ?? "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 8)
+        : [];
     const catalogOems: string[] = vinScoped
-      ? await (ref
-          ? articlesByVehicleAndName(
-              {
-                vehicleId: ref.vehicleId,
-                catalog: ref.catalog,
-                ssd: ref.ssd,
-                brand: vehicle?.make ?? "",
-                name: vehicle?.model ?? "",
-              },
-              raw
-            ).then((ps) => ps.map((p) => p.oem))
-          : articlesByVinAndName(realVin, raw).then((r) => r.parts.map((p) => p.oem))
-        ).catch((err) => {
-          console.warn("[api/search] shatem catalog failed:", (err as Error).message);
-          return [];
-        })
+      ? providedOems.length
+        ? providedOems
+        : await (ref
+            ? articlesByVehicleAndName(
+                {
+                  vehicleId: ref.vehicleId,
+                  catalog: ref.catalog,
+                  ssd: ref.ssd,
+                  brand: vehicle?.make ?? "",
+                  name: vehicle?.model ?? "",
+                },
+                raw
+              ).then((ps) => ps.map((p) => p.oem))
+            : articlesByVinAndName(realVin, raw).then((r) => r.parts.map((p) => p.oem))
+          ).catch((err) => {
+            console.warn("[api/search] shatem catalog failed:", (err as Error).message);
+            return [];
+          })
       : [];
     const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
     const catalogArticleSet = new Set(catalogOems.map(normArt));
