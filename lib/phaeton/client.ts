@@ -6,29 +6,25 @@ import type {
   PhaetonPricesResponse,
 } from "./types";
 
-// 10s: приоритет — быстрая выдача (только Астана + в наличии, ~3.5с). Тёплое
-// соединение (его держит /api/cron/warm) отдаёт даже большой ответ цен за
-// ~2-3с, так что Phaeton успевает и попадает в выдачу. Гнаться за холодным
-// соединением большим таймаутом смысла нет — это делало поиск медленным, а
-// сам огромный ответ Phaeton по API не ужать (Sources/includeAnalogs не
-// фильтруют). Ретрая на таймаут нет: холодный вызов просто не блокирует поиск.
-const DEFAULT_TIMEOUT = 10_000;
+// СТАБИЛЬНОСТЬ ВАЖНЕЕ СКОРОСТИ: Phaeton должен отдавать цены КАЖДЫЙ раз, а не
+// «со второго запроса». Ответ по ходовому артикулу большой (~230КБ, по API не
+// ужать), и на «холодном» соединении с прокси КЗ он доходит за ~11-21с. Поэтому
+// таймаут 20с И повтор при таймауте: если первая попытка не успела, она уже
+// прогрела соединение → повтор по нему проходит быстро, и Phaeton попадает в
+// выдачу в рамках того же запроса. keep-warm (/api/cron/warm) держит соединение
+// тёплым, так что обычно хватает первой попытки за ~2-3с. Так было до
+// оптимизации холодного старта и работало стабильно.
+const DEFAULT_TIMEOUT = 20_000;
 const RETRY_ATTEMPTS = 2; // initial + 1 retry on transient failure
 const RETRY_DELAY_MS = 600;
 
 function isTransient(err: Error): boolean {
   const m = err.message;
   return (
-    /ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up/i.test(m) ||
+    // Таймаут/abort — тоже транзиент: повтор по прогретому соединению успевает.
+    /aborted|timed?\s*out|ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up/i.test(m) ||
     /\b5\d\d\b/.test(m) // any 5xx upstream
   );
-}
-
-// Our own AbortController firing means the call already ran the full timeout —
-// retrying just doubles the wall for a call that won't return quickly, so we
-// never retry an abort/timeout (only fast-failing connection errors above).
-function isAbort(err: Error): boolean {
-  return err.name === "AbortError" || /abort|timed?\s*out/i.test(err.message);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -164,7 +160,7 @@ async function phaetonFetch<T>(
       return (await res.json()) as T;
     } catch (err) {
       lastErr = err as Error;
-      if (attempt < RETRY_ATTEMPTS && isTransient(lastErr) && !isAbort(lastErr)) {
+      if (attempt < RETRY_ATTEMPTS && isTransient(lastErr)) {
         console.warn(
           `[phaeton] ${path} attempt ${attempt} transient: ${lastErr.message.slice(0, 120)} — retrying`
         );
