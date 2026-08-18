@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSetting } from "@/lib/sheets/settings";
 import { getLocations } from "@/lib/shatem/client";
+import { checkProxyHealth } from "@/lib/proxy-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,7 +74,7 @@ export async function GET() {
   }
   const tgToken = (tgTokenSetting || process.env.TELEGRAM_BOT_TOKEN || "").trim();
 
-  const [phaetonOk, shatemReachable, tgTokenOk] = await Promise.all([
+  const [phaetonOk, shatemReachable, tgTokenOk, proxy] = await Promise.all([
     checkUrl(`${phaetonBase}/`),
     // Shate-M lives behind the KZ proxy (its root pinged directly from Vercel
     // always fails — a false alarm). Probe the way search actually uses it:
@@ -84,6 +85,9 @@ export async function GET() {
           .catch(() => false)
       : Promise.resolve(false),
     checkTelegramToken(tgToken),
+    // Живость KZ-прокси (общий канал всех поставщиков). Кэш ~30с + свой таймаут,
+    // fail-safe — латентность /api/health не растёт.
+    checkProxyHealth(),
   ]);
 
   // Заказ уходит в телеграм только если есть И рабочий токен, И чат
@@ -109,6 +113,7 @@ export async function GET() {
         phaeton: phaetonOk ? "ok" : "fail",
         shatem: shatemConfigured ? (shatemReachable ? "ok" : "fail") : "missing",
         autotrade: autotradeConfigured ? "configured" : "missing",
+        proxy: !proxy.configured ? "missing" : proxy.ok ? "ok" : "fail",
         sheets: !sheetsConfigured ? "missing" : sheetsOk ? "ok" : "fail",
         cloudinary:
           process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL

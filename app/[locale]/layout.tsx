@@ -6,6 +6,7 @@ import { locales, type Locale } from "@/lib/i18n-config";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { ProxyBanner } from "@/components/proxy-banner";
 import { ThemeStyle } from "@/components/theme-style";
 import { SeoJsonLd } from "@/components/seo-jsonld";
 import { getImageSlot, imageAlt } from "@/lib/content";
@@ -95,6 +96,7 @@ export default async function LocaleLayout({
           >
             <div className="flex min-h-screen flex-col">
               <SiteHeader />
+              <ProxyBanner />
               <main className="flex-1">{children}</main>
               <SiteFooter />
             </div>

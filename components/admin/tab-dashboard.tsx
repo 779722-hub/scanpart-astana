@@ -15,9 +15,17 @@ const STATUS_LABELS: Record<string, string> = {
   phaeton: "Phaeton (Р1)",
   shatem: "Shate-M (М2)",
   autotrade: "Autotrade (Т3)",
+  proxy: "Прокси",
   sheets: "Google Sheets",
   cloudinary: "Cloudinary",
   telegram: "Telegram",
+};
+
+// Прокси — единый канал всех поставщиков, показываем словами, а не «ok/fail».
+const PROXY_VALUE_RU: Record<string, string> = {
+  ok: "работает",
+  fail: "не работает",
+  missing: "не настроен",
 };
 
 export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
@@ -75,7 +83,12 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
         <div className="mt-4 space-y-2">
           {health ? (
             Object.entries(health.checks).map(([k, v]) => (
-              <Row key={k} label={STATUS_LABELS[k] ?? k} ok={v === "ok" || v === "configured"} value={v} />
+              <Row
+                key={k}
+                label={STATUS_LABELS[k] ?? k}
+                ok={v === "ok" || v === "configured"}
+                value={k === "proxy" ? PROXY_VALUE_RU[v] ?? v : v}
+              />
             ))
           ) : (
             <Loader2 className="h-5 w-5 animate-spin" />

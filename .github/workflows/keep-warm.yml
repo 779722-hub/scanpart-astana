@@ -26,3 +26,11 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "${{ secrets.WARM_PING_URL }}")
           echo "warm ping HTTP $code"
           [ "$code" = "200" ] || exit 1
+
+      # Мониторинг прокси: проверяет живость KZ-прокси и шлёт телеграм при смене
+      # статуса (упал/поднялся). Тот же интервал ~5 мин, что и прогрев.
+      - name: Ping proxy-check endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "${{ secrets.PROXY_CHECK_URL }}")
+          echo "proxy-check ping HTTP $code"
+          [ "$code" = "200" ] || exit 1
