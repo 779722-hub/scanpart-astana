@@ -16,8 +16,11 @@ test("handover code: normalize / validate / match", () => {
 
 test("status transitions: only forward moves allowed", () => {
   assert.equal(canTransition("new", "assigned"), true);
-  assert.equal(canTransition("assigned", "picking"), true);
+  // Курьер сначала принимает доставку (accepted), затем забирает (picking).
+  assert.equal(canTransition("assigned", "accepted"), true);
+  assert.equal(canTransition("accepted", "picking"), true);
   assert.equal(canTransition("en_route", "delivered"), true);
+  assert.equal(canTransition("assigned", "picking"), false); // нельзя мимо accepted
   assert.equal(canTransition("new", "delivered"), false); // can't skip
   assert.equal(canTransition("delivered", "en_route"), false); // terminal
   assert.equal(canTransition("picking", "canceled"), true);
