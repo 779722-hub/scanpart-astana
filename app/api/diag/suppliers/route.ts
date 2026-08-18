@@ -38,6 +38,13 @@ function mask(msg: string): string {
   return s;
 }
 
+function causeOf(err: unknown): string {
+  const e = err as { cause?: { code?: string; message?: string } };
+  const c = e?.cause;
+  if (!c) return "";
+  return mask(`${c.code ?? ""} ${c.message ?? ""}`.trim()).slice(0, 200);
+}
+
 async function timed<T>(fn: () => Promise<T>) {
   const t0 = Date.now();
   try {
@@ -48,7 +55,36 @@ async function timed<T>(fn: () => Promise<T>) {
       ok: false as const,
       ms: Date.now() - t0,
       error: mask((err as Error).message).slice(0, 400),
+      cause: causeOf(err),
     };
+  }
+}
+
+/** Raw fetch probe (no app client), optionally through the Phaeton proxy. */
+async function probe(url: string, useProxy: boolean) {
+  const { ProxyAgent, fetch: uf } = await import("undici");
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), 8000);
+  const t0 = Date.now();
+  try {
+    const proxyUrl = process.env.PHAETON_PROXY_URL;
+    const dispatcher =
+      useProxy && proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+    const res = await uf(url, {
+      signal: ctrl.signal,
+      dispatcher,
+      headers: { accept: "*/*" },
+    });
+    return { ok: true as const, ms: Date.now() - t0, status: res.status };
+  } catch (err) {
+    return {
+      ok: false as const,
+      ms: Date.now() - t0,
+      error: mask((err as Error).message).slice(0, 200),
+      cause: causeOf(err),
+    };
+  } finally {
+    clearTimeout(tm);
   }
 }
 
@@ -116,10 +152,20 @@ export async function GET(req: NextRequest) {
     return { configured: true, offers: offers.length };
   });
 
+  // Сырые пробы: отличить проблему прокси от прямой сети и контрольный хост.
+  const probes = {
+    telegram_direct: await probe("https://api.telegram.org/", false),
+    shatem_direct: await probe("https://api.shate-m.kz/api/v1/locations", false),
+    autotrade_direct: await probe("https://sklad.autotrade.kz/login/", false),
+    phaeton_direct: await probe("https://api.phaeton.kz/", false),
+    phaeton_via_proxy: await probe("https://api.phaeton.kz/", true),
+  };
+
   return NextResponse.json({
     ok: true,
     query: q,
     env,
+    probes,
     phaeton: { warehouses: phaetonWarehouses, dictionary: phaetonDict, brands: phaetonBrands },
     shatem: {
       articles: shatemArticles,
