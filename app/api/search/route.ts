@@ -87,11 +87,9 @@ export async function GET(req: NextRequest) {
       );
     };
 
-    const [warehouseIds, markupPct, analogsMax, whMarkup, showOemSetting] = await Promise.all([
-      getAstanaWarehouseIds().catch((err) => {
-        console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
-        return [] as string[];
-      }),
+    // NB: Astana warehouse IDs come from Phaeton's /api/Dictionary, so we resolve
+    // them ONLY inside the Phaeton phase below — the fast path never calls Phaeton.
+    const [markupPct, analogsMax, whMarkup, showOemSetting] = await Promise.all([
       getMarkupPercent(),
       getAnalogsMax(),
       getWarehouseMarkupMap().catch(() => ({} as Record<string, number>)),
@@ -197,6 +195,13 @@ export async function GET(req: NextRequest) {
     // phase, and return them for the client to append. Never blocks the UI.
     // ======================================================================
     if (phase === "phaeton") {
+      // Astana warehouse IDs (Phaeton Dictionary, 24h in-module cache) — used to
+      // filter Phaeton price items and scope searchPrices. Fail-safe to [].
+      const warehouseIds = await getAstanaWarehouseIds().catch((err) => {
+        console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
+        return [] as string[];
+      });
+
       // Step A — brands. For a VIN-scoped name search, price ONLY the catalog
       // OEMs (vehicle-fit). Free-text Phaeton search isn't vehicle-aware, so
       // it's used only when there is no known vehicle (also feeds autodoc/alias).
