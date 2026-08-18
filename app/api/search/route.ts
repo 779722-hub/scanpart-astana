@@ -21,6 +21,9 @@ import { pickPerSource, partKey } from "@/lib/search/pick";
 import { partPhotoUrl } from "@/lib/parts/photos";
 
 export const runtime = "nodejs";
+// Фоновая фаза Phaeton (?phase=phaeton) на холодном инстансе тянет ~230КБ по
+// прокси КЗ >20с (таймаут клиента 25с + возможный повтор) — даём запас.
+export const maxDuration = 60;
 const MAX_BRANDS_TO_QUERY = 6;
 const MAX_BRANDS_TO_QUERY_NAME = 12;
 const AUTODOC_TOP_N = 8;
@@ -52,6 +55,10 @@ export async function GET(req: NextRequest) {
   const raw = (req.nextUrl.searchParams.get("q") ?? "").trim();
   const kind: "article" | "name" =
     req.nextUrl.searchParams.get("k") === "name" ? "name" : "article";
+  // Прогрессивная выдача: быстрые поставщики (М2/Т3-Т5) — сразу, а Phaeton (Р1)
+  // грузится клиентом отдельным фоновым запросом ?phase=phaeton и дописывается
+  // в список. Быстрый путь НЕ обращается к Phaeton вовсе.
+  const phase = req.nextUrl.searchParams.get("phase");
   if (!raw) {
     return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   }
@@ -161,9 +168,198 @@ export async function GET(req: NextRequest) {
     const normArt = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
     const catalogArticleSet = new Set(catalogOems.map(normArt));
 
+    // Shared payload mapper — strip supplier `source` (never leaks to the
+    // client) and stamp the opaque warehouse code (Р1/М2/Т3-Т5). Used by both
+    // the fast phase and the Phaeton phase so their offers are shaped identically.
+    const codeOffers = (list: PartOffer[]) =>
+      list.map(({ source, ...o }) => {
+        // Prefer a per-offer code (Autotrade sets its warehouse's own Т3/Т4/Т5);
+        // otherwise fall back to the source default (Phaeton Р1, Shate-M М2).
+        const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
+        return {
+          ...o,
+          image: showPhotos ? partPhotoUrl(o.article, o.brand) : undefined,
+          warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${code})`,
+          // Opaque supplier code — carried explicitly so it can be stored on the
+          // order for internal pickup routing.
+          sourceCode: code === "?" ? "" : code,
+          // A VIN-scoped search draws every part from the vehicle's own catalog,
+          // so they all fit — show them all as confirmed.
+          ...(vinScoped
+            ? { compat: "match" as const, compatReason: "подобрано по каталогу для вашего авто" }
+            : {}),
+        };
+      });
+
+    // ======================================================================
+    // PHAETON PHASE — background-only. Query ONLY Phaeton (Р1), build offers
+    // with the SAME Astana/in-stock filter + markup + coded label as the fast
+    // phase, and return them for the client to append. Never blocks the UI.
+    // ======================================================================
+    if (phase === "phaeton") {
+      // Step A — brands. For a VIN-scoped name search, price ONLY the catalog
+      // OEMs (vehicle-fit). Free-text Phaeton search isn't vehicle-aware, so
+      // it's used only when there is no known vehicle (also feeds autodoc/alias).
+      let brandsItems: PhaetonBrandItem[];
+      const autodocKeys = new Set<string>();
+      const aliasKeys = new Set<string>();
+      {
+        const variants: string[] = vinScoped ? [...catalogOems] : [raw];
+        if (kind === "name" && !vinScoped && vehicle?.make) {
+          variants.push(`${raw} ${vehicle.make}`);
+          if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
+            variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
+          }
+        }
+        const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
+        // Autodoc-фолбэк включается флагом — по умолчанию выключен.
+        const autodocOn = process.env.AUTODOC_ENABLED === "true";
+        const autodocPromise =
+          kind === "name" && autodocOn && !vinScoped
+            ? autodocFindArticles(raw, {
+                make: vehicle?.make,
+                model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
+              }).catch((err) => {
+                console.warn("[api/search] autodoc lookup failed:", (err as Error).message);
+                return { parts: [], status: 0, challenge: false, triedUrls: [] };
+              })
+            : Promise.resolve({ parts: [], status: 0, challenge: false, triedUrls: [] });
+
+        // Словарь синонимов из админки (query → (Brand, Article)).
+        const aliasPromise =
+          kind === "name" && !vinScoped
+            ? findAliasMatches(raw, vehicle?.make).catch((err) => {
+                console.warn("[api/search] alias lookup failed:", (err as Error).message);
+                return [];
+              })
+            : Promise.resolve([]);
+
+        const [brandResponses, autodoc, aliases] = await Promise.all([
+          phaetonPromise,
+          autodocPromise,
+          aliasPromise,
+        ]);
+
+        const seen = new Set<string>();
+        brandsItems = [];
+        for (const r of brandResponses) {
+          if (r.status !== "fulfilled" || r.value.IsError) continue;
+          for (const it of r.value.Items ?? []) {
+            const k = `${it.Brand}|${it.Article}`;
+            if (seen.has(k)) continue;
+            seen.add(k);
+            brandsItems.push(it);
+          }
+        }
+        for (const p of (autodoc.parts ?? []).slice(0, AUTODOC_TOP_N)) {
+          const k = `${p.brand}|${p.article}`;
+          autodocKeys.add(k.toUpperCase());
+          if (seen.has(k)) continue;
+          seen.add(k);
+          brandsItems.push({ Brand: p.brand, Article: p.article, Name: p.name });
+        }
+        for (const ba of aliases) {
+          const k = `${ba.brand}|${ba.article}`;
+          aliasKeys.add(k.toUpperCase());
+          if (seen.has(k)) continue;
+          seen.add(k);
+          brandsItems.push({ Brand: ba.brand, Article: ba.article, Name: "" });
+        }
+      }
+
+      if (!brandsItems.length) {
+        return NextResponse.json({ ok: true, offers: [] });
+      }
+
+      // Step B — prices for each brand in parallel.
+      const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
+      const priceResponses = await Promise.allSettled(
+        brandsItems.slice(0, cap).map((b) =>
+          searchPrices({
+            article: b.Article,
+            brand: b.Brand,
+            warehouseIds,
+            includeAnalogs: true,
+          })
+        )
+      );
+
+      const rawItems: PhaetonPriceItem[] = [];
+      priceResponses.forEach((r) => {
+        if (r.status === "fulfilled" && !r.value.IsError) {
+          rawItems.push(...(r.value.Items ?? []));
+        }
+      });
+
+      const queryTokens = kind === "name" ? tokenize(raw) : [];
+      const matchesAllWords = (name: string): boolean => {
+        if (!queryTokens.length) return true;
+        const hay = (name || "").toLowerCase();
+        return queryTokens.every((tok) => hay.includes(tok));
+      };
+      const isAtAstana = (i: PhaetonPriceItem): boolean => {
+        if (warehouseIds.length && i.WarehouseId && warehouseIds.includes(i.WarehouseId)) return true;
+        return /астана|astana/i.test(i.Warehouse ?? "");
+      };
+
+      const normArticle = raw.toUpperCase().replace(/[\s\-]/g, "");
+      const phaetonOffers: PartOffer[] = rawItems
+        .filter((i) => (i.AvailableCount ?? 0) > 0 && (i.Price ?? 0) > 0)
+        .map((i): PartOffer => {
+          const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
+          const isOriginal = cleanArticle === normArticle;
+          const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
+          const compat = classifyCompat(name, vehicle);
+          const days = shipmentDays(i);
+          const k = `${i.Brand}|${i.Article}`.toUpperCase();
+          const fromCatalog =
+            autodocKeys.has(k) || aliasKeys.has(k) || catalogArticleSet.has(cleanArticle);
+          return {
+            id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
+            brand: i.Brand,
+            article: i.Article,
+            name,
+            priceRaw: i.Price,
+            priceFinal: applyMarkup(i.Price, markupPct),
+            quantity: i.AvailableCount ?? 0,
+            warehouse: i.Warehouse,
+            isOriginal,
+            compat: compat.compat,
+            compatReason: compat.reason,
+            atAstana: isAtAstana(i),
+            inStockNow: days === 0,
+            matchesAllWords: fromCatalog ? true : matchesAllWords(name),
+            shipmentDays: days,
+            fromCatalog,
+            source: "phaeton",
+          };
+        });
+
+      // Re-price with the warehouse markup (Р1 override or global).
+      for (const o of phaetonOffers) o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
+
+      // Astana + in-stock now; word-match for name search (same as fast phase).
+      const wantsWords = kind === "name" && queryTokens.length > 0;
+      const inAstanaStock = phaetonOffers.filter(
+        (o) => o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords)
+      );
+      const picked = pickPerSource(inAstanaStock, analogsMax);
+
+      return NextResponse.json({ ok: true, offers: codeOffers(picked) });
+    }
+
+    // ======================================================================
+    // FAST PHASE — Shate-M (М2) + Autotrade (Т3-Т5) only. Returns quickly even
+    // on a cold instance. Sets `phaetonPending` when Phaeton could contribute
+    // (article search always; name search when there are catalog OEMs) so the
+    // client fetches the Phaeton phase in the background.
+    // ======================================================================
+    const phaetonPending =
+      kind === "article" || (kind === "name" && catalogOems.length > 0);
+
     // Second supplier — Shate-M price/stock (Astana, in-stock). Article search
     // prices the query; name search prices the catalog OEMs. Gated by apikey,
-    // fully fail-safe so a Shate-M outage never breaks Phaeton results.
+    // fully fail-safe.
     const shatemTargets = kind === "article" ? [raw] : catalogOems;
     const shatemPromise: Promise<PartOffer[]> =
       process.env.SHATEM_API_KEY && shatemTargets.length
@@ -179,7 +375,7 @@ export async function GET(req: NextRequest) {
 
     // Third supplier — Autotrade (sklad.autotrade.kz, code Т3). Article search
     // prices the query (+ crosses/analogs); name search prices the catalog OEMs
-    // (capped for latency — two API calls per target). Astana-only, fail-safe.
+    // (capped for latency). Astana-only, fail-safe.
     const autotradeTargets = kind === "article" ? [raw] : catalogOems.slice(0, 3);
     const autotradePromise: Promise<PartOffer[]> =
       autotradeConfigured() && autotradeTargets.length
@@ -193,8 +389,8 @@ export async function GET(req: NextRequest) {
           ).then((lists) => lists.flat())
         : Promise.resolve([]);
 
-    // «Сопутствующие товары» — Autotrade's own related products (mounting kits,
-    // caliper grease…) for an article search. Shown in a separate section.
+    // «Сопутствующие товары» — Autotrade's own related products for an article
+    // search. Shown in a separate section.
     const autotradeRelatedPromise: Promise<PartOffer[]> =
       kind === "article" && autotradeConfigured()
         ? searchAutotradeRelated(raw, { markupPct }).catch((err) => {
@@ -203,120 +399,20 @@ export async function GET(req: NextRequest) {
           })
         : Promise.resolve([]);
 
-    // Step A — brands. For name search with a known vehicle we run several
-    // text variants in parallel ("колодки", "колодки Nissan", "колодки
-    // Nissan X-Trail") and merge their brand lists, dedupe by Brand+Article.
-    // For name kind we ALSO query autodoc.ru in parallel: Phaeton's text
-    // search is poor for Russian queries, but autodoc gives real (Brand,
-    // Article) pairs that we then price through Phaeton like normal.
-    let brandsItems: PhaetonBrandItem[];
-    const autodocKeys = new Set<string>();
-    const aliasKeys = new Set<string>();
-    {
-      // For a VIN-scoped name search, price ONLY the catalog OEMs (vehicle-fit).
-      // Free-text Phaeton search is not vehicle-aware and returns parts that
-      // don't fit the car, so it's used only when there is no known vehicle.
-      const variants: string[] = vinScoped ? [...catalogOems] : [raw];
-      if (kind === "name" && !vinScoped && vehicle?.make) {
-        variants.push(`${raw} ${vehicle.make}`);
-        if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
-          variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
-        }
-      }
-      const phaetonPromise = Promise.allSettled(variants.map((v) => searchBrands(v)));
-      // Autodoc-фолбэк включается флагом — по умолчанию выключен,
-      // чтобы случайно не показать клиенту нерелевантные карточки из
-      // боковых блоков «похожие товары». Включается через env
-      // AUTODOC_ENABLED=true после ручной проверки в /api/catalog/debug.
-      const autodocOn = process.env.AUTODOC_ENABLED === "true";
-      const autodocPromise =
-        kind === "name" && autodocOn && !vinScoped
-          ? autodocFindArticles(raw, {
-              make: vehicle?.make,
-              model: vehicle?.model && vehicle.model !== "—" ? vehicle.model : undefined,
-            }).catch((err) => {
-              console.warn("[api/search] autodoc lookup failed:", (err as Error).message);
-              return { parts: [], status: 0, challenge: false, triedUrls: [] };
-            })
-          : Promise.resolve({ parts: [], status: 0, challenge: false, triedUrls: [] });
-
-      // Словарь синонимов из админки. Это основной источник для
-      // name-поиска: админ вручную ведёт пары query → (Brand, Article),
-      // и Phaeton прайсит их без проблем.
-      const aliasPromise =
-        kind === "name" && !vinScoped
-          ? findAliasMatches(raw, vehicle?.make).catch((err) => {
-              console.warn("[api/search] alias lookup failed:", (err as Error).message);
-              return [];
-            })
-          : Promise.resolve([]);
-
-      const [brandResponses, autodoc, aliases] = await Promise.all([
-        phaetonPromise,
-        autodocPromise,
-        aliasPromise,
-      ]);
-
-      const seen = new Set<string>();
-      brandsItems = [];
-      for (const r of brandResponses) {
-        if (r.status !== "fulfilled" || r.value.IsError) continue;
-        for (const it of r.value.Items ?? []) {
-          const k = `${it.Brand}|${it.Article}`;
-          if (seen.has(k)) continue;
-          seen.add(k);
-          brandsItems.push(it);
-        }
-      }
-      for (const p of (autodoc.parts ?? []).slice(0, AUTODOC_TOP_N)) {
-        const k = `${p.brand}|${p.article}`;
-        const upper = k.toUpperCase();
-        autodocKeys.add(upper);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        brandsItems.push({ Brand: p.brand, Article: p.article, Name: p.name });
-      }
-      for (const ba of aliases) {
-        const k = `${ba.brand}|${ba.article}`;
-        const upper = k.toUpperCase();
-        aliasKeys.add(upper);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        // Name пустой — Phaeton подставит своё в priceItem.Name.
-        brandsItems.push({ Brand: ba.brand, Article: ba.article, Name: "" });
-      }
-    }
-
-    // Step B — prices for each brand in parallel. Kick this off NOW (it depends
-    // only on brandsItems + warehouseIds) so the Phaeton price round-trips
-    // overlap the Shate-M/Autotrade await instead of running strictly after it.
-    const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
-    const toQuery = brandsItems.slice(0, cap);
-    const pricePromise = Promise.allSettled(
-      toQuery.map((b) =>
-        searchPrices({
-          article: b.Article,
-          brand: b.Brand,
-          warehouseIds,
-          includeAnalogs: true,
-        })
-      )
-    );
-
-    // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
-    // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
     const [shatemOffers, autotradeOffers, autotradeRelated] = await Promise.all([
       shatemPromise,
       autotradePromise,
       autotradeRelatedPromise,
     ]);
-    // Classify Shate-M / Autotrade offers against the vehicle too (they arrive
-    // as "unknown"), so the fit check below sees their make hints as well.
+    // Classify Shate-M / Autotrade offers against the vehicle (they arrive as
+    // "unknown"), so the fit check below sees their make hints too.
     if (kind === "article" && vehicle?.make) {
       for (const o of shatemOffers) o.compat = classifyCompat(o.name, vehicle).compat;
       for (const o of autotradeOffers) o.compat = classifyCompat(o.name, vehicle).compat;
     }
-    if (!brandsItems.length && !shatemOffers.length && !autotradeOffers.length) {
+
+    if (!shatemOffers.length && !autotradeOffers.length) {
+      // Nothing fast — Phaeton may still carry it, so the client keeps searching.
       logSearch(0);
       return NextResponse.json({
         ok: true,
@@ -324,87 +420,26 @@ export async function GET(req: NextRequest) {
         query: raw,
         offers: [],
         ...(vinSteer ? { fitWarning: vinSteer } : {}),
+        phaetonPending,
       });
     }
 
-    // Prices were kicked off before the Shate-M/Autotrade await above.
-    const priceResponses = await pricePromise;
+    const allOffers: PartOffer[] = [...shatemOffers, ...autotradeOffers];
 
-    const rawItems: PhaetonPriceItem[] = [];
-    priceResponses.forEach((r) => {
-      if (r.status === "fulfilled" && !r.value.IsError) {
-        rawItems.push(...(r.value.Items ?? []));
-      }
-    });
-
-    // Tokenize query for the words-AND filter (name search only).
-    const queryTokens = kind === "name" ? tokenize(raw) : [];
-    const matchesAllWords = (name: string): boolean => {
-      if (!queryTokens.length) return true;
-      const hay = (name || "").toLowerCase();
-      return queryTokens.every((tok) => hay.includes(tok));
-    };
-    const isAtAstana = (i: PhaetonPriceItem): boolean => {
-      if (warehouseIds.length && i.WarehouseId && warehouseIds.includes(i.WarehouseId)) return true;
-      return /астана|astana/i.test(i.Warehouse ?? "");
-    };
-
-    const normArticle = raw.toUpperCase().replace(/[\s\-]/g, "");
-    const allOffers: PartOffer[] = rawItems
-      .filter((i) => (i.AvailableCount ?? 0) > 0 && (i.Price ?? 0) > 0)
-      .map((i): PartOffer => {
-        const cleanArticle = (i.CleanArticle ?? i.Article).toUpperCase().replace(/[\s\-]/g, "");
-        const isOriginal = cleanArticle === normArticle;
-        const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
-        const compat = classifyCompat(name, vehicle);
-        const days = shipmentDays(i);
-        const k = `${i.Brand}|${i.Article}`.toUpperCase();
-        const fromCatalog =
-          autodocKeys.has(k) || aliasKeys.has(k) || catalogArticleSet.has(cleanArticle);
-        return {
-          id: `${i.Brand}|${i.Article}|${i.WarehouseId ?? ""}`,
-          brand: i.Brand,
-          article: i.Article,
-          name,
-          priceRaw: i.Price,
-          priceFinal: applyMarkup(i.Price, markupPct),
-          quantity: i.AvailableCount ?? 0,
-          warehouse: i.Warehouse,
-          isOriginal,
-          compat: compat.compat,
-          compatReason: compat.reason,
-          atAstana: isAtAstana(i),
-          inStockNow: days === 0,
-          // autodoc-curated articles are already matched semantically to the
-          // query — don't re-filter them by word presence in the (often
-          // truncated) Phaeton name.
-          matchesAllWords: fromCatalog ? true : matchesAllWords(name),
-          shipmentDays: days,
-          fromCatalog,
-          source: "phaeton",
-        };
-      });
-
-    // Merge Shate-M + Autotrade offers (already normalized + Astana/in-stock).
-    if (shatemOffers.length) allOffers.push(...shatemOffers);
-    if (autotradeOffers.length) allOffers.push(...autotradeOffers);
-
-    // Re-price every offer with its warehouse's markup (global unless the
-    // warehouse has its own markup set in admin «Склады»). Done before the
+    // Re-price every offer with its warehouse's markup. Done before the
     // pick/sort so "cheapest" reflects the real customer price.
     for (const o of allOffers) o.priceFinal = applyMarkup(o.priceRaw, markupForOffer(o));
 
+    // Tokenize query for the words-AND filter (name search only).
+    const queryTokens = kind === "name" ? tokenize(raw) : [];
+
     // Show ONLY what the customer asked for: Astana warehouses, in stock now.
-    // No relaxation to delivery/other cities. Word-match applies to name
-    // search; compat is a sort hint, never a hard filter, so vehicle-fit
-    // catalog parts are never dropped.
     const wantsWords = kind === "name" && queryTokens.length > 0;
     const inAstanaStock = allOffers.filter(
       (o) => o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords)
     );
 
-    // Up to `analogsMax` (admin setting) distinct parts from EACH warehouse
-    // (Р1/М2/Т3/Т4/Т5), deduped by part number so every warehouse is represented.
+    // Up to `analogsMax` distinct parts from EACH warehouse, deduped by part number.
     const picked = pickPerSource(inAstanaStock, analogsMax);
 
     if (!picked.length) {
@@ -415,6 +450,7 @@ export async function GET(req: NextRequest) {
         query: raw,
         offers: [],
         ...(vinSteer ? { fitWarning: vinSteer } : {}),
+        phaetonPending,
       });
     }
 
@@ -423,29 +459,7 @@ export async function GET(req: NextRequest) {
 
     logSearch(picked.length);
 
-    // Coded supplier label — never expose the real supplier name to customers.
-    // Each source gets an opaque code shown in parentheses after the city.
-    // Strip `source` from the payload so the real supplier never reaches the
-    // client — only the opaque code survives, embedded in the warehouse label.
-    const offers = picked.map(({ source, ...o }) => {
-      // Prefer a per-offer code (Autotrade sets its warehouse's own Т3/Т4/Т5);
-      // otherwise fall back to the source default (Phaeton Р1, Shate-M М2).
-      const code = o.sourceCode || SOURCE_CODE[source ?? "phaeton"] || "?";
-      return {
-      ...o,
-      image: showPhotos ? partPhotoUrl(o.article, o.brand) : undefined,
-      warehouse: `${o.atAstana ? "Астана" : o.warehouse || "склад"} (${code})`,
-      // Opaque supplier code — already shown to the client in the label; carried
-      // explicitly so it can be stored on the order for internal pickup routing.
-      sourceCode: code === "?" ? "" : code,
-      // A VIN-scoped search draws every part from the vehicle's own catalog, so
-      // they all fit — show them all as confirmed rather than the misleading
-      // "совместимость не подтверждена" that name-text heuristics produce.
-      ...(vinScoped
-        ? { compat: "match" as const, compatReason: "подобрано по каталогу для вашего авто" }
-        : {}),
-      };
-    });
+    const offers = codeOffers(picked);
 
     // «Сопутствующие товары» — re-price by warehouse markup, drop anything
     // already shown in the main results, cap and code like the main offers.
@@ -479,8 +493,7 @@ export async function GET(req: NextRequest) {
 
     // Part-number search for a KNOWN vehicle: warn whenever NO result is a
     // confirmed fit. "mismatch" = the description names a different car (loud,
-    // hidden). "unconfirmed" = we can't confirm fit from the description (loud
-    // banner, parts still shown). A single confirmed "match" clears the warning.
+    // hidden). "unconfirmed" = we can't confirm fit (loud banner, parts shown).
     const vehLabel = vehicle
       ? {
           make: vehicle.make,
@@ -500,14 +513,12 @@ export async function GET(req: NextRequest) {
         level: picked.some((o) => o.compat === "mismatch") ? "mismatch" : "unconfirmed",
       };
     } else if (kind === "name" && vehLabel && !realVin && !ref && picked.length > 0) {
-      // A car was chosen MANUALLY without the catalog (free-text make/model, no
-      // VIN and no wizard ref) — matches aren't verified. Warn and point to VIN.
+      // A car was chosen MANUALLY without the catalog — matches aren't verified.
       fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
     }
 
     // Оригинальный (OEM) номер = ЗАВОДСКОЙ номер для выбранного авто, из
-    // VIN-каталога Laximo (Shate-M) — доступен при поиске по названию. Для
-    // поиска по «сырому» артикулу заводского OEM у нас нет, поэтому не выдумываем.
+    // VIN-каталога Laximo (Shate-M) — доступен при поиске по названию.
     const oem =
       kind === "name" && showOem
         ? Array.from(new Set(catalogOems.filter(Boolean))).slice(0, 8)
@@ -523,6 +534,7 @@ export async function GET(req: NextRequest) {
       level: "exact",
       relaxed: false,
       fitWarning,
+      phaetonPending,
     });
   } catch (err) {
     const msg = (err as Error).message;

@@ -17,6 +17,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { PartOffer, RelaxLevel } from "@/lib/phaeton/types";
+import { partKey } from "@/lib/search/pick";
 import { useCart } from "@/lib/cart";
 import { PartPhotoLightbox } from "@/components/part-photo-lightbox";
 
@@ -60,38 +61,101 @@ export function ResultsList({
   const [state, setState] = useState<State>({ kind: "loading" });
   const [revealed, setRevealed] = useState(false);
   const [sort, setSort] = useState<"asc" | "desc">("asc");
+  // Phaeton (Р1) грузится вторым фоновым запросом и дописывается в список —
+  // пока он идёт, показываем ненавязчивый индикатор «Ищем ещё предложения…».
+  const [phaetonSearching, setPhaetonSearching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setPhaetonSearching(false);
     (async () => {
+      // Fast phase — Shate-M/Autotrade, returns immediately.
+      let fast: {
+        ok?: boolean;
+        empty?: boolean;
+        offers?: PartOffer[];
+        related?: PartOffer[];
+        oem?: string[];
+        level?: RelaxLevel;
+        fitWarning?: FitWarning | null;
+        phaetonPending?: boolean;
+      };
       try {
         const params = new URLSearchParams({ q, k: kind });
         if (strict) params.set("strict", "1");
         const res = await fetch(`/api/search?${params.toString()}`);
-        const json = await res.json();
+        fast = await res.json();
         if (cancelled) return;
-        if (!res.ok || !json.ok) {
+        if (!res.ok || !fast.ok) {
           setState({ kind: "error" });
           return;
         }
-        if (json.empty || !json.offers?.length) {
-          setState({
-            kind: "empty",
-            fit: (json.fitWarning as FitWarning | null) ?? null,
-          });
-          return;
-        }
-        setState({
-          kind: "ok",
-          offers: json.offers as PartOffer[],
-          related: (json.related as PartOffer[]) ?? [],
-          oem: (json.oem as string[]) ?? [],
-          level: (json.level as RelaxLevel) ?? "exact",
-          fit: (json.fitWarning as FitWarning | null) ?? null,
-        });
       } catch {
         if (!cancelled) setState({ kind: "error" });
+        return;
       }
+
+      const pending = Boolean(fast.phaetonPending);
+      const fastFit = (fast.fitWarning as FitWarning | null) ?? null;
+      const hasFast = !fast.empty && !!fast.offers?.length;
+
+      if (hasFast) {
+        setState({
+          kind: "ok",
+          offers: fast.offers as PartOffer[],
+          related: (fast.related as PartOffer[]) ?? [],
+          oem: (fast.oem as string[]) ?? [],
+          level: (fast.level as RelaxLevel) ?? "exact",
+          fit: fastFit,
+        });
+        if (pending) setPhaetonSearching(true);
+      } else if (pending) {
+        // Nothing fast yet, but Phaeton may still carry it — keep the spinner
+        // up instead of flashing "empty" before the background result lands.
+        setState({ kind: "loading" });
+      } else {
+        setState({ kind: "empty", fit: fastFit });
+        return;
+      }
+
+      if (!pending) return;
+
+      // Phaeton phase — background. Additive: merge new offers, never error out.
+      let ph: { ok?: boolean; offers?: PartOffer[] } | null = null;
+      try {
+        const pp = new URLSearchParams({ q, k: kind, phase: "phaeton" });
+        const res = await fetch(`/api/search?${pp.toString()}`);
+        ph = await res.json();
+      } catch {
+        ph = null;
+      }
+      if (cancelled) return;
+      setPhaetonSearching(false);
+      const incoming: PartOffer[] =
+        ph && ph.ok && Array.isArray(ph.offers) ? ph.offers : [];
+
+      setState((prev) => {
+        const existing = prev.kind === "ok" ? prev.offers : [];
+        const keys = new Set(existing.map(partKey));
+        const merged = [...existing];
+        for (const o of incoming) {
+          const k = partKey(o);
+          if (keys.has(k)) continue;
+          keys.add(k);
+          merged.push(o);
+        }
+        if (!merged.length) return { kind: "empty", fit: fastFit };
+        if (prev.kind === "ok") return { ...prev, offers: merged };
+        // We were in the "loading" bridge (empty fast + pending) — go to ok.
+        return {
+          kind: "ok",
+          offers: merged,
+          related: (fast.related as PartOffer[]) ?? [],
+          oem: (fast.oem as string[]) ?? [],
+          level: (fast.level as RelaxLevel) ?? "exact",
+          fit: fastFit,
+        };
+      });
     })();
     return () => {
       cancelled = true;
@@ -178,6 +242,13 @@ export function ResultsList({
       {sortedOffers.map((o, i) => (
         <OfferCard key={o.id} offer={o} index={i} locale={locale} />
       ))}
+
+      {phaetonSearching && (
+        <div className="flex items-center justify-center gap-2 py-2 text-sm text-ink-mute dark:text-paper-mute">
+          <Loader2 className="h-4 w-4 animate-spin text-brand" />
+          <span>{t("searchingMore")}</span>
+        </div>
+      )}
 
       {state.related.length > 0 && (
         <div className="space-y-3 pt-6">
