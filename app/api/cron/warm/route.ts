@@ -18,10 +18,15 @@ export const maxDuration = 30;
  * инстансу и токенам «остыть».
  */
 export async function GET(req: NextRequest) {
+  // Прогрев можно дёргать: Vercel-кроном (Authorization: Bearer CRON_SECRET) —
+  // недоступно на Hobby (только суточные кроны) — ИЛИ внешним бесплатным
+  // планировщиком по URL с ключом: /api/cron/warm?key=CRON_SECRET.
   const secret = process.env.CRON_SECRET;
-  const isCron =
+  const byHeader =
     Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`;
-  if (!isCron) {
+  const byQuery =
+    Boolean(secret) && req.nextUrl.searchParams.get("key") === secret;
+  if (!byHeader && !byQuery) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

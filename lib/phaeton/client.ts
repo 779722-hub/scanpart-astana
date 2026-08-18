@@ -6,16 +6,23 @@ import type {
   PhaetonPricesResponse,
 } from "./types";
 
-const DEFAULT_TIMEOUT = 20_000;
+const DEFAULT_TIMEOUT = 8_000;
 const RETRY_ATTEMPTS = 2; // initial + 1 retry on transient failure
 const RETRY_DELAY_MS = 600;
 
 function isTransient(err: Error): boolean {
   const m = err.message;
   return (
-    /aborted|timed?\s*out|ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up/i.test(m) ||
+    /ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up/i.test(m) ||
     /\b5\d\d\b/.test(m) // any 5xx upstream
   );
+}
+
+// Our own AbortController firing means the call already ran the full timeout —
+// retrying just doubles the wall for a call that won't return quickly, so we
+// never retry an abort/timeout (only fast-failing connection errors above).
+function isAbort(err: Error): boolean {
+  return err.name === "AbortError" || /abort|timed?\s*out/i.test(err.message);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -151,7 +158,7 @@ async function phaetonFetch<T>(
       return (await res.json()) as T;
     } catch (err) {
       lastErr = err as Error;
-      if (attempt < RETRY_ATTEMPTS && isTransient(lastErr)) {
+      if (attempt < RETRY_ATTEMPTS && isTransient(lastErr) && !isAbort(lastErr)) {
         console.warn(
           `[phaeton] ${path} attempt ${attempt} transient: ${lastErr.message.slice(0, 120)} — retrying`
         );

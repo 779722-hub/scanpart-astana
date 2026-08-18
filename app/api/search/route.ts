@@ -271,6 +271,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Step B — prices for each brand in parallel. Kick this off NOW (it depends
+    // only on brandsItems + warehouseIds) so the Phaeton price round-trips
+    // overlap the Shate-M/Autotrade await instead of running strictly after it.
+    const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
+    const toQuery = brandsItems.slice(0, cap);
+    const pricePromise = Promise.allSettled(
+      toQuery.map((b) =>
+        searchPrices({
+          article: b.Article,
+          brand: b.Brand,
+          warehouseIds,
+          includeAnalogs: true,
+        })
+      )
+    );
+
     // Await Shate-M early: a part Phaeton doesn't carry may still be in stock
     // at Shate-M, so we must not short-circuit on an empty Phaeton brand list.
     const [shatemOffers, autotradeOffers, autotradeRelated] = await Promise.all([
@@ -289,19 +305,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
     }
 
-    // Step B — prices for each brand in parallel.
-    const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
-    const toQuery = brandsItems.slice(0, cap);
-    const priceResponses = await Promise.allSettled(
-      toQuery.map((b) =>
-        searchPrices({
-          article: b.Article,
-          brand: b.Brand,
-          warehouseIds,
-          includeAnalogs: true,
-        })
-      )
-    );
+    // Prices were kicked off before the Shate-M/Autotrade await above.
+    const priceResponses = await pricePromise;
 
     const rawItems: PhaetonPriceItem[] = [];
     priceResponses.forEach((r) => {
