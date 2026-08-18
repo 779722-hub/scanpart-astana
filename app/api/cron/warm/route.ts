@@ -19,13 +19,16 @@ export const maxDuration = 30;
  */
 export async function GET(req: NextRequest) {
   // Прогрев можно дёргать: Vercel-кроном (Authorization: Bearer CRON_SECRET) —
-  // недоступно на Hobby (только суточные кроны) — ИЛИ внешним бесплатным
-  // планировщиком по URL с ключом: /api/cron/warm?key=CRON_SECRET.
+  // недоступно на Hobby (только суточные кроны) — ИЛИ внешним планировщиком
+  // (GitHub Actions / cron-job.org) по URL с ключом: /api/cron/warm?key=WARM_KEY.
+  // WARM_KEY — отдельный ключ для пингера; CRON_SECRET оставлен для совместимости.
   const secret = process.env.CRON_SECRET;
+  const warmKey = process.env.WARM_KEY;
+  const q = req.nextUrl.searchParams.get("key");
   const byHeader =
     Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`;
   const byQuery =
-    Boolean(secret) && req.nextUrl.searchParams.get("key") === secret;
+    (Boolean(warmKey) && q === warmKey) || (Boolean(secret) && q === secret);
   if (!byHeader && !byQuery) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }

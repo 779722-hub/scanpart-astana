@@ -1,0 +1,28 @@
+name: Keep warm
+
+# Пингует /api/cron/warm каждые ~5 минут, чтобы serverless-инстанс и сессии
+# поставщиков (Phaeton/Shate-M/Autotrade через прокси КЗ) не «остывали» —
+# иначе первый поиск после простоя холодный (~11с вместо ~3-5с).
+# План Vercel Hobby не даёт частые кроны, поэтому пингуем снаружи.
+# ВНИМАНИЕ: расписание GitHub Actions — «best effort», запуск может
+# задерживаться; это нормально для прогрева.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping warm endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "${{ secrets.WARM_PING_URL }}")
+          echo "warm ping HTTP $code"
+          [ "$code" = "200" ] || exit 1
