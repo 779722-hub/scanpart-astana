@@ -85,6 +85,21 @@ test("nameMatchesAll: category head rejects accessories (reported bug)", () => {
   assert.equal(nameMatchesAll("Задний тормозной диск", tokens("тормозной диск")), true);
 });
 
+test("nameMatchesAll: Toyota-style 'Комплект … колодок' brake pads (reported bug)", () => {
+  // Fleeting vowel: "колодки"→ must match the catalog's genitive "колодок".
+  // Collection head "Комплект": judged by the noun it governs, not "комплект".
+  assert.equal(nameMatchesAll("Комплект передних тормозных колодок", tokens("колодки")), true);
+  assert.equal(nameMatchesAll("Комплект задних тормозных колодок", tokens("колодки")), true);
+  assert.equal(nameMatchesAll("Комплект колодок заднего тормоза", tokens("колодки")), true);
+  // Position filter still applies to the kits.
+  assert.equal(nameMatchesAll("Комплект передних тормозных колодок", tokens("колодки задние")), false);
+  assert.equal(nameMatchesAll("Комплект задних тормозных колодок", tokens("колодки задние")), true);
+  // Hardware kits that merely mention pads are NOT the pads.
+  assert.equal(nameMatchesAll("Комплект распорок задних тормозных колодок", tokens("колодки")), false);
+  assert.equal(nameMatchesAll("Комплект прижимных пружин колодок заднего тормоза", tokens("колодки")), false);
+  assert.equal(nameMatchesAll("Комплект соединительных деталей заднего дискового тормоза", tokens("колодки")), false);
+});
+
 test("matchingLeafGroups: single noun → all relevant leaves", () => {
   assert.deepEqual(ids(matchingLeafGroups(tree, "колодки")), [15, 16]);
 });

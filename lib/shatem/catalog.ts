@@ -91,6 +91,27 @@ export function stem(t: string): string {
 // "Задний тормозной диск" resolves to "тормозной", not "задний".
 const POSITION_RE = /^(передн|задн|лев|прав|верхн|нижн|наружн|внутрен|средн)/;
 
+// Collection/packaging heads: "Комплект передних тормозных колодок" is a SET of
+// a part, not a different part — its real subject is the governed noun that
+// follows (Toyota names brake pads exactly this way). The plain head check
+// otherwise stopped at "комплект" and dropped the pads entirely.
+const COLLECTION_HEAD = /^(комплект|ремкомплект|набор|компл|к-?т)$/;
+
+// Adjective/participle word-forms (position qualifiers included) — skipped when
+// looking past a collection head for the governed subject noun.
+const ADJ_FORM = /(ого|его|ому|ему|ыми|ими|ых|их|ый|ий|ой|ая|яя|ое|ее|ые|ие|ым|им|ом|ем|ую|юю)$/;
+
+/**
+ * Match key: the token stem capped at 5 chars. The 6-char stem misses the
+ * Russian genitive-plural fleeting vowel — "колодки"(→"колодк") never matched
+ * the catalog's "колодок"(колод·о·к), which broke brake-pad name search for
+ * Toyota-style catalogs. Five chars ("колод") match both forms; "фильтр"/
+ * "масляный" still resolve fine.
+ */
+function matchKey(t: string): string {
+  return stem(t).slice(0, 5);
+}
+
 /** First significant word that isn't a position qualifier — the part's category. */
 export function categoryHead(name: string): string {
   const words = name.toLowerCase().match(/[0-9a-zа-яё]{3,}/gi) ?? [];
@@ -99,18 +120,45 @@ export function categoryHead(name: string): string {
 }
 
 /**
- * `name` contains the stem of EVERY query token (order-independent) AND the
+ * The noun a collection head governs: the first word after "Комплект…" that is
+ * not a position qualifier or an adjective — e.g. "Комплект передних тормозных
+ * КОЛОДОК" → "колодок", but "Комплект РАСПОРОК задних тормозных колодок" →
+ * "распорок" (a spacer kit, correctly not the pads).
+ */
+function governedSubject(name: string): string {
+  const words = name.toLowerCase().match(/[0-9a-zа-яё]{3,}/gi) ?? [];
+  let pastHead = false;
+  for (const w of words) {
+    if (!pastHead) {
+      if (COLLECTION_HEAD.test(w)) pastHead = true;
+      continue;
+    }
+    if (POSITION_RE.test(w) || ADJ_FORM.test(w)) continue;
+    return w;
+  }
+  return "";
+}
+
+/**
+ * `name` contains the match key of EVERY query token (order-independent) AND the
  * part's CATEGORY head is one the query names. The head check rejects
  * accessories that merely mention the part — e.g. "Крепление масляного фильтра"
  * for query "масляный фильтр" (head "крепление" ≠ query) — while keeping the
- * filter itself and position-qualified parts ("Задний тормозной диск").
+ * filter itself and position-qualified parts ("Задний тормозной диск"). When the
+ * head is a collection word ("Комплект … колодок") we judge by the noun it
+ * collects instead, so kits of the queried part are kept but kits of its
+ * hardware (spacers/springs) are not.
  */
 export function nameMatchesAll(name: string, qtokens: string[]): boolean {
   if (!qtokens.length) return false;
   const hay = name.toLowerCase();
-  if (!qtokens.every((t) => hay.includes(stem(t)))) return false;
+  if (!qtokens.every((t) => hay.includes(matchKey(t)))) return false;
   const head = categoryHead(name);
-  return !head || qtokens.some((t) => head.includes(stem(t)));
+  if (COLLECTION_HEAD.test(head)) {
+    const subject = governedSubject(name);
+    return qtokens.some((t) => subject.includes(matchKey(t)));
+  }
+  return !head || qtokens.some((t) => head.includes(matchKey(t)));
 }
 
 /**
