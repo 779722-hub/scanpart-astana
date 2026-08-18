@@ -30,7 +30,7 @@ interface FitWarning {
 
 type State =
   | { kind: "loading" }
-  | { kind: "empty" }
+  | { kind: "empty"; fit?: FitWarning | null }
   | { kind: "error"; message?: string }
   | {
       kind: "ok";
@@ -75,7 +75,10 @@ export function ResultsList({
           return;
         }
         if (json.empty || !json.offers?.length) {
-          setState({ kind: "empty" });
+          setState({
+            kind: "empty",
+            fit: (json.fitWarning as FitWarning | null) ?? null,
+          });
           return;
         }
         setState({
@@ -115,12 +118,17 @@ export function ResultsList({
 
   if (state.kind === "empty") {
     return (
-      <div className="card space-y-5 text-center">
-        <Package className="mx-auto h-12 w-12 text-ink-mute" />
-        <p className="text-lg">{t("empty")}</p>
-        <Link href={`/${locale}/search/${kind}`} className="btn-primary inline-flex">
-          {t("newSearch")}
-        </Link>
+      <div className="space-y-4">
+        {/* Manual car (no VIN): nothing found by name — steer to a VIN search
+            instead of a dead-end, so we never guess parts for the wrong car. */}
+        {state.fit?.needsVin && <FitBanner fit={state.fit} locale={locale} />}
+        <div className="card space-y-5 text-center">
+          <Package className="mx-auto h-12 w-12 text-ink-mute" />
+          <p className="text-lg">{t("empty")}</p>
+          <Link href={`/${locale}/search/${kind}`} className="btn-primary inline-flex">
+            {t("newSearch")}
+          </Link>
+        </div>
       </div>
     );
   }

@@ -124,6 +124,22 @@ export async function GET(req: NextRequest) {
     // fallback is exactly what produced non-fitting "фантазии".
     const vinScoped =
       kind === "name" && webConfigured && (Boolean(realVin) || Boolean(ref));
+
+    // Manual car (make/year, no VIN and no wizard ref): a name search has no
+    // catalog binding, so we can't safely surface warehouse parts (a free-text
+    // supplier search would return parts for the wrong car — "фантазии"). Steer
+    // the customer to add a VIN instead of silently returning empty. Reused on
+    // both the empty and the has-offers responses below.
+    const vinSteer =
+      kind === "name" && vehicle?.make && !realVin && !ref
+        ? {
+            make: vehicle.make,
+            model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
+            year: vehicle.year && vehicle.year !== "—" ? vehicle.year : "",
+            level: "unconfirmed" as const,
+            needsVin: true,
+          }
+        : null;
     const catalogOems: string[] = vinScoped
       ? await (ref
           ? articlesByVehicleAndName(
@@ -302,7 +318,13 @@ export async function GET(req: NextRequest) {
     }
     if (!brandsItems.length && !shatemOffers.length && !autotradeOffers.length) {
       logSearch(0);
-      return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
+      return NextResponse.json({
+        ok: true,
+        empty: true,
+        query: raw,
+        offers: [],
+        ...(vinSteer ? { fitWarning: vinSteer } : {}),
+      });
     }
 
     // Prices were kicked off before the Shate-M/Autotrade await above.
@@ -387,7 +409,13 @@ export async function GET(req: NextRequest) {
 
     if (!picked.length) {
       logSearch(0);
-      return NextResponse.json({ ok: true, empty: true, query: raw, offers: [] });
+      return NextResponse.json({
+        ok: true,
+        empty: true,
+        query: raw,
+        offers: [],
+        ...(vinSteer ? { fitWarning: vinSteer } : {}),
+      });
     }
 
     session.lastSearch = { kind, query: raw };

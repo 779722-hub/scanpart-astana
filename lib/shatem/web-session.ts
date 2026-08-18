@@ -10,9 +10,44 @@
  *  1. SHATEM_WEB_LOGIN + SHATEM_WEB_PASSWORD → autonomous login (prod, path B).
  *  2. SHATEM_SESSION_COOKIE (raw browser Cookie header) → seed for local dev.
  */
+import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { resolveProxyUrl } from "@/lib/proxy";
 import { CookieJar } from "./cookie-jar";
 
 const WEB = (process.env.SHATEM_WEB_BASE || "https://shate-m.kz").replace(/\/+$/, "");
+const TIMEOUT_MS = 15_000;
+
+// On Vercel shate-m.kz is not reachable from the serverless egress region
+// (direct calls time out ~11s). Route the Laximo WEB session through the same
+// fixed-IP KZ proxy as the trading API (lib/shatem/client.ts) / Autotrade /
+// Phaeton. Dev keeps the direct path when no proxy env is set.
+let _proxyAgent: ProxyAgent | null = null;
+function proxyAgent(): ProxyAgent | undefined {
+  const url = resolveProxyUrl("SHATEM_PROXY_URL", "PHAETON_PROXY_URL");
+  if (!url) return undefined;
+  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
+  return _proxyAgent;
+}
+
+/** fetch against the web host through the proxy (when set), with a timeout. */
+function webFetch(
+  url: string,
+  init: { method?: string; body?: string; headers?: Record<string, string> } = {}
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const dispatcher = proxyAgent();
+  const p = dispatcher
+    ? undiciFetch(url, {
+        method: init.method,
+        body: init.body,
+        headers: init.headers,
+        signal: ctrl.signal,
+        dispatcher,
+      })
+    : fetch(url, { ...init, signal: ctrl.signal, cache: "no-store" });
+  return (p as Promise<Response>).finally(() => clearTimeout(tm));
+}
 
 let jar: CookieJar | null = null;
 
@@ -25,7 +60,7 @@ async function loginWeb(j: CookieJar): Promise<boolean> {
   const login = process.env.SHATEM_WEB_LOGIN;
   const password = process.env.SHATEM_WEB_PASSWORD;
   if (!login || !password) return false;
-  const res = await fetch(`${WEB}/api/auth/Login`, {
+  const res = await webFetch(`${WEB}/api/auth/Login`, {
     method: "POST",
     headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
     body:
@@ -38,7 +73,7 @@ async function loginWeb(j: CookieJar): Promise<boolean> {
 }
 
 async function refresh(j: CookieJar): Promise<boolean> {
-  const res = await fetch(`${WEB}/api/auth/refresh`, {
+  const res = await webFetch(`${WEB}/api/auth/refresh`, {
     method: "POST",
     headers: { accept: "application/json", cookie: j.header(), "content-type": "application/json" },
     body: "{}",
@@ -79,7 +114,7 @@ async function ensureSession(): Promise<CookieJar> {
 export async function catalogGet<T>(path: string): Promise<T> {
   const j = await ensureSession();
   const doCall = () =>
-    fetch(`${WEB}${path}`, {
+    webFetch(`${WEB}${path}`, {
       headers: { accept: "application/json", cookie: j.header(), "x-requested-with": "XMLHttpRequest" },
     });
 

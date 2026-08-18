@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSetting } from "@/lib/sheets/settings";
+import { getLocations } from "@/lib/shatem/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,6 @@ async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<bool
 
 export async function GET() {
   const phaetonBase = process.env.PHAETON_BASE_URL || "https://api.phaeton.kz";
-  const shatemBase = process.env.SHATEM_BASE_URL || "https://api.shate-m.kz";
   const shatemConfigured = Boolean(process.env.SHATEM_API_KEY);
   const autotradeConfigured = Boolean(
     process.env.AUTOTRADE_API_KEY || process.env.AUTOTRADE_LOGIN
@@ -75,7 +75,14 @@ export async function GET() {
 
   const [phaetonOk, shatemReachable, tgTokenOk] = await Promise.all([
     checkUrl(`${phaetonBase}/`),
-    shatemConfigured ? checkUrl(`${shatemBase}/`) : Promise.resolve(false),
+    // Shate-M lives behind the KZ proxy (its root pinged directly from Vercel
+    // always fails — a false alarm). Probe the way search actually uses it:
+    // an authed call through the proxy. Fail-safe → never throws the endpoint.
+    shatemConfigured
+      ? getLocations()
+          .then((l) => l.length > 0)
+          .catch(() => false)
+      : Promise.resolve(false),
     checkTelegramToken(tgToken),
   ]);
 
