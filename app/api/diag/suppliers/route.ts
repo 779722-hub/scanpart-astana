@@ -88,6 +88,35 @@ async function probe(url: string, useProxy: boolean) {
   }
 }
 
+/** Hit the real Phaeton /api/Search directly (NO proxy) to see if Vercel's IP
+ *  is accepted. If 200 with data → the proxy is no longer needed. */
+async function phaetonApiDirect(article: string) {
+  const { fetch: uf } = await import("undici");
+  const base = process.env.PHAETON_BASE_URL || "https://api.phaeton.kz";
+  const guid = process.env.PHAETON_USER_GUID ?? "";
+  const key = process.env.PHAETON_API_KEY ?? "";
+  const url =
+    `${base}/api/Search?UserGuid=${encodeURIComponent(guid)}` +
+    `&ApiKey=${encodeURIComponent(key)}&Article=${encodeURIComponent(article)}`;
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), 12000);
+  const t0 = Date.now();
+  try {
+    const res = await uf(url, { signal: ctrl.signal, headers: { accept: "application/json" } });
+    const body = (await res.text().catch(() => "")).slice(0, 200);
+    return { ok: res.ok, ms: Date.now() - t0, status: res.status, body: mask(body) };
+  } catch (err) {
+    return {
+      ok: false as const,
+      ms: Date.now() - t0,
+      error: mask((err as Error).message).slice(0, 200),
+      cause: causeOf(err),
+    };
+  } finally {
+    clearTimeout(tm);
+  }
+}
+
 export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("t") !== SECRET) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -161,6 +190,7 @@ export async function GET(req: NextRequest) {
     phaeton_via_proxy: await probe("https://api.phaeton.kz/", true),
     phaeton_via_proxy_2: await probe("https://api.phaeton.kz/", true),
     shatem_via_proxy: await probe("https://api.shate-m.kz/api/v1/locations", true),
+    phaeton_api_direct: await phaetonApiDirect(q),
   };
 
   return NextResponse.json({
