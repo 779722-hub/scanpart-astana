@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContext } from "@/lib/shatem/client";
-import { getDictionary } from "@/lib/phaeton/client";
+import { searchBrands, searchPrices } from "@/lib/phaeton/client";
 import { authedGet } from "@/lib/autotrade/session";
 
 export const runtime = "nodejs";
@@ -33,10 +33,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
+  // Phaeton: настоящий поиск цен (большой ответ ~230КБ), а НЕ лёгкий Dictionary —
+  // только реальная загрузка «раскачивает» TCP-окно соединения через прокси КЗ,
+  // иначе первый пользовательский поиск всё равно холодный (~11с) и Р1 теряется.
+  const warmPhaeton = searchBrands("0986424815")
+    .then((r) => {
+      const b = (r.Items ?? [])[0];
+      return b
+        ? searchPrices({ article: b.Article, brand: b.Brand, includeAnalogs: true })
+        : null;
+    })
+    .catch(() => null);
+
   const t0 = Date.now();
   const settle = await Promise.allSettled([
     getContext(), // Shate-M: логин + договор/адрес (кэш 1ч)
-    getDictionary().catch(() => null), // Phaeton: держим прокси-соединение тёплым
+    warmPhaeton, // Phaeton: реальный запрос цен — греет соединение под поиск
     authedGet("/").catch(() => null), // Autotrade: держим веб-сессию
   ]);
   const status = settle.map((s) => s.status);
