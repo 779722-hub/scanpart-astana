@@ -159,6 +159,8 @@ export async function GET(req: NextRequest) {
     autotrade_direct: await probe("https://sklad.autotrade.kz/login/", false),
     phaeton_direct: await probe("https://api.phaeton.kz/", false),
     phaeton_via_proxy: await probe("https://api.phaeton.kz/", true),
+    phaeton_via_proxy_2: await probe("https://api.phaeton.kz/", true),
+    shatem_via_proxy: await probe("https://api.shate-m.kz/api/v1/locations", true),
   };
 
   return NextResponse.json({
