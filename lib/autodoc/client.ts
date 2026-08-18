@@ -1,7 +1,7 @@
-import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { fetch as undiciFetch } from "undici";
 import * as cheerio from "cheerio";
 import { LRUCache } from "lru-cache";
-import { resolveProxyUrl } from "@/lib/proxy";
+import { getProxyAgent, resetProxyAgent, isProxyConnError } from "@/lib/proxy";
 
 /**
  * Точечный прокси к autodoc.ru — тянем HTML страниц поиска / продукта,
@@ -28,17 +28,9 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
 
-let _proxyAgent: ProxyAgent | null = null;
-function proxyAgent(): ProxyAgent | undefined {
-  // По умолчанию используем тот же фиксированный IP что и для Phaeton
-  // (Proxy6) — иначе при работе на Vercel мы будем стучаться с разных
-  // адресов, что повышает шанс на бан со стороны Cloudflare.
-  const url = resolveProxyUrl("AUTODOC_PROXY_URL", "PHAETON_PROXY_URL");
-  if (!url) return undefined;
-  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
-  return _proxyAgent;
-}
-
+// По умолчанию используем тот же фиксированный IP что и для Phaeton
+// (Proxy6) — иначе при работе на Vercel мы будем стучаться с разных
+// адресов, что повышает шанс на бан со стороны Cloudflare.
 async function fetchHtml(url: string): Promise<{ html: string; status: number }> {
   const ctrl = new AbortController();
   const tm = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -51,12 +43,16 @@ async function fetchHtml(url: string): Promise<{ html: string; status: number }>
       pragma: "no-cache",
       "upgrade-insecure-requests": "1",
     };
-    const dispatcher = proxyAgent();
+    const dispatcher = getProxyAgent("AUTODOC_PROXY_URL", "PHAETON_PROXY_URL");
     const res = dispatcher
       ? await undiciFetch(url, { headers, signal: ctrl.signal, dispatcher, redirect: "follow" })
       : await fetch(url, { headers, signal: ctrl.signal, cache: "no-store", redirect: "follow" });
     const html = await res.text();
     return { html, status: res.status };
+  } catch (err) {
+    // Мёртвый туннель прокси → сбросить агент, следующий запрос переподключится.
+    if (isProxyConnError(err)) resetProxyAgent("AUTODOC_PROXY_URL", "PHAETON_PROXY_URL");
+    throw err;
   } finally {
     clearTimeout(tm);
   }

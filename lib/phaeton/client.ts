@@ -1,5 +1,5 @@
-import { fetch as undiciFetch, ProxyAgent } from "undici";
-import { resolveProxyUrl } from "@/lib/proxy";
+import { fetch as undiciFetch } from "undici";
+import { getProxyAgent, resetProxyAgent, isProxyConnError } from "@/lib/proxy";
 import type {
   PhaetonBrandsResponse,
   PhaetonDictionaryResponse,
@@ -39,14 +39,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * fetch implementation can ignore the `dispatcher` option, so we call the
  * raw undici fetch which always honors it.
  */
-let _proxyAgent: ProxyAgent | null = null;
-function proxyAgent(): ProxyAgent | undefined {
-  const url = resolveProxyUrl("PHAETON_PROXY_URL");
-  if (!url) return undefined;
-  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
-  return _proxyAgent;
-}
-
 function env(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env ${name}`);
@@ -137,7 +129,7 @@ async function phaetonFetch<T>(
     const ctrl = new AbortController();
     const tm = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT);
     try {
-      const dispatcher = proxyAgent();
+      const dispatcher = getProxyAgent("PHAETON_PROXY_URL");
       const res = dispatcher
         ? await undiciFetch(url, {
             headers: { accept: "application/json" },
@@ -161,6 +153,9 @@ async function phaetonFetch<T>(
       return (await res.json()) as T;
     } catch (err) {
       lastErr = err as Error;
+      // Мёртвый туннель прокси → сбросить кешированный агент, чтобы РЕТРАЙ ниже
+      // (и любой следующий запрос) собрал свежий и переподключился.
+      if (isProxyConnError(lastErr)) resetProxyAgent("PHAETON_PROXY_URL");
       if (attempt < RETRY_ATTEMPTS && isTransient(lastErr)) {
         console.warn(
           `[phaeton] ${path} attempt ${attempt} transient: ${lastErr.message.slice(0, 120)} — retrying`

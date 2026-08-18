@@ -10,22 +10,14 @@
  * фиксированный прокси, что и API Phaeton (PHAETON_PROXY_URL), если задан —
  * на случай IP-привязки.
  */
-import { fetch as undiciFetch, ProxyAgent, type Response as UndiciResponse } from "undici";
+import { fetch as undiciFetch, type Response as UndiciResponse } from "undici";
 import { CookieJar } from "@/lib/shatem/cookie-jar";
-import { resolveProxyUrl } from "@/lib/proxy";
+import { getProxyAgent, resetProxyAgent, isProxyConnError } from "@/lib/proxy";
 
 const WEB = (process.env.PHAETON_SHOP_BASE || "https://shop.phaeton.kz").replace(/\/+$/, "");
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
-
-let _proxy: ProxyAgent | null = null;
-function proxyAgent(): ProxyAgent | undefined {
-  const url = resolveProxyUrl("PHAETON_PROXY_URL");
-  if (!url) return undefined;
-  if (!_proxy) _proxy = new ProxyAgent(url);
-  return _proxy;
-}
 
 function webFetch(
   path: string,
@@ -44,7 +36,11 @@ function webFetch(
     headers,
     body: init.body,
     redirect: init.redirect ?? "manual",
-    dispatcher: proxyAgent(),
+    dispatcher: getProxyAgent("PHAETON_PROXY_URL"),
+  }).catch((err) => {
+    // Мёртвый туннель прокси → сбросить агент, следующий запрос переподключится.
+    if (isProxyConnError(err)) resetProxyAgent("PHAETON_PROXY_URL");
+    throw err;
   });
 }
 

@@ -5,8 +5,8 @@
  * token in-module (single-flight) and re-auth on expiry or on a 401. Base URL
  * + key come from env: SHATEM_BASE_URL, SHATEM_API_KEY.
  */
-import { fetch as undiciFetch, ProxyAgent } from "undici";
-import { resolveProxyUrl } from "@/lib/proxy";
+import { fetch as undiciFetch } from "undici";
+import { getProxyAgent, resetProxyAgent, isProxyConnError } from "@/lib/proxy";
 import type {
   ShatemAuthResponse,
   ShatemArticleHit,
@@ -29,14 +29,6 @@ const TOKEN_SKEW_MS = 60_000; // refresh a minute before real expiry
  * Shate-M fine). Dev keeps the direct path when no proxy env is set.
  * Uses undici.fetch — the global fetch on Vercel can ignore `dispatcher`.
  */
-let _proxyAgent: ProxyAgent | null = null;
-function proxyAgent(): ProxyAgent | undefined {
-  const url = resolveProxyUrl("SHATEM_PROXY_URL", "PHAETON_PROXY_URL");
-  if (!url) return undefined;
-  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
-  return _proxyAgent;
-}
-
 function base(): string {
   return (process.env.SHATEM_BASE_URL || "https://api.shate-m.kz").replace(/\/+$/, "");
 }
@@ -88,7 +80,7 @@ function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
     ...(init.body ? { "content-type": "application/json" } : {}),
     ...((init.headers as Record<string, string>) || {}),
   };
-  const dispatcher = proxyAgent();
+  const dispatcher = getProxyAgent("SHATEM_PROXY_URL", "PHAETON_PROXY_URL");
   const url = `${base()}${path}`;
   const p = dispatcher
     ? undiciFetch(url, {
@@ -99,7 +91,14 @@ function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
         dispatcher,
       })
     : fetch(url, { ...init, headers, signal: ctrl.signal, cache: "no-store" });
-  return (p as Promise<Response>).finally(() => clearTimeout(tm));
+  return (p as Promise<Response>)
+    .catch((err) => {
+      // Мёртвый туннель прокси → сбросить агент; следующий вызов (в т.ч. повтор
+      // после re-auth в api()) соберёт свежий и переподключится.
+      if (isProxyConnError(err)) resetProxyAgent("SHATEM_PROXY_URL", "PHAETON_PROXY_URL");
+      throw err;
+    })
+    .finally(() => clearTimeout(tm));
 }
 
 /** Authenticated JSON call with one automatic re-auth on 401. */

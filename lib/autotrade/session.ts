@@ -1,6 +1,6 @@
-import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { fetch as undiciFetch } from "undici";
 import { CookieJar } from "@/lib/shatem/cookie-jar";
-import { resolveProxyUrl } from "@/lib/proxy";
+import { getProxyAgent, resetProxyAgent, isProxyConnError } from "@/lib/proxy";
 
 /**
  * Autotrade (sklad.autotrade.kz) authenticated web session.
@@ -23,14 +23,6 @@ const UA =
   "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
 
 const TIMEOUT_MS = 12_000;
-
-let _proxyAgent: ProxyAgent | null = null;
-function proxyAgent(): ProxyAgent | undefined {
-  const url = resolveProxyUrl("AUTOTRADE_PROXY_URL", "PHAETON_PROXY_URL");
-  if (!url) return undefined;
-  if (!_proxyAgent) _proxyAgent = new ProxyAgent(url);
-  return _proxyAgent;
-}
 
 export interface AtResponse {
   status: number;
@@ -55,7 +47,7 @@ async function raw(
       ...(jar.header() ? { cookie: jar.header() } : {}),
       ...init.headers,
     };
-    const dispatcher = proxyAgent();
+    const dispatcher = getProxyAgent("AUTOTRADE_PROXY_URL", "PHAETON_PROXY_URL");
     const res = dispatcher
       ? await undiciFetch(url, {
           method: init.method ?? "GET",
@@ -76,6 +68,10 @@ async function raw(
     jar.absorb(res as unknown as Response);
     const html = await res.text();
     return { status: res.status, url: (res as { url?: string }).url ?? url, html };
+  } catch (err) {
+    // Мёртвый туннель прокси → сбросить агент, следующий запрос переподключится.
+    if (isProxyConnError(err)) resetProxyAgent("AUTOTRADE_PROXY_URL", "PHAETON_PROXY_URL");
+    throw err;
   } finally {
     clearTimeout(tm);
   }
