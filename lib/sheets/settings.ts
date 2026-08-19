@@ -92,7 +92,7 @@ export async function getPriceBrackets(): Promise<PriceBracket[]> {
 }
 
 export const ANALOGS_MIN = 0;
-export const ANALOGS_MAX = 10;
+export const ANALOGS_MAX = 20;
 export const ANALOGS_DEFAULT = 3;
 
 function clampAnalogs(n: number): number {
