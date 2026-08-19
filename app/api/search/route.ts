@@ -238,11 +238,13 @@ export async function GET(req: NextRequest) {
       const autodocKeys = new Set<string>();
       const aliasKeys = new Set<string>();
       {
-        // Поиск по номеру терпим к пробелам: Phaeton опрашиваем одной
-        // нормализованной формой (без пробелов). Поиск по названию — как есть.
+        // Поиск по номеру терпим к пробелам/дефисам: тяжёлый Phaeton опрашиваем
+        // ОДНОЙ канонической формой (без пробелов и дефисов), одинаковой для
+        // всех вариантов ввода — Phaeton нормализует номер сам (CleanArticle).
+        // Поиск по названию — как есть.
         const variants: string[] = vinScoped
           ? [...catalogOems]
-          : [kind === "article" ? raw.replace(/\s+/g, "") : raw];
+          : [kind === "article" ? raw.replace(/[\s-]/g, "") : raw];
         if (kind === "name" && !vinScoped && !anyCar && vehicle?.make) {
           variants.push(`${raw} ${vehicle.make}`);
           if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
@@ -399,16 +401,21 @@ export async function GET(req: NextRequest) {
     // prices the query; name search prices the catalog OEMs. Gated by apikey,
     // fully fail-safe.
     // Поиск по номеру терпим к пробелам/дефисам: «AH 03004» = «AH03004» =
-    // «AH-03004». Опрашиваем небольшой набор форм (исходная, без пробелов, без
-    // пробелов и дефисов); clean() схлопывает офферы при дедупе/isOriginal.
-    // Ограничено ≤3 различными формами (обычно 1-2). Interkom — одна форма
-    // (без пробелов), тяжёлый Phaeton — тоже одна (см. фазу выше).
-    const numberVariants = Array.from(
-      new Set(
-        [raw.trim(), raw.replace(/\s+/g, ""), raw.replace(/[\s-]/g, "")].filter(Boolean)
-      )
-    );
-    const numberNormalized = raw.replace(/\s+/g, "");
+    // «AH-03004». Пробел и дефис — взаимозаменяемые разделители: опрашиваем
+    // небольшой набор форм (исходная, пробел→дефис, без пробелов, без пробелов
+    // и дефисов). Для 11-значных числовых восстанавливаем дефис по формату OEM
+    // ГАЗ (4-7, напр. «33022905006» → «3302-2905006») — так слитная и слитно-
+    // дефисная формы находят одну и ту же деталь у поставщика, который матчит
+    // номер строго с дефисом. clean() схлопывает офферы при дедупе/isOriginal;
+    // лишние формы безопасны (строгий матч по OEM/артикулу просто не найдёт
+    // «мусорный» вариант). Дедуп, обычно 2-3 формы.
+    const numberVariants = (() => {
+      const t = raw.trim();
+      const bare = t.replace(/[\s-]/g, "");
+      const forms = [t, t.replace(/\s+/g, "-"), t.replace(/\s+/g, ""), bare];
+      if (/^\d{11}$/.test(bare)) forms.push(`${bare.slice(0, 4)}-${bare.slice(4)}`);
+      return Array.from(new Set(forms.filter(Boolean))).slice(0, 5);
+    })();
 
     const shatemTargets = kind === "article" ? numberVariants : catalogOems;
     const shatemPromise: Promise<PartOffer[]> =
@@ -442,12 +449,14 @@ export async function GET(req: NextRequest) {
     // Fourth supplier — Interkom (opt.interkom.kz, code И6). Article search
     // prices the query; name search prices the catalog OEMs (capped for
     // latency). Segment picked from the car make. Astana-only, fail-safe.
-    // Interkom itemsSearch (≥4 симв., ищет по артикулу/OEM/наименованию):
-    // по номеру — одна форма без пробелов; по названию на «любое авто» —
-    // прямой текст запроса (allSegments); иначе — OEM из каталога.
+    // Interkom itemsSearch (≥4 симв., ищет по артикулу/OEM/наименованию) матчит
+    // номер строго (с дефисом), поэтому шлём тот же набор форм — так «33022905006»
+    // и «3302 2905006» тоже находят деталь, лежащую под «3302-2905006». По
+    // названию на «любое авто» — прямой текст запроса (allSegments); иначе —
+    // OEM из каталога.
     const interkomTargets =
       kind === "article"
-        ? [numberNormalized]
+        ? numberVariants
         : anyCar
           ? [raw]
           : catalogOems.slice(0, 3);
