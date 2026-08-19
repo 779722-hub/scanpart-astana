@@ -22,7 +22,7 @@ export default async function ResultsPage({
   const q = (searchParams.q ?? "").trim();
   const strict = searchParams.strict === "1";
   const kind: "article" | "name" = searchParams.k === "name" ? "name" : "article";
-  const anyCar = kind === "article" && searchParams.anycar === "1";
+  const anyCar = searchParams.anycar === "1";
 
   if (!q) {
     return (

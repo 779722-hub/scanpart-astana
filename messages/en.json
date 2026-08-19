@@ -80,7 +80,8 @@
     "title": "Search by name",
     "placeholder": "Front brake pads",
     "hint": "Enter the part name (e.g. \"front brake pads\")",
-    "submit": "Search"
+    "submit": "Search",
+    "anyCarLabel": "Search by name for any car (ignore my set car)"
   },
   "results": {
     "title": "Available at the Astana warehouse",

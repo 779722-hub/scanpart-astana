@@ -66,6 +66,26 @@ test("interkom: normalizes to PartOffer (source/code/warehouse/flags)", () => {
   }
 });
 
+test("interkom: name never blank — falls back to «brand article» when GoodsInfo is empty", () => {
+  // A real in-stock row (text-success) whose <a.GoodsInfo> carries no text —
+  // observed live for «Автомагнат AM-01-026» on query 3102-2915006. The offer
+  // must still be emitted with a non-empty, concrete name.
+  const row = `
+    <tr class="min-h38px">
+      <td>AM-01-026</td>
+      <td>AM-01-026</td>
+      <td>3102-2915006</td>
+      <td><i class="bi bi-patch-check text-success"></i><a class="GoodsInfo"></a></td>
+      <td>Автомагнат</td>
+      <td></td>
+      <td>12 500</td>
+    </tr>`;
+  const offers = parseInterkomRows(row, { query: "3102-2915006", markupPct: 35 });
+  assert.equal(offers.length, 1, "in-stock row still emitted");
+  assert.ok(offers[0].name.trim().length > 0, "name must not be blank");
+  assert.equal(offers[0].name, "Автомагнат AM-01-026"); // brand + article fallback
+});
+
 test("interkom: make → segment mapping", () => {
   // Known makes → their single segment GUID.
   assert.deepEqual(segmentsForMake("Chevrolet"), [INTERKOM_SEGMENTS.CHEVROLET]);

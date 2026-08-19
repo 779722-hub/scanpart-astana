@@ -70,7 +70,6 @@ export function parseInterkomRows(
     const code = tds.eq(0).text().trim();
     const article = dash(tds.eq(1).text());
     const oem = dash(tds.eq(2).text());
-    const name = tds.eq(3).find("a.GoodsInfo").first().text().trim();
 
     // In-stock rule: keep only the green «available on stock» patch-check icon.
     const iconClass = tds.eq(3).find("i.bi").first().attr("class") ?? "";
@@ -83,6 +82,21 @@ export function parseInterkomRows(
     // Prefer the part's own article; fall back to OEM, then the internal code.
     const art = article || oem || code;
     if (!art) return;
+
+    // Name — robust, never blank. Some in-stock rows have no <a.GoodsInfo> text.
+    // (1) the link text; (2) the name cell's own text with the stock icon/tooltip
+    // stripped; (3) fall back to «brand article» (or just the article). Collapse
+    // whitespace and drop stray leading/trailing dashes.
+    const collapse = (s: string) =>
+      s.replace(/\s+/g, " ").trim().replace(/^-+|-+$/g, "").trim();
+    const nameCell = tds.eq(3).clone();
+    nameCell.find("i, .tooltip").remove();
+    const name =
+      tds.eq(3).find("a.GoodsInfo").first().text().trim() ||
+      collapse(nameCell.text()) ||
+      collapse(`${brand} ${art}`) ||
+      art;
+    if (!name) return;
 
     const key = `${brand}|${clean(art)}`;
     if (seen.has(key)) return;

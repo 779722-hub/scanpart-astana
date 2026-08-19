@@ -61,11 +61,10 @@ export async function GET(req: NextRequest) {
   // грузится клиентом отдельным фоновым запросом ?phase=phaeton и дописывается
   // в список. Быстрый путь НЕ обращается к Phaeton вовсе.
   const phase = req.nextUrl.searchParams.get("phase");
-  // «Свободный поиск по номеру на любое авто» (чек-бокс). Только для article:
-  // игнорируем установленное авто для проверки совместимости (не показываем
-  // fitWarning) и заставляем Interkom опрашивать ВСЕ сегменты брендов.
-  const anyCar =
-    kind === "article" && req.nextUrl.searchParams.get("anycar") === "1";
+  // «Свободный поиск на любое авто» (чек-бокс) — и для парт-номера, и для
+  // названия. Игнорируем установленное авто: не привязываемся к VIN-каталогу,
+  // не показываем fitWarning, а Interkom опрашиваем по ВСЕМ сегментам брендов.
+  const anyCar = req.nextUrl.searchParams.get("anycar") === "1";
   if (!raw) {
     return NextResponse.json({ ok: false, error: "empty" }, { status: 400 });
   }
@@ -140,8 +139,10 @@ export async function GET(req: NextRequest) {
     // A name search for a KNOWN vehicle must be catalog-driven so results fit
     // the car. When true we never fall back to free-text/alias search — that
     // fallback is exactly what produced non-fitting "фантазии".
+    // «Любое авто» для названия снимает привязку к каталогу выбранного авто —
+    // работает НЕ vinScoped-путь (свободный текст Phaeton + синонимы).
     const vinScoped =
-      kind === "name" && webConfigured && (Boolean(realVin) || Boolean(ref));
+      kind === "name" && !anyCar && webConfigured && (Boolean(realVin) || Boolean(ref));
 
     // Manual car (make/year, no VIN and no wizard ref): a name search has no
     // catalog binding, so we can't safely surface warehouse parts (a free-text
@@ -149,7 +150,7 @@ export async function GET(req: NextRequest) {
     // the customer to add a VIN instead of silently returning empty. Reused on
     // both the empty and the has-offers responses below.
     const vinSteer =
-      kind === "name" && vehicle?.make && !realVin && !ref
+      kind === "name" && !anyCar && vehicle?.make && !realVin && !ref
         ? {
             make: vehicle.make,
             model: vehicle.model && vehicle.model !== "—" ? vehicle.model : "",
@@ -237,8 +238,12 @@ export async function GET(req: NextRequest) {
       const autodocKeys = new Set<string>();
       const aliasKeys = new Set<string>();
       {
-        const variants: string[] = vinScoped ? [...catalogOems] : [raw];
-        if (kind === "name" && !vinScoped && vehicle?.make) {
+        // Поиск по номеру терпим к пробелам: Phaeton опрашиваем одной
+        // нормализованной формой (без пробелов). Поиск по названию — как есть.
+        const variants: string[] = vinScoped
+          ? [...catalogOems]
+          : [kind === "article" ? raw.replace(/\s+/g, "") : raw];
+        if (kind === "name" && !vinScoped && !anyCar && vehicle?.make) {
           variants.push(`${raw} ${vehicle.make}`);
           if (vehicle.model && vehicle.model !== "—" && vehicle.model.length > 1) {
             variants.push(`${raw} ${vehicle.make} ${vehicle.model}`);
@@ -388,12 +393,24 @@ export async function GET(req: NextRequest) {
     // client fetches the Phaeton phase in the background.
     // ======================================================================
     const phaetonPending =
-      kind === "article" || (kind === "name" && catalogOems.length > 0);
+      kind === "article" || (kind === "name" && (catalogOems.length > 0 || anyCar));
 
     // Second supplier — Shate-M price/stock (Astana, in-stock). Article search
     // prices the query; name search prices the catalog OEMs. Gated by apikey,
     // fully fail-safe.
-    const shatemTargets = kind === "article" ? [raw] : catalogOems;
+    // Поиск по номеру терпим к пробелам/дефисам: «AH 03004» = «AH03004» =
+    // «AH-03004». Опрашиваем небольшой набор форм (исходная, без пробелов, без
+    // пробелов и дефисов); clean() схлопывает офферы при дедупе/isOriginal.
+    // Ограничено ≤3 различными формами (обычно 1-2). Interkom — одна форма
+    // (без пробелов), тяжёлый Phaeton — тоже одна (см. фазу выше).
+    const numberVariants = Array.from(
+      new Set(
+        [raw.trim(), raw.replace(/\s+/g, ""), raw.replace(/[\s-]/g, "")].filter(Boolean)
+      )
+    );
+    const numberNormalized = raw.replace(/\s+/g, "");
+
+    const shatemTargets = kind === "article" ? numberVariants : catalogOems;
     const shatemPromise: Promise<PartOffer[]> =
       process.env.SHATEM_API_KEY && shatemTargets.length
         ? Promise.all(
@@ -409,7 +426,7 @@ export async function GET(req: NextRequest) {
     // Third supplier — Autotrade (sklad.autotrade.kz, code Т3). Article search
     // prices the query (+ crosses/analogs); name search prices the catalog OEMs
     // (capped for latency). Astana-only, fail-safe.
-    const autotradeTargets = kind === "article" ? [raw] : catalogOems.slice(0, 3);
+    const autotradeTargets = kind === "article" ? numberVariants : catalogOems.slice(0, 3);
     const autotradePromise: Promise<PartOffer[]> =
       autotradeConfigured() && autotradeTargets.length
         ? Promise.all(
@@ -425,7 +442,15 @@ export async function GET(req: NextRequest) {
     // Fourth supplier — Interkom (opt.interkom.kz, code И6). Article search
     // prices the query; name search prices the catalog OEMs (capped for
     // latency). Segment picked from the car make. Astana-only, fail-safe.
-    const interkomTargets = kind === "article" ? [raw] : catalogOems.slice(0, 3);
+    // Interkom itemsSearch (≥4 симв., ищет по артикулу/OEM/наименованию):
+    // по номеру — одна форма без пробелов; по названию на «любое авто» —
+    // прямой текст запроса (allSegments); иначе — OEM из каталога.
+    const interkomTargets =
+      kind === "article"
+        ? [numberNormalized]
+        : anyCar
+          ? [raw]
+          : catalogOems.slice(0, 3);
     const interkomPromise: Promise<PartOffer[]> =
       interkomEnabled && interkomTargets.length
         ? Promise.all(
@@ -460,6 +485,18 @@ export async function GET(req: NextRequest) {
       for (const o of shatemOffers) o.compat = classifyCompat(o.name, vehicle).compat;
       for (const o of autotradeOffers) o.compat = classifyCompat(o.name, vehicle).compat;
       for (const o of interkomOffers) o.compat = classifyCompat(o.name, vehicle).compat;
+    }
+
+    // Свободный поиск по НАЗВАНИЮ через Interkom матчит Наименование на стороне
+    // поставщика; всё равно применяем наш строгий фильтр «все слова» локально —
+    // только конкретные совпадения, без «фантазий». Interkom отдаёт офферы с
+    // matchesAllWords=true, поэтому пересчитываем по словам запроса.
+    if (kind === "name" && anyCar) {
+      const toks = tokenize(raw);
+      for (const o of interkomOffers)
+        o.matchesAllWords = toks.length
+          ? toks.every((tk) => (o.name || "").toLowerCase().includes(tk))
+          : true;
     }
 
     if (!shatemOffers.length && !autotradeOffers.length && !interkomOffers.length) {
@@ -563,7 +600,7 @@ export async function GET(req: NextRequest) {
         ...vehLabel,
         level: picked.some((o) => o.compat === "mismatch") ? "mismatch" : "unconfirmed",
       };
-    } else if (kind === "name" && vehLabel && !realVin && !ref && picked.length > 0) {
+    } else if (kind === "name" && !anyCar && vehLabel && !realVin && !ref && picked.length > 0) {
       // A car was chosen MANUALLY without the catalog — matches aren't verified.
       fitWarning = { ...vehLabel, level: "unconfirmed", needsVin: true };
     }
