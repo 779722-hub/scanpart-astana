@@ -46,6 +46,9 @@ export async function GET() {
   const autotradeConfigured = Boolean(
     process.env.AUTOTRADE_API_KEY || process.env.AUTOTRADE_LOGIN
   );
+  const interkomConfigured = Boolean(
+    process.env.INTERKOM_LOGIN && process.env.INTERKOM_PASSWORD
+  );
 
   const sheetsConfigured = Boolean(
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 &&
@@ -59,14 +62,17 @@ export async function GET() {
   let sheetsOk = false;
   let tgTokenSetting: string | undefined;
   let tgChat = "";
+  let interkomEnabled = false;
   if (sheetsConfigured) {
     try {
-      const [tok, chat] = await Promise.all([
+      const [tok, chat, ikEnabled] = await Promise.all([
         getSetting("telegram_bot_token"),
         getSetting("telegram_chat_id"),
+        getSetting("interkom_enabled"),
       ]);
       tgTokenSetting = tok;
       tgChat = (chat ?? "").trim();
+      interkomEnabled = (ikEnabled ?? "").trim() === "on";
       sheetsOk = true;
     } catch {
       sheetsOk = false;
@@ -113,6 +119,9 @@ export async function GET() {
         phaeton: phaetonOk ? "ok" : "fail",
         shatem: shatemConfigured ? (shatemReachable ? "ok" : "fail") : "missing",
         autotrade: autotradeConfigured ? "configured" : "missing",
+        // Interkom: "missing" без кредов; "off" если креды есть, но выключатель
+        // interkom_enabled не «on»; "ok" (подключён) когда есть и то, и другое.
+        interkom: !interkomConfigured ? "missing" : interkomEnabled ? "ok" : "off",
         proxy: !proxy.configured ? "missing" : proxy.ok ? "ok" : "fail",
         sheets: !sheetsConfigured ? "missing" : sheetsOk ? "ok" : "fail",
         cloudinary:

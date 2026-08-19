@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   phaeton: "Phaeton (Р1)",
   shatem: "Shate-M (М2)",
   autotrade: "Autotrade (Т3)",
+  interkom: "Interkom (И6)",
   proxy: "Прокси",
   sheets: "Google Sheets",
   cloudinary: "Cloudinary",
@@ -25,6 +26,14 @@ const STATUS_LABELS: Record<string, string> = {
 const PROXY_VALUE_RU: Record<string, string> = {
   ok: "работает",
   fail: "не работает",
+  missing: "не настроен",
+};
+
+// Interkom: подключён (креды + включён), выключен (креды есть, тумблер off),
+// не настроен (нет логина/пароля).
+const INTERKOM_VALUE_RU: Record<string, string> = {
+  ok: "подключён",
+  off: "выключен",
   missing: "не настроен",
 };
 
@@ -87,7 +96,13 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
                 key={k}
                 label={STATUS_LABELS[k] ?? k}
                 ok={v === "ok" || v === "configured"}
-                value={k === "proxy" ? PROXY_VALUE_RU[v] ?? v : v}
+                value={
+                  k === "proxy"
+                    ? PROXY_VALUE_RU[v] ?? v
+                    : k === "interkom"
+                      ? INTERKOM_VALUE_RU[v] ?? v
+                      : v
+                }
               />
             ))
           ) : (
