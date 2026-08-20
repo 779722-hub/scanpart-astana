@@ -344,10 +344,11 @@ function LoadStatusBanner({
 }) {
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border-2 border-brand bg-brand/5 px-4 py-3">
-        <span className="relative flex h-5 w-5 flex-none items-center justify-center">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand/40" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-brand" />
+      <div className="flex animate-pulse items-center gap-3 rounded-2xl border-2 border-brand bg-brand/10 px-4 py-3">
+        <span className="relative flex h-7 w-7 flex-none items-center justify-center">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand/60" />
+          <span className="absolute inline-flex h-5 w-5 animate-ping rounded-full bg-brand/70 [animation-delay:150ms]" />
+          <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-brand" />
         </span>
         <span className="text-sm font-semibold text-brand sm:text-base">{loadingLabel}</span>
       </div>
