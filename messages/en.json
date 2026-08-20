@@ -107,6 +107,8 @@
     "loadingTitle": "Please wait, searching the database…",
     "loadingHint": "Checking availability at the Astana warehouse",
     "searchingMore": "Searching for more offers…",
+    "searchLoadingAll": "Please wait, loading all positions",
+    "searchReadyAstana": "These parts are in stock at the Astana warehouse",
     "errorService": "Service temporarily unavailable.",
     "oemLabel": "Original number (OEM):",
     "sortLabel": "Sort:",

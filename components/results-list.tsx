@@ -7,6 +7,7 @@ import {
   Loader2,
   Package,
   Check,
+  CheckCircle2,
   HelpCircle,
   Info,
   Clock,
@@ -52,12 +53,16 @@ export function ResultsList({
   strict = false,
   kind = "article",
   anyCar = false,
+  loadingLabel,
+  readyLabel,
 }: {
   locale: string;
   q: string;
   strict?: boolean;
   kind?: "article" | "name";
   anyCar?: boolean;
+  loadingLabel: string;
+  readyLabel: string;
 }) {
   const t = useTranslations("results");
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -236,6 +241,13 @@ export function ResultsList({
 
   return (
     <div className="space-y-4">
+      {/* Статус загрузки: красный пульс, пока фоном тянется Phaeton (Р1);
+          зелёная галочка, когда позиции со всех складов уже здесь. */}
+      <LoadStatusBanner
+        loading={phaetonSearching}
+        loadingLabel={loadingLabel}
+        readyLabel={readyLabel}
+      />
       {state.fit && <FitBanner fit={state.fit} locale={locale} />}
       {state.level !== "exact" && <RelaxBanner level={state.level} />}
       {state.oem.length > 0 && (
@@ -256,7 +268,7 @@ export function ResultsList({
       {phaetonSearching && (
         <div className="flex items-center justify-center gap-2 py-2 text-sm text-ink-mute dark:text-paper-mute">
           <Loader2 className="h-4 w-4 animate-spin text-brand" />
-          <span>{t("searchingMore")}</span>
+          <span>{loadingLabel}</span>
         </div>
       )}
 
@@ -320,6 +332,36 @@ function PriceSort({
   );
 }
 
+
+function LoadStatusBanner({
+  loading,
+  loadingLabel,
+  readyLabel,
+}: {
+  loading: boolean;
+  loadingLabel: string;
+  readyLabel: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border-2 border-brand bg-brand/5 px-4 py-3">
+        <span className="relative flex h-5 w-5 flex-none items-center justify-center">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand/40" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-brand" />
+        </span>
+        <span className="text-sm font-semibold text-brand sm:text-base">{loadingLabel}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 dark:border-emerald-700/60 dark:bg-emerald-900/15">
+      <CheckCircle2 className="h-5 w-5 flex-none text-emerald-600 dark:text-emerald-400" />
+      <span className="text-sm font-semibold text-emerald-700 sm:text-base dark:text-emerald-300">
+        {readyLabel}
+      </span>
+    </div>
+  );
+}
 
 function FitBanner({ fit, locale }: { fit: FitWarning; locale: string }) {
   const t = useTranslations("results");

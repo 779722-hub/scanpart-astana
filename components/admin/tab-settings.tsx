@@ -5,7 +5,7 @@ import { Loader2, Save, CheckCircle2, Settings, Send, Radar, Camera, KeyRound, M
 import { MARKUP_MAX, MARKUP_MIN, PRICE_BRACKETS_MAX } from "@/lib/markup";
 
 const ANALOGS_MIN = 0;
-const ANALOGS_MAX = 10;
+const ANALOGS_MAX = 30;
 
 // Одна строка таблицы диапазонов наценки (строковые поля для полей ввода).
 type BracketRow = { from: string; to: string; kind: "percent" | "fixed"; value: string };
@@ -60,6 +60,8 @@ const FIELDS: {
   { key: "analogs_max", label: "Сколько аналогов показывать", hint: `${ANALOGS_MIN}–${ANALOGS_MAX}`, kind: "number" },
   { key: "show_oem", label: "Показывать OEM-номер оригинала в результатах", kind: "select", options: YESNO_OPTIONS, def: "on" },
   { key: "show_photos", label: "Показывать фото деталей в результатах", kind: "select", options: YESNO_OPTIONS, def: "off" },
+  { key: "search_loading_label", label: "Надпись, пока грузятся все склады (над результатами)", hint: "по умолч. «Подождите загрузку всех позиций»" },
+  { key: "search_ready_label", label: "Надпись, когда позиции со всех складов загружены", hint: "по умолч. «Данные запчасти на складе в Астане»" },
   { key: "interkom_enabled", label: "Поставщик Interkom (склад И6, Астана)", hint: "Логин/пароль задаются в переменных окружения. Включайте после проверки.", kind: "select", options: YESNO_OPTIONS, def: "off" },
   {
     key: "tecdoc_api_key",
