@@ -3,6 +3,7 @@ import { noindexMetadata } from "@/lib/seo";
 import { unstable_setRequestLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ResultsList } from "@/components/results-list";
+import { getSetting } from "@/lib/sheets/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,14 @@ export default async function ResultsPage({
   const strict = searchParams.strict === "1";
   const kind: "article" | "name" = searchParams.k === "name" ? "name" : "article";
   const anyCar = searchParams.anycar === "1";
+
+  // Надписи статуса загрузки — можно переопределить в админке (иначе перевод).
+  const [loadingLabelSet, readyLabelSet] = await Promise.all([
+    getSetting("search_loading_label").catch(() => undefined),
+    getSetting("search_ready_label").catch(() => undefined),
+  ]);
+  const loadingLabel = loadingLabelSet?.trim() || t("searchLoadingAll");
+  const readyLabel = readyLabelSet?.trim() || t("searchReadyAstana");
 
   if (!q) {
     return (
@@ -53,7 +62,15 @@ export default async function ResultsPage({
           {t("newSearch")}
         </Link>
       </div>
-      <ResultsList locale={locale} q={q} strict={strict} kind={kind} anyCar={anyCar} />
+      <ResultsList
+        locale={locale}
+        q={q}
+        strict={strict}
+        kind={kind}
+        anyCar={anyCar}
+        loadingLabel={loadingLabel}
+        readyLabel={readyLabel}
+      />
     </section>
   );
 }
