@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSetting } from "@/lib/sheets/settings";
 import { checkProxyHealth } from "@/lib/proxy-health";
+import { getTelegramToken, getTelegramChatId } from "@/lib/telegram/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,30 +12,49 @@ const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.GI
  * Проверка токена бота — честно и с ПРИЧИНОЙ (наличие значения ничего не доказывает):
  *  - "ok"          — getMe принял токен;
  *  - "invalid"     — Telegram ответил, но токен не принят (неверный/отозванный/опечатка);
- *  - "unreachable" — Telegram недоступен/таймаут (сеть, а не токен) — транзиентно.
+ *  - "unreachable" — Telegram недоступен/таймаут/лимит (сеть или 429/5xx, а не токен).
+ *
+ * Кэш ~60с: /api/health опрашивают часто (дашборд, аптайм-мониторы), а getMe без
+ * кэша на каждый опрос может упереться в 429 — и тогда рабочий токен ложно
+ * показывался бы «неверным». 429 и 5xx — это транзиент, а не «invalid».
  */
 type TgProbe = "ok" | "invalid" | "unreachable";
-async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<TgProbe> {
-  if (!token) return "invalid";
+interface TgResult { probe: TgProbe; status?: number; desc?: string }
+let tgCache: { at: number; token: string; r: TgResult } | null = null;
+const TG_TTL_MS = 60_000;
+async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<TgResult> {
+  if (!token) return { probe: "invalid", desc: "empty" };
+  if (tgCache && tgCache.token === token && Date.now() - tgCache.at < TG_TTL_MS) {
+    return tgCache.r;
+  }
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let r: TgResult;
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, {
       signal: ctrl.signal,
       cache: "no-store",
     });
-    const j = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-    if (j?.ok) return "ok";
-    // Ответ получен, но токен не принят. 5xx — это сбой на стороне Telegram, а не токена.
-    return res.status >= 500 ? "unreachable" : "invalid";
-  } catch {
-    return "unreachable";
+    const j = (await res.json().catch(() => null)) as
+      | { ok?: boolean; description?: string }
+      | null;
+    if (j?.ok) r = { probe: "ok", status: res.status };
+    else if (res.status === 429 || res.status >= 500)
+      r = { probe: "unreachable", status: res.status, desc: j?.description };
+    else r = { probe: "invalid", status: res.status, desc: j?.description };
+  } catch (e) {
+    r = { probe: "unreachable", desc: (e as Error).message.slice(0, 120) };
   } finally {
     clearTimeout(t);
   }
+  tgCache = { at: Date.now(), token, r };
+  return r;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const diagOn =
+    !!process.env.DIAG_TOKEN &&
+    new URL(req.url).searchParams.get("diag") === process.env.DIAG_TOKEN;
   const phaetonConfigured = Boolean(process.env.PHAETON_API_KEY);
   const shatemConfigured = Boolean(process.env.SHATEM_API_KEY);
   const autotradeConfigured = Boolean(
@@ -49,13 +69,7 @@ export async function GET() {
       process.env.SHEETS_SPREADSHEET_ID
   );
 
-  // Токен бота живёт в админке ИЛИ в env (см. lib/telegram/notify) — раньше
-  // здесь смотрели только env, поэтому панель показывала «не подключён» при
-  // рабочем боте. Настройки читаем кэшированным getSetting (60 с), а не
-  // свежим чтением: /api/health публичный и его опрашивают.
   let sheetsOk = false;
-  let tgTokenSetting: string | undefined;
-  let tgChat = "";
   let interkomEnabled = false;
   // Честные статусы поставщиков пишет крон /api/cron/proxy-check раз в ~5 мин
   // реальными пробами выдачи (см. lib/monitoring). Health лишь ЧИТАЕТ последний
@@ -66,18 +80,13 @@ export async function GET() {
   let interkomStatus: string | undefined;
   if (sheetsConfigured) {
     try {
-      const [tok, chat, ikEnabled, phStatus, shStatus, atStatus, ikStatus] =
-        await Promise.all([
-          getSetting("telegram_bot_token"),
-          getSetting("telegram_chat_id"),
-          getSetting("interkom_enabled"),
-          getSetting("phaeton_status"),
-          getSetting("shatem_status"),
-          getSetting("autotrade_status"),
-          getSetting("interkom_status"),
-        ]);
-      tgTokenSetting = tok;
-      tgChat = (chat ?? "").trim();
+      const [ikEnabled, phStatus, shStatus, atStatus, ikStatus] = await Promise.all([
+        getSetting("interkom_enabled"),
+        getSetting("phaeton_status"),
+        getSetting("shatem_status"),
+        getSetting("autotrade_status"),
+        getSetting("interkom_status"),
+      ]);
       interkomEnabled = (ikEnabled ?? "").trim() === "on";
       phaetonStatus = (phStatus ?? "").trim();
       shatemStatus = (shStatus ?? "").trim();
@@ -88,7 +97,12 @@ export async function GET() {
       sheetsOk = false;
     }
   }
-  const tgToken = (tgTokenSetting || process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  // Токен и chat_id берём ТЕМ ЖЕ путём, что и реальная отправка (notify.creds,
+  // свежее чтение настроек) — иначе health мог тестировать другой (напр. старый
+  // env) токен, чем тот, которым бот шлёт сообщения, и врал «неверный токен»
+  // при рабочем боте.
+  const tgToken = (await getTelegramToken().catch(() => "")).trim();
+  const tgChat = (await getTelegramChatId().catch(() => "")).trim();
 
   const [tgProbe, proxy] = await Promise.all([
     checkTelegramToken(tgToken),
@@ -118,9 +132,9 @@ export async function GET() {
   // явно: неверный токен / нет связи с Telegram / нет chat id.
   const telegram = !tgToken
     ? "missing"
-    : tgProbe === "unreachable"
+    : tgProbe.probe === "unreachable"
       ? "unreachable"
-      : tgProbe === "invalid"
+      : tgProbe.probe === "invalid"
         ? "invalid"
         : !tgChat
           ? "no-chat"
@@ -155,6 +169,23 @@ export async function GET() {
             : "missing",
         telegram,
       },
+      // Диагностика Telegram (за ?diag=<DIAG_TOKEN>): точный ответ getMe и откуда
+      // взят токен — чтобы понять «неверный токен» при рабочей отправке. Токен
+      // НЕ раскрываем: только длину/источник и текст ошибки Telegram.
+      ...(diagOn
+        ? {
+            _diag: {
+              telegram: {
+                probe: tgProbe.probe,
+                status: tgProbe.status,
+                desc: tgProbe.desc,
+                tokenLen: tgToken.length,
+                chatSet: Boolean(tgChat),
+                envTokenSet: Boolean((process.env.TELEGRAM_BOT_TOKEN ?? "").trim()),
+              },
+            },
+          }
+        : {}),
     },
     { status: ok ? 200 : 503 }
   );
