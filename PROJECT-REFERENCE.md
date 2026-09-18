@@ -1,8 +1,12 @@
 # PROJECT-REFERENCE — scanpart.kz (полный справочник)
 
-Обновлено: 2026‑08‑19. Читать ПЕРВЫМ при возвращении к проекту.
+Обновлено: 2026‑09‑18. Читать ПЕРВЫМ при возвращении к проекту.
 Это единый источник правды по архитектуре, поставщикам, прокси, поиску, настройкам,
 env, админке и деплою. Все функции и доработки — здесь.
+
+> Свежее (2026‑09‑18): фикс выдачи Phaeton (склад Астаны отдаёт 1 день → §4.1),
+> честный мониторинг ВСЕХ поставщиков + Telegram‑алерты + «сторож» авто‑починки (§3.1),
+> русский дашборд «работает/не работает», индикатор загрузки и зелёные карточки наличия (§4.2).
 
 ---
 
@@ -80,6 +84,37 @@ Phaeton. Если прокси падает — поиск отдаёт пуст
 - **Резерв (TODO владельца):** второй прокси на случай сбоя основного — тогда авто‑переключение
   (не сделано, ждёт второго прокси), либо переезд на VPS (постоянный IP, без стороннего прокси).
 
+### 3.1 ЧЕСТНЫЙ мониторинг всех поставщиков + «сторож» (2026‑09‑18)
+Раньше health завышал: `phaeton` был просто пингом корня `api.phaeton.kz` (не через прокси) и
+оставался «ok», пока поиск реально молчал. Теперь всё честно и с авто‑починкой.
+
+- **Реальные пробы** (`lib/monitoring.ts`, `lib/phaeton/health.ts`): гоняем «сентинел»‑артикулы через
+  ТУ ЖЕ функцию поиска, что видит покупатель. Семантика (чтобы не было ложных тревог):
+  - **Р1 (Phaeton)** — СТРОГО по наличию сентинелов в Астане (каталог большой, они гарантированы):
+    пусто = сломано (whitelist/склад/фильтр).
+  - **М2/Т3/И6** — по ДОСТУПНОСТИ: их `searchXxxOffers` бросают только на auth/сети, пустой каталог = `[]`;
+    «down» лишь когда ВСЕ сентинелы упали. Иначе Interkom (узкая номенклатура) ложно показывал «не работает».
+    Interkom пробуется только при `interkom_enabled=on`. Сентинелы — env `SUPPLIER_HEALTH_ARTICLES`
+    (или `PHAETON_HEALTH_ARTICLES`), деф. `0986424815,0451103316,OC90`. Кэш проб 60с.
+- **Крон `GET /api/cron/proxy-check`** (GitHub Actions «Keep warm», ~5 мин): проверяет прокси + каждого
+  поставщика, пишет `${supplier}_status` (up/down), шлёт Telegram ТОЛЬКО при СМЕНЕ статуса
+  (🔴 «… не работает» / 🟢 «… снова работает»; первый замер без алерта). Если прокси лёг — пробы не
+  гоняем (дублей к алерту прокси нет; дашборд сам покажет поставщиков «не работает» через оверлей).
+- **«СТОРОЖ» (авто‑починка, безопасно):** при «не работает» (прокси жив) монитор СНАЧАЛА чинит в рамках
+  рабочей логики — `remediate()`: `resetProxyAgent(...)` (застрявший туннель) + сброс сессии поставщика
+  (`resetShatemAuth`/`resetAutotradeSession`/`resetInterkomSession` — протухшая кука/токен без явной 401) —
+  и `reprobe(force=true)` мимо кэша. Помогло и сбой был кратким → тихо (без спама); поднялся из
+  устойчивого down → 🟢 «(авто‑восстановление)»; не помогло → 🔴 «нужна проверка». НЕ трогает то, что
+  требует человека (провайдер прокси, IP‑whitelist, токены, редеплой) — только точный алерт.
+- **Health честно по каждому** (`app/api/health/route.ts`): `phaeton/shatem/autotrade/interkom` берутся из
+  `${supplier}_status`; при `proxyDown` все показываются «не работает» (без записи статуса — без шторма
+  алертов на восстановлении). `telegram` — с причиной: `invalid`/`unreachable`/`no-chat`; токен тестируется
+  ТЕМ ЖЕ путём, что и отправка (`getTelegramToken`/`getTelegramChatId`, свежее чтение), иначе врал «неверный
+  токен» при рабочем боте из‑за старого env `TELEGRAM_BOT_TOKEN`. getMe кэшируется 60с (429/5xx = транзиент).
+- **`?diag=<DIAG_TOKEN>`**: `GET /api/search?...&phase=phaeton&diag=` — счётчики brands/prices,
+  warehouseIds, atAstana/inStockNow/picked, дамп складов Dictionary; `GET /api/health?diag=` — детали getMe
+  Telegram (без раскрытия токена). `DIAG_TOKEN` в Vercel prod непустой.
+
 ---
 
 ## 4. Архитектура поиска (`app/api/search/route.ts`)
@@ -92,6 +127,29 @@ Phaeton. Если прокси падает — поиск отдаёт пуст
 - **Ускорение Phaeton по названию:** для name‑поиска быстрая фаза уже резолвит OEM из каталога Laximo
   (`oem[]`); клиент передаёт их в фазу Phaeton `&oems=...` → Phaeton не гоняет Laximo второй раз
   (было ~30с → стало ~3‑5с).
+
+### 4.1 Склад Астаны у Phaeton (инцидент+фикс 2026‑09‑18)
+Симптом «Р1 не отдаёт запчасти» оказался НЕ прокси (бренды/цены приходили, rawItems~5000). Причины:
+1. **Phaeton Dictionary перестал отдавать список `Warehouses`** → `getAstanaWarehouseIds()` бросал ошибку →
+   `warehouseIds=[]`. **Фикс:** env **`PHAETON_ASTANA_WAREHOUSE_ID=fd6fcfe0-a729-11e7-80c2-9457a554842b`**
+   (склад «Астана»). Это надёжно определяет Астану без Dictionary И скоупит `searchPrices` к Астане →
+   payload упал ~4988→~4 позиции, ответ 10‑17с→**1‑2с** (побочно ушла нестабильность «работает со 2‑го раза»).
+2. **Склад «Астана» отдаёт 1 день отгрузки** даже на физический остаток, а фильтр требовал `days===0` →
+   выкидывал ВЕСЬ остаток Астаны. **Фикс:** «в наличии» = позиция на складе Астаны с остатком (>0 уже
+   отфильтровано), без `days===0`. Плюс у позиций Астаны обнуляем `shipmentDays` → на карточке НЕТ плашки
+   «Доставка под заказ N дней» (это местное наличие). Диагностика — `?diag` (см. §3.1).
+- **Правило на будущее:** при «Р1 не отдаёт» сначала `?diag`, не редеплой ради прокси. Если brands/prices
+  fulfilled — дело в резолвере склада/фильтрах. `getAstanaWarehouseIds` (`lib/phaeton/astana-warehouse.ts`)
+  сначала берёт env‑override, иначе матчит `/астана|astana/i` в Dictionary (24ч кэш).
+
+### 4.2 Выдача результатов (UX)
+- **Индикатор загрузки над карточками** (`components/results-list.tsx`, серверные надписи из
+  `app/[locale]/results/page.tsx`): пока фоном идёт Phaeton — красный пульсирующий кружок и надпись
+  «Подождите загрузку всех позиций»; когда позиции со всех складов пришли — зелёная галочка «Данные
+  запчасти на складе в Астане». Обе надписи РЕДАКТИРУЮТСЯ в админке: настройки `search_loading_label` /
+  `search_ready_label` (пусто = перевод по умолчанию RU/KK/EN: `results.searchLoadingAll`/`searchReadyAstana`).
+- **Зелёные карточки наличия:** позиция в наличии в Астане (остаток ≥1) — карточка с зелёным фоном + значок
+  «В наличии · Астана» (`results.inStockBadge`), чтобы читалось «есть сейчас», а не «под заказ».
 
 ### Поиск по названию
 - Для авто с VIN/каталогом (`vinScoped`) — по каталогу Laximo (Shate‑M web‑session, `lib/shatem/catalog.ts`,
@@ -117,21 +175,25 @@ Phaeton. Если прокси падает — поиск отдаёт пуст
 - `lib/markup.ts`: `applyBracketMarkup(price, brackets, fallbackPct)`, `parsePriceBrackets` (валид/сорт/≤10).
   Формат `price_brackets` (JSON): `[{from, to|null, kind:"percent"|"fixed", value}]`, от 0 до 10 строк.
   Редактор в «Настройках» (таблица От/До/тип %|₸/значение).
-- **`analogs_max`** — сколько позиций с каждого склада показывать, **диапазон 0–20** (было 0–10), деф. 3.
+- **`analogs_max`** — сколько позиций с каждого склада показывать, **диапазон 0–30** (было 0–20), деф. **20**.
 
 ---
 
 ## 5. Env‑переменные (Vercel → Production; имена, без значений)
 `PHAETON_USER_GUID`, `PHAETON_API_KEY`, `PHAETON_BASE_URL`, **`PHAETON_PROXY_URL`** (общий прокси),
+**`PHAETON_ASTANA_WAREHOUSE_ID`** (=`fd6fcfe0-a729-11e7-80c2-9457a554842b`, склад Астаны — см. §4.1),
 `PHAETON_SHOP_LOGIN`, `PHAETON_SHOP_PASSWORD`,
 `SHATEM_API_KEY`, `SHATEM_WEB_LOGIN`, `SHATEM_WEB_PASSWORD`,
 `AUTOTRADE_LOGIN`, `AUTOTRADE_PASSWORD`,
 **`INTERKOM_LOGIN`, `INTERKOM_PASSWORD`** (опц. `INTERKOM_PROXY_URL` → фолбэк на PHAETON_PROXY_URL),
 `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`, `SHEETS_SPREADSHEET_ID`,
 `CLOUDINARY_URL`, `CLOUDINARY_API_SECRET`, `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,
-`IRON_SESSION_PASSWORD`, `BCRYPT_PEPPER`, `CRON_SECRET`, **`WARM_KEY`** (пингер), `DIAG_TOKEN`,
+`IRON_SESSION_PASSWORD`, `BCRYPT_PEPPER`, `CRON_SECRET`, **`WARM_KEY`** (пингер), **`DIAG_TOKEN`** (непустой — для `?diag`),
+опц. **`SUPPLIER_HEALTH_ARTICLES`**/`PHAETON_HEALTH_ARTICLES` (сентинелы мониторинга, деф. `0986424815,0451103316,OC90`),
 `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SITE_NAME`.
 (Прочие прокси‑env‑имена как фолбэки: SHATEM_PROXY_URL, AUTOTRADE_PROXY_URL, AUTODOC_PROXY_URL — не заданы.)
+**Внимание:** env `TELEGRAM_BOT_TOKEN` содержит СТАРЫЙ/отозванный токен (рабочий — в настройке
+`telegram_bot_token`). Health теперь тестирует токен из настроек, но env‑значение лучше удалить/обновить (§12).
 
 **GitHub secrets (repo 779722-hub/scanpart-astana):** `WARM_PING_URL` (=warm URL с ключом),
 `PROXY_CHECK_URL` (=proxy-check URL с ключом). `gh` залогинен под 779722-hub.
@@ -143,9 +205,11 @@ Phaeton. Если прокси падает — поиск отдаёт пуст
 ---
 
 ## 6. Настройки (лист Google Sheets `Settings`, ключи)
-`markup_percent`, **`price_brackets`** (JSON), `analogs_max` (0–20), `show_oem`, `show_photos`,
+`markup_percent`, **`price_brackets`** (JSON), `analogs_max` (0–30, деф. 20), `show_oem`, `show_photos`,
 `photo_size_phaeton`, `photo_size_shatem`, `photo_size_autotrade`, **`interkom_enabled`**,
-**`proxy_status`** (up/down — ведёт крон), `telegram_bot_token`, `telegram_chat_id`,
+**`search_loading_label`**, **`search_ready_label`** (надписи индикатора загрузки, см. §4.2),
+**`proxy_status`**, **`phaeton_status`**, **`shatem_status`**, **`autotrade_status`**, **`interkom_status`**
+(up/down — ведёт крон‑мониторинг, читает дашборд), `telegram_bot_token`, `telegram_chat_id`,
 `sale_enabled`, `sale_markup_percent`, `sale_pages`, `sale_sync_at`, `sale_sync_cursor`,
 `vin_ocr_provider`, `voice_search_enabled`, `voice_stt_provider`, `openai_api_key`, `gemini_api_key`,
 `openrouter_api_key`, `openrouter_model`.
@@ -160,8 +224,10 @@ PUT принимает `{patch:{key:value}}` (пустой секрет = не �
 - **Безопасность (фикс сессии):** секреты не утекают в settings GET; PUT/DELETE курьеров и GET списка
   пользователей — только **owner** (`requireRole("owner")`). Настройки — секреты редактируются.
 - **Дашборд (`components/admin/tab-dashboard.tsx`)** — карточка «Статус» из `/api/health`:
-  Phaeton (Р1), Shate‑M (М2), Autotrade (Т3), **Interkom (И6)**, **Прокси**, Google Sheets, Cloudinary, Telegram.
-  Прокси/Interkom — словами (работает/не работает; подключён/выключен/не настроен). Опрос каждые 30с.
+  Phaeton (Р1), Shate‑M (М2), Autotrade (Т3), **Interkom (И6)**, **Прокси**, Google Таблицы, Хранилище фото, Телеграм.
+  Все подписи на русском (склады/коды Р1/М2/Т3/И6 не переводим), единые статусы **«работает / не работает»**
+  (+ «не настроено / выключено / нет данных»), значок зелёный/красный/серый. Статусы поставщиков — из
+  честных проб крона (§3.1). Опрос каждые 30с.
 - Вкладки: Дашборд, Операции (Заказы+Доставки), Клиенты, Локации/Склады, Контент, Дизайн(+Картинки),
   Словарь, Что искали, Настройки, Доступы (owner‑only: менеджеры+курьеры). Полная ширина, сайдбар слева,
   мобильный — выезжающий ящик.
@@ -180,7 +246,9 @@ PUT принимает `{patch:{key:value}}` (пустой секрет = не �
 
 ## 9. Крон / GitHub Actions
 - **`.github/workflows/keep-warm.yml`** (cron `*/5`): пинг `WARM_PING_URL` (прогрев) + `PROXY_CHECK_URL`
-  (мониторинг прокси + телеграм‑алерт). GH‑расписание «best effort» (бывают задержки).
+  (честный мониторинг всех поставщиков + «сторож» авто‑починки + телеграм‑алерт, §3.1). Шаг proxy‑check
+  помечен `if: always()` (отрабатывает, даже если прогрев подвис); прогрев скоуплен на склад Астаны
+  (иначе на холодном инстансе 504 — тянул ~230КБ). GH‑расписание «best effort» (бывают задержки).
 - Vercel‑крон в `vercel.json`: только суточный `sale-sync` (Hobby не даёт частые). Warm/proxy‑check —
   через GitHub Actions по URL‑ключу.
 - VPS‑деплой (`.github/workflows/deploy.yml`) — ОТКЛЮЧЁН (VPS не поднимали), прод на Vercel.
@@ -201,6 +269,8 @@ PUT принимает `{patch:{key:value}}` (пустой секрет = не �
   `lib/autotrade/{session,search}.ts`, **`lib/interkom/{session,search}.ts`**.
 - Прокси/устойчивость: `lib/proxy.ts`, `lib/proxy-health.ts`, `app/api/cron/{warm,proxy-check}/route.ts`,
   `components/proxy-banner.tsx`, `.github/workflows/keep-warm.yml`.
+- Мониторинг/сторож: **`lib/monitoring.ts`** (пробы поставщиков), **`lib/phaeton/health.ts`** (проба Р1),
+  `lib/phaeton/astana-warehouse.ts`, resetʼы сессий в `lib/{shatem/client,autotrade/session,interkom/session}.ts`.
 - Наценка/настройки: `lib/markup.ts`, `lib/sheets/settings.ts`, `components/admin/tab-settings.tsx`.
 - Здоровье/дашборд: `app/api/health/route.ts`, `components/admin/tab-dashboard.tsx`.
 - VIN: `app/api/vin/route.ts`, `components/vin-search-form.tsx`.
@@ -210,8 +280,11 @@ PUT принимает `{patch:{key:value}}` (пустой секрет = не �
 ## 12. Незакрытые задачи ВЛАДЕЛЬЦА (важно)
 1. **Ротировать 4 ключа** (могли утечь до фикса settings): `telegram_bot_token`, `openai_api_key`,
    `gemini_api_key`, `openrouter_api_key` — перевыпустить у провайдеров, вписать в «Настройки».
-2. **Склад И6** — добавить адрес+координаты пункта выдачи в «Локации» (для курьерской маршрутизации).
-3. **Наценка по диапазонам** — сейчас `price_brackets` пусто → действует общий % (сейчас 50). Задать при желании.
-4. **Прокси px6** — включить автопродление `194.32.251.55` (единая точка отказа); при повторных сбоях —
+2. **Env `TELEGRAM_BOT_TOKEN`** содержит СТАРЫЙ/отозванный токен — удалить его в Vercel или вписать
+   актуальный (рабочий токен лежит в настройке `telegram_bot_token`; health уже тестирует именно её).
+3. **Склад И6** — добавить адрес+координаты пункта выдачи в «Локации» (для курьерской маршрутизации).
+4. **Наценка по диапазонам** — сейчас `price_brackets` пусто → действует общий % (сейчас 50). Задать при желании.
+5. **Прокси px6** — включить автопродление `194.32.251.55` (единая точка отказа); при повторных сбоях —
    резервный прокси (для авто‑переключения нужно доработать код + дать второй URL) или переезд на VPS.
-5. `analogs_max` сейчас = 10 (можно до 20).
+   «Сторож» (§3.1) чинит только транзиент (застрявший туннель/сессия); провайдера/whitelist чинит человек.
+6. `analogs_max` сейчас = 20 (можно до 30).
