@@ -101,14 +101,12 @@ export async function GET(req: NextRequest) {
         const t = proxyStatusTransition(prev, snow);
         if (t.alert === "down") {
           await sendTelegramHtml(
-            `🔴 ${SUPPLIER_LABEL[key]} не отдаёт запчасти со склада Астаны${
+            `🔴 ${SUPPLIER_LABEL[key]} не работает${
               h.error ? ` (${h.error})` : ""
-            } — проверьте доступ поставщика и склад`
+            } — проверьте доступ поставщика (логин/сессия/склад)`
           );
         } else if (t.alert === "up") {
-          await sendTelegramHtml(
-            `🟢 ${SUPPLIER_LABEL[key]} снова отдаёт запчасти со склада Астаны`
-          );
+          await sendTelegramHtml(`🟢 ${SUPPLIER_LABEL[key]} снова работает`);
         }
         if (prev !== snow) {
           await writeSetting(`${key}_status`, snow);
