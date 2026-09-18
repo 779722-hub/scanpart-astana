@@ -41,11 +41,21 @@ const SUPPLIER_VALUE_RU: Record<string, string> = {
 };
 const SUPPLIER_KEYS = new Set(["phaeton", "shatem", "autotrade", "interkom"]);
 
-// Тон строки: зелёный (ок), красный (сломано), серый (не активно/нет данных).
+// Telegram: показываем причину, а не голое «fail».
+const TELEGRAM_VALUE_RU: Record<string, string> = {
+  ok: "работает",
+  invalid: "неверный токен",
+  unreachable: "нет связи с Telegram",
+  "no-chat": "не задан chat id",
+  missing: "не настроен",
+};
+
+// Тон строки: зелёный (ок), красный (сломано), серый (не активно/нет данных/транзиент).
 function toneFor(v: string): "ok" | "bad" | "muted" {
   if (v === "ok" || v === "configured") return "ok";
-  if (v === "off" || v === "missing" || v === "unknown" || v === "no-chat") return "muted";
-  return "bad";
+  if (v === "off" || v === "missing" || v === "unknown" || v === "unreachable")
+    return "muted";
+  return "bad"; // fail / invalid / no-chat
 }
 
 export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
@@ -110,9 +120,11 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
                 value={
                   k === "proxy"
                     ? PROXY_VALUE_RU[v] ?? v
-                    : SUPPLIER_KEYS.has(k)
-                      ? SUPPLIER_VALUE_RU[v] ?? v
-                      : v
+                    : k === "telegram"
+                      ? TELEGRAM_VALUE_RU[v] ?? v
+                      : SUPPLIER_KEYS.has(k)
+                        ? SUPPLIER_VALUE_RU[v] ?? v
+                        : v
                 }
               />
             ))
