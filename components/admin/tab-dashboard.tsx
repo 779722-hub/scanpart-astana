@@ -10,52 +10,40 @@ interface Health {
   checks: Record<string, string>;
 }
 
-// Admin-only view — supplier names + their opaque customer codes are fine here.
+// Подписи строк на русском. Названия складов/поставщиков (Р1/М2/Т3/И6) НЕ
+// переводим — это опознаваемые коды/имена.
 const STATUS_LABELS: Record<string, string> = {
   phaeton: "Phaeton (Р1)",
   shatem: "Shate-M (М2)",
   autotrade: "Autotrade (Т3)",
   interkom: "Interkom (И6)",
   proxy: "Прокси",
-  sheets: "Google Sheets",
-  cloudinary: "Cloudinary",
-  telegram: "Telegram",
+  sheets: "Google Таблицы",
+  cloudinary: "Хранилище фото",
+  telegram: "Телеграм",
 };
 
-// Прокси — единый канал всех поставщиков, показываем словами, а не «ok/fail».
-const PROXY_VALUE_RU: Record<string, string> = {
+// Единые подписи статусов на русском для ВСЕХ строк — чтобы везде было
+// одинаково «работает / не работает», а не смесь «работает» и «ok».
+const VALUE_RU: Record<string, string> = {
   ok: "работает",
+  configured: "работает",
+  up: "работает",
   fail: "не работает",
-  missing: "не настроен",
-};
-
-// Поставщики (Р1/М2/Т3/И6): честный статус из реальной пробы (крон proxy-check).
-// Р1 — по наличию сентинелов; М2/Т3/И6 — по доступности (auth/сессия/сеть).
-// «нет данных» — крон ещё не проверял; «выключен» — Interkom off тумблером.
-const SUPPLIER_VALUE_RU: Record<string, string> = {
-  ok: "работает",
-  fail: "не работает",
+  down: "не работает",
+  invalid: "не работает",
+  unreachable: "не работает",
+  "no-chat": "не работает",
+  missing: "не настроено",
+  off: "выключено",
   unknown: "нет данных",
-  missing: "не настроен",
-  off: "выключен",
-};
-const SUPPLIER_KEYS = new Set(["phaeton", "shatem", "autotrade", "interkom"]);
-
-// Telegram: показываем причину, а не голое «fail».
-const TELEGRAM_VALUE_RU: Record<string, string> = {
-  ok: "работает",
-  invalid: "неверный токен",
-  unreachable: "нет связи с Telegram",
-  "no-chat": "не задан chat id",
-  missing: "не настроен",
 };
 
-// Тон строки: зелёный (ок), красный (сломано), серый (не активно/нет данных/транзиент).
+// Тон строки: зелёный (работает), красный (не работает), серый (не активно/нет данных).
 function toneFor(v: string): "ok" | "bad" | "muted" {
-  if (v === "ok" || v === "configured") return "ok";
-  if (v === "off" || v === "missing" || v === "unknown" || v === "unreachable")
-    return "muted";
-  return "bad"; // fail / invalid / no-chat
+  if (v === "ok" || v === "configured" || v === "up") return "ok";
+  if (v === "off" || v === "missing" || v === "unknown") return "muted";
+  return "bad"; // fail / down / invalid / unreachable / no-chat
 }
 
 export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
@@ -117,15 +105,7 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
                 key={k}
                 label={STATUS_LABELS[k] ?? k}
                 tone={toneFor(v)}
-                value={
-                  k === "proxy"
-                    ? PROXY_VALUE_RU[v] ?? v
-                    : k === "telegram"
-                      ? TELEGRAM_VALUE_RU[v] ?? v
-                      : SUPPLIER_KEYS.has(k)
-                        ? SUPPLIER_VALUE_RU[v] ?? v
-                        : v
-                }
+                value={VALUE_RU[v] ?? v}
               />
             ))
           ) : (
