@@ -27,10 +27,13 @@ jobs:
           echo "warm ping HTTP $code"
           [ "$code" = "200" ] || exit 1
 
-      # Мониторинг прокси: проверяет живость KZ-прокси и шлёт телеграм при смене
-      # статуса (упал/поднялся). Тот же интервал ~5 мин, что и прогрев.
+      # Мониторинг: живость прокси + РЕАЛЬНАЯ проба выдачи Phaeton, телеграм при
+      # смене статуса. `if: always()` — мониторинг ДОЛЖЕН отработать, даже если
+      # прогрев выше подвис/вернул не 200 (иначе честный сигнал не обновится).
+      # Таймаут щедрый: проба Phaeton гоняет несколько запросов через прокси КЗ.
       - name: Ping proxy-check endpoint
+        if: always()
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "${{ secrets.PROXY_CHECK_URL }}")
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "${{ secrets.PROXY_CHECK_URL }}")
           echo "proxy-check ping HTTP $code"
           [ "$code" = "200" ] || exit 1
