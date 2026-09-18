@@ -224,12 +224,23 @@ export async function GET(req: NextRequest) {
     // phase, and return them for the client to append. Never blocks the UI.
     // ======================================================================
     if (phase === "phaeton") {
+      // Диагностика Phaeton — только по совпадающему токену (?diag=<DIAG_TOKEN>).
+      // Ничего не отдаёт публично; секреты уже маскируются клиентом (ApiKey/Guid).
+      // Нужна, потому что фаза Phaeton глотает connection/HTTP-ошибки в пустой
+      // ok:true — «нет связи» и «нет совпадений» снаружи неотличимы.
+      const diagOn =
+        !!process.env.DIAG_TOKEN &&
+        req.nextUrl.searchParams.get("diag") === process.env.DIAG_TOKEN;
+      const diag: Record<string, unknown> = {};
+
       // Astana warehouse IDs (Phaeton Dictionary, 24h in-module cache) — used to
       // filter Phaeton price items and scope searchPrices. Fail-safe to [].
       const warehouseIds = await getAstanaWarehouseIds().catch((err) => {
         console.warn("[api/search] astana warehouse resolver failed:", (err as Error).message);
+        if (diagOn) diag.warehouseIdsError = (err as Error).message.slice(0, 300);
         return [] as string[];
       });
+      if (diagOn) diag.warehouseIdsCount = warehouseIds.length;
 
       // Step A — brands. For a VIN-scoped name search, price ONLY the catalog
       // OEMs (vehicle-fit). Free-text Phaeton search isn't vehicle-aware, so
@@ -280,6 +291,21 @@ export async function GET(req: NextRequest) {
           aliasPromise,
         ]);
 
+        if (diagOn) {
+          diag.brands = {
+            variants: variants.length,
+            fulfilled: brandResponses.filter((r) => r.status === "fulfilled").length,
+            rejected: brandResponses.filter((r) => r.status === "rejected").length,
+            isError: brandResponses.filter(
+              (r) => r.status === "fulfilled" && (r.value as { IsError?: boolean }).IsError
+            ).length,
+            firstReject:
+              (brandResponses.find((r) => r.status === "rejected") as
+                | PromiseRejectedResult
+                | undefined)?.reason?.message?.slice(0, 400) ?? null,
+          };
+        }
+
         const seen = new Set<string>();
         brandsItems = [];
         for (const r of brandResponses) {
@@ -308,8 +334,9 @@ export async function GET(req: NextRequest) {
       }
 
       if (!brandsItems.length) {
-        return NextResponse.json({ ok: true, offers: [] });
+        return NextResponse.json({ ok: true, offers: [], ...(diagOn ? { _diag: diag } : {}) });
       }
+      if (diagOn) diag.brandsItems = brandsItems.length;
 
       // Step B — prices for each brand in parallel.
       const cap = kind === "name" ? MAX_BRANDS_TO_QUERY_NAME : MAX_BRANDS_TO_QUERY;
@@ -330,6 +357,22 @@ export async function GET(req: NextRequest) {
           rawItems.push(...(r.value.Items ?? []));
         }
       });
+
+      if (diagOn) {
+        diag.prices = {
+          queried: Math.min(brandsItems.length, cap),
+          fulfilled: priceResponses.filter((r) => r.status === "fulfilled").length,
+          rejected: priceResponses.filter((r) => r.status === "rejected").length,
+          isError: priceResponses.filter(
+            (r) => r.status === "fulfilled" && (r.value as { IsError?: boolean }).IsError
+          ).length,
+          rawItems: rawItems.length,
+          firstReject:
+            (priceResponses.find((r) => r.status === "rejected") as
+              | PromiseRejectedResult
+              | undefined)?.reason?.message?.slice(0, 400) ?? null,
+        };
+      }
 
       const queryTokens = kind === "name" ? tokenize(raw) : [];
       const matchesAllWords = (name: string): boolean => {
@@ -385,7 +428,19 @@ export async function GET(req: NextRequest) {
       );
       const picked = pickPerSource(inAstanaStock, analogsMax);
 
-      return NextResponse.json({ ok: true, offers: codeOffers(picked) });
+      if (diagOn) {
+        diag.analogsMax = analogsMax;
+        diag.inStockNow = phaetonOffers.filter((o) => o.inStockNow).length;
+        diag.atAstana = phaetonOffers.filter((o) => o.atAstana).length;
+        diag.afterFilter = inAstanaStock.length;
+        diag.picked = picked.length;
+      }
+
+      return NextResponse.json({
+        ok: true,
+        offers: codeOffers(picked),
+        ...(diagOn ? { _diag: diag } : {}),
+      });
     }
 
     // ======================================================================
