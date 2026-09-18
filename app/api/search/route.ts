@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchBrands, searchPrices } from "@/lib/phaeton/client";
+import { searchBrands, searchPrices, getDictionary } from "@/lib/phaeton/client";
 import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { applyMarkup, applyBracketMarkup, type PriceBracket } from "@/lib/markup";
 import { getMarkupPercent, getAnalogsMax, getPriceBrackets, getSetting } from "@/lib/sheets/settings";
@@ -434,6 +434,32 @@ export async function GET(req: NextRequest) {
         diag.atAstana = phaetonOffers.filter((o) => o.atAstana).length;
         diag.afterFilter = inAstanaStock.length;
         diag.picked = picked.length;
+        // Что реально в Dictionary (как называются склады) — чтобы понять, почему
+        // Astana-резолвер не нашёл склад, и с какими днями отгрузки идёт наличие.
+        diag.dictWarehouses = await getDictionary()
+          .then((d) =>
+            (Array.isArray(d.Warehouses) ? d.Warehouses : [])
+              .slice(0, 40)
+              .map((w) => ({
+                id: w.WarehouseId,
+                name: w.Name ?? "",
+                city: (w as { City?: string }).City ?? "",
+                address: (w as { Address?: string }).Address ?? "",
+              }))
+          )
+          .catch((e) => `dict error: ${(e as Error).message.slice(0, 200)}`);
+        diag.sampleItems = rawItems
+          .filter((i) => (i.AvailableCount ?? 0) > 0)
+          .slice(0, 12)
+          .map((i) => ({
+            wh: i.Warehouse,
+            whId: i.WarehouseId,
+            qty: i.AvailableCount,
+            expShip: i.ExpectedShipmentDays,
+            guarShip: i.GuaranteedShipmentDays,
+            expDel: i.ExpectedDelivery,
+            guarDel: i.GuaranteedDelivery,
+          }));
       }
 
       return NextResponse.json({
