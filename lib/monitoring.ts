@@ -8,11 +8,19 @@ import { interkomConfigured } from "@/lib/interkom/session";
 import { getSetting } from "@/lib/sheets/settings";
 
 /**
- * ЧЕСТНЫЕ пробы всех поставщиков — единый механизм, как у Phaeton
- * (см. lib/phaeton/health). Гоняем «сентинел»-артикулы через ТУ ЖЕ функцию
- * поиска, что видит покупатель, и считаем офферы, реально доступные в Астане
- * (склад Астаны, остаток>0). ok = есть остаток; иначе «ответил, но пусто»
- * (no_astana_stock — регрессия склада/фильтра/сессии) или ошибка (auth/сеть).
+ * ЧЕСТНЫЕ пробы всех поставщиков. Гоняем «сентинел»-артикулы через ТУ ЖЕ
+ * функцию поиска, что видит покупатель.
+ *
+ * ВАЖНО про семантику «сломано», чтобы НЕ было ложных тревог:
+ *  - Phaeton (Р1): огромный каталог, сентинелы гарантированно есть в Астане →
+ *    строгий сигнал: ok = есть остаток. Пусто = что-то сломано (whitelist/склад/
+ *    фильтр) — так и ловили инцидент 2026-09-18.
+ *  - Shate-M/Autotrade/Interkom: меньше номенклатура, конкретных сентинелов может
+ *    просто не быть на складе → это НЕ поломка. Поэтому сигнал = ДОСТУПНОСТЬ:
+ *    поиск отработал без жёсткой ошибки (их searchXxxOffers бросают только на
+ *    auth/сети, а на пустой каталог возвращают []). ok = дозвонились; «down»
+ *    только когда ВСЕ запросы упали (auth/сессия/сеть). Так «нет этих деталей»
+ *    не путается с «поставщик отвалился».
  *
  * Все поставщики ходят через один KZ-прокси. Если прокси лёг — пробы не
  * запускаем (крон это делает), чтобы не плодить дубли к алерту прокси.
@@ -39,27 +47,25 @@ function sentinels(): string[] {
   return env.length ? env : ["0986424815", "0451103316", "OC90"];
 }
 
-async function probeVia(
+// Доступность: поиск отработал хотя бы по одному сентинелу без жёсткого сбоя
+// (пустой каталог = [] = «дозвонились»). `reachable=false` только когда ВСЕ
+// запросы бросили (auth/сессия/сеть).
+async function probeReachable(
   searchOne: (art: string) => Promise<PartOffer[]>
-): Promise<{ ok: boolean; offers: number; error?: string }> {
+): Promise<{ reachable: boolean; offers: number; error?: string }> {
   const res = await Promise.allSettled(sentinels().map(searchOne));
   let offers = 0;
-  let anyResponded = false;
+  let reachable = false;
   let lastErr: string | undefined;
   for (const r of res) {
     if (r.status === "fulfilled") {
-      anyResponded = true;
+      reachable = true;
       offers += r.value.filter((o) => o.atAstana && o.quantity > 0).length;
     } else {
       lastErr = (r.reason as Error)?.message?.slice(0, 200);
     }
   }
-  const ok = offers > 0;
-  return {
-    ok,
-    offers,
-    error: ok ? undefined : anyResponded ? "no_astana_stock" : lastErr ?? "all_failed",
-  };
+  return { reachable, offers, error: reachable ? undefined : lastErr ?? "all_failed" };
 }
 
 const CACHE_TTL_MS = 60_000;
@@ -81,27 +87,27 @@ export async function probePhaeton(): Promise<SupplierHealth> {
   return { configured: h.configured, ok: h.ok, offers: h.offers, error: h.error, ms: h.ms };
 }
 
-/** Shate-M (М2) — тот же apikey-поиск, что и в выдаче. */
+/** Shate-M (М2) — доступность apikey-поиска (пустой каталог = ок, не поломка). */
 export async function probeShatem(): Promise<SupplierHealth> {
   if (!process.env.SHATEM_API_KEY) return { configured: false, ok: false, offers: 0 };
   return withCache("shatem", async () => {
     const t0 = Date.now();
-    const r = await probeVia((a) => searchShatemOffers(a, { markupPct: 0 }));
-    return { configured: true, ...r, ms: Date.now() - t0 };
+    const r = await probeReachable((a) => searchShatemOffers(a, { markupPct: 0 }));
+    return { configured: true, ok: r.reachable, offers: r.offers, error: r.error, ms: Date.now() - t0 };
   });
 }
 
-/** Autotrade (Т3-Т5) — та же веб-сессия/поиск, что и в выдаче. */
+/** Autotrade (Т3-Т5) — доступность веб-сессии/поиска. */
 export async function probeAutotrade(): Promise<SupplierHealth> {
   if (!autotradeConfigured()) return { configured: false, ok: false, offers: 0 };
   return withCache("autotrade", async () => {
     const t0 = Date.now();
-    const r = await probeVia((a) => searchAutotradeOffers(a, { markupPct: 0 }));
-    return { configured: true, ...r, ms: Date.now() - t0 };
+    const r = await probeReachable((a) => searchAutotradeOffers(a, { markupPct: 0 }));
+    return { configured: true, ok: r.reachable, offers: r.offers, error: r.error, ms: Date.now() - t0 };
   });
 }
 
-/** Interkom (И6) — пробуем только если включён тумблером interkom_enabled. */
+/** Interkom (И6) — доступность; пробуем только если включён тумблером. */
 export async function probeInterkom(): Promise<SupplierHealth> {
   if (!interkomConfigured()) return { configured: false, ok: false, offers: 0 };
   const enabled =
@@ -109,11 +115,10 @@ export async function probeInterkom(): Promise<SupplierHealth> {
   if (!enabled) return { configured: true, disabled: true, ok: false, offers: 0 };
   return withCache("interkom", async () => {
     const t0 = Date.now();
-    // allSegments=true — ищем по всем сегментам (как «любое авто»), чтобы проба
-    // не зависела от выбранной марки.
-    const r = await probeVia((a) =>
+    // allSegments=true — по всем сегментам (как «любое авто»), проба не зависит от марки.
+    const r = await probeReachable((a) =>
       searchInterkomOffers(a, { markupPct: 0, allSegments: true })
     );
-    return { configured: true, ...r, ms: Date.now() - t0 };
+    return { configured: true, ok: r.reachable, offers: r.offers, error: r.error, ms: Date.now() - t0 };
   });
 }
