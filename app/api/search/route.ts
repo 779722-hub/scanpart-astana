@@ -393,7 +393,11 @@ export async function GET(req: NextRequest) {
           const isOriginal = cleanArticle === normArticle;
           const name = i.Name ?? brandsItems.find((b) => b.Brand === i.Brand)?.Name ?? "";
           const compat = classifyCompat(name, vehicle);
-          const days = shipmentDays(i);
+          const atAstanaItem = isAtAstana(i);
+          // Склад «Астана» — это местное наличие. Phaeton формально отдаёт по нему
+          // 1 день отгрузки, но для покупателя это «в наличии», а не «под заказ»:
+          // не показываем плашку «отгрузка N дней» на позициях со склада Астаны.
+          const days = atAstanaItem ? 0 : shipmentDays(i);
           const k = `${i.Brand}|${i.Article}`.toUpperCase();
           const fromCatalog =
             autodocKeys.has(k) || aliasKeys.has(k) || catalogArticleSet.has(cleanArticle);
@@ -409,7 +413,7 @@ export async function GET(req: NextRequest) {
             isOriginal,
             compat: compat.compat,
             compatReason: compat.reason,
-            atAstana: isAtAstana(i),
+            atAstana: atAstanaItem,
             inStockNow: days === 0,
             matchesAllWords: fromCatalog ? true : matchesAllWords(name),
             shipmentDays: days,

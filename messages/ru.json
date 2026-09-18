@@ -109,6 +109,7 @@
     "searchingMore": "Ищем ещё предложения…",
     "searchLoadingAll": "Подождите загрузку всех позиций",
     "searchReadyAstana": "Данные запчасти на складе в Астане",
+    "inStockBadge": "В наличии · Астана",
     "errorService": "Сервис временно недоступен.",
     "oemLabel": "Оригинальный номер (OEM):",
     "sortLabel": "Сортировка:",
