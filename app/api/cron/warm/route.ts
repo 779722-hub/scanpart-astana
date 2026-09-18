@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContext } from "@/lib/shatem/client";
 import { searchBrands, searchPrices } from "@/lib/phaeton/client";
+import { getAstanaWarehouseIds } from "@/lib/phaeton/astana-warehouse";
 import { authedGet } from "@/lib/autotrade/session";
 
 export const runtime = "nodejs";
@@ -33,17 +34,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  // Phaeton: настоящий поиск цен (большой ответ ~230КБ), а НЕ лёгкий Dictionary —
-  // только реальная загрузка «раскачивает» TCP-окно соединения через прокси КЗ,
-  // иначе первый пользовательский поиск всё равно холодный (~11с) и Р1 теряется.
-  const warmPhaeton = searchBrands("0986424815")
-    .then((r) => {
-      const b = (r.Items ?? [])[0];
-      return b
-        ? searchPrices({ article: b.Article, brand: b.Brand, includeAnalogs: true })
-        : null;
-    })
-    .catch(() => null);
+  // Phaeton: реальный поиск цен ТЕМ ЖЕ путём, что и пользовательский — со
+  // скоупом на склад Астаны (PHAETON_ASTANA_WAREHOUSE_ID). Так прогрев греет
+  // соединение/авторизацию через прокси КЗ, но ответ маленький (~4 позиции, а не
+  // ~230КБ) → без 504-таймаутов пингера и совпадает с реальной выдачей.
+  const warmPhaeton = (async () => {
+    const whIds = await getAstanaWarehouseIds().catch(() => [] as string[]);
+    const r = await searchBrands("0986424815");
+    const b = (r.Items ?? [])[0];
+    if (!b) return null;
+    return searchPrices({
+      article: b.Article,
+      brand: b.Brand,
+      warehouseIds: whIds.length ? whIds : undefined,
+      includeAnalogs: true,
+    });
+  })().catch(() => null);
 
   const t0 = Date.now();
   const settle = await Promise.allSettled([
