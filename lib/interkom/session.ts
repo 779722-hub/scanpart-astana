@@ -136,6 +136,15 @@ async function ensureSession(): Promise<CookieJar> {
   return _bootstrap;
 }
 
+/**
+ * Сбросить b2b-сессию Interkom — «сторож» зовёт при «не работает», чтобы
+ * следующий запрос переавторизовался (протухшая кука b2b без явной 401).
+ */
+export function resetInterkomSession(): void {
+  jar = null;
+  _bootstrap = null;
+}
+
 /** Authenticated POST (form-urlencoded body). Re-logs in once on HTTP 401. */
 export async function authedPost(
   pathOrUrl: string,
