@@ -421,10 +421,15 @@ export async function GET(req: NextRequest) {
       // Итоговая цена — по диапазонам входящей цены (резерв — общая наценка).
       for (const o of phaetonOffers) o.priceFinal = priceFor(o);
 
-      // Astana + in-stock now; word-match for name search (same as fast phase).
+      // Astana stock; word-match for name search (same as fast phase).
+      // ВАЖНО: у Phaeton склад «Астана» (whId fd6fcfe0-…) сам по себе — местное
+      // наличие (AvailableCount>0 уже отфильтровано выше). Раньше требовали
+      // days===0, но Phaeton теперь отдаёт по Астане 1 день отгрузки даже на то,
+      // что физически лежит на складе → фильтр days===0 выкидывал ВЁСЬ остаток
+      // Астаны. Поэтому «в наличии» = «на складе Астаны с остатком», без days===0.
       const wantsWords = kind === "name" && queryTokens.length > 0;
       const inAstanaStock = phaetonOffers.filter(
-        (o) => o.atAstana && o.inStockNow && (!wantsWords || o.matchesAllWords)
+        (o) => o.atAstana && (!wantsWords || o.matchesAllWords)
       );
       const picked = pickPerSource(inAstanaStock, analogsMax);
 
