@@ -7,9 +7,15 @@ export const dynamic = "force-dynamic";
 
 const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.GITHUB_SHA?.slice(0, 7) ?? "dev";
 
-/** Does the bot token actually work? Presence of a value proves nothing. */
-async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<boolean> {
-  if (!token) return false;
+/**
+ * Проверка токена бота — честно и с ПРИЧИНОЙ (наличие значения ничего не доказывает):
+ *  - "ok"          — getMe принял токен;
+ *  - "invalid"     — Telegram ответил, но токен не принят (неверный/отозванный/опечатка);
+ *  - "unreachable" — Telegram недоступен/таймаут (сеть, а не токен) — транзиентно.
+ */
+type TgProbe = "ok" | "invalid" | "unreachable";
+async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<TgProbe> {
+  if (!token) return "invalid";
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -18,9 +24,11 @@ async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<bool
       cache: "no-store",
     });
     const j = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-    return Boolean(j?.ok);
+    if (j?.ok) return "ok";
+    // Ответ получен, но токен не принят. 5xx — это сбой на стороне Telegram, а не токена.
+    return res.status >= 500 ? "unreachable" : "invalid";
   } catch {
-    return false;
+    return "unreachable";
   } finally {
     clearTimeout(t);
   }
@@ -82,7 +90,7 @@ export async function GET() {
   }
   const tgToken = (tgTokenSetting || process.env.TELEGRAM_BOT_TOKEN || "").trim();
 
-  const [tgTokenOk, proxy] = await Promise.all([
+  const [tgProbe, proxy] = await Promise.all([
     checkTelegramToken(tgToken),
     // Живость KZ-прокси (общий канал всех поставщиков). Кэш ~30с + свой таймаут,
     // fail-safe — латентность /api/health не растёт.
@@ -106,14 +114,17 @@ export async function GET() {
   };
 
   // Заказ уходит в телеграм только если есть И рабочий токен, И чат
-  // (см. app/api/order) — поэтому «ok» лишь когда есть оба.
+  // (см. app/api/order) — поэтому «ok» лишь когда есть оба. Причину показываем
+  // явно: неверный токен / нет связи с Telegram / нет chat id.
   const telegram = !tgToken
     ? "missing"
-    : !tgTokenOk
-      ? "fail"
-      : !tgChat
-        ? "no-chat"
-        : "ok";
+    : tgProbe === "unreachable"
+      ? "unreachable"
+      : tgProbe === "invalid"
+        ? "invalid"
+        : !tgChat
+          ? "no-chat"
+          : "ok";
 
   // Uptime monitors poll this — reflect core health (Google Sheets: settings,
   // orders, content), not Phaeton's unproxied root ping, which fails from
