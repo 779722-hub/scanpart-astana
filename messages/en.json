@@ -109,6 +109,7 @@
     "searchingMore": "Searching for more offers…",
     "searchLoadingAll": "Please wait, loading all positions",
     "searchReadyAstana": "These parts are in stock at the Astana warehouse",
+    "inStockBadge": "In stock · Astana",
     "errorService": "Service temporarily unavailable.",
     "oemLabel": "Original number (OEM):",
     "sortLabel": "Sort:",

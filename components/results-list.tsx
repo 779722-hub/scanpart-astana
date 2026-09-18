@@ -535,9 +535,24 @@ function OfferCard({
     });
   };
 
+  // В наличии на складе Астаны (остаток ≥ 1) — карточку красим зелёным и ставим
+  // явный значок «в наличии», чтобы позиция читалась как «есть сейчас», а не «под заказ».
+  const astanaInStock = offer.atAstana && offer.quantity >= 1;
   return (
-    <article className="card-offer">
+    <article
+      className={`card-offer ${
+        astanaInStock
+          ? "!border-emerald-300 !bg-emerald-50 dark:!border-emerald-700/50 dark:!bg-emerald-900/15"
+          : ""
+      }`}
+    >
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        {astanaInStock && (
+          <span className="chip bg-emerald-600 text-white dark:bg-emerald-600">
+            <Check className="h-3 w-3" />
+            {t("inStockBadge")}
+          </span>
+        )}
         <span
           className={`chip ${
             offer.isOriginal
