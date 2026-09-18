@@ -144,6 +144,15 @@ async function ensureSession(): Promise<CookieJar> {
   return _bootstrap;
 }
 
+/**
+ * Сбросить веб-сессию Autotrade — «сторож» зовёт при «не работает», чтобы
+ * следующий запрос залогинился заново (протухшая кука без явной 401).
+ */
+export function resetAutotradeSession(): void {
+  jar = null;
+  _bootstrap = null;
+}
+
 /** True when Autotrade is configured (creds or a seeded cookie). */
 export function autotradeConfigured(): boolean {
   return hasCreds() || Boolean(process.env.AUTOTRADE_SESSION_COOKIE);

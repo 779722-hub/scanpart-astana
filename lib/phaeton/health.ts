@@ -39,8 +39,8 @@ function sentinelArticles(): string[] {
   return env.length ? env : ["0986424815", "0451103316", "OC90"];
 }
 
-export async function checkPhaetonSearchHealth(): Promise<PhaetonHealth> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.result;
+export async function checkPhaetonSearchHealth(force = false): Promise<PhaetonHealth> {
+  if (!force && cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.result;
   const store = (result: PhaetonHealth): PhaetonHealth => {
     cache = { at: Date.now(), result };
     return result;

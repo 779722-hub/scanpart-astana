@@ -72,25 +72,26 @@ const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { at: number; result: SupplierHealth }>();
 async function withCache(
   key: string,
+  force: boolean,
   fn: () => Promise<SupplierHealth>
 ): Promise<SupplierHealth> {
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.result;
+  if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.result;
   const result = await fn();
   cache.set(key, { at: Date.now(), result });
   return result;
 }
 
 /** Phaeton (Р1) — переиспользуем его собственную пробу, приводим к общему типу. */
-export async function probePhaeton(): Promise<SupplierHealth> {
-  const h: PhaetonHealth = await checkPhaetonSearchHealth();
+export async function probePhaeton(force = false): Promise<SupplierHealth> {
+  const h: PhaetonHealth = await checkPhaetonSearchHealth(force);
   return { configured: h.configured, ok: h.ok, offers: h.offers, error: h.error, ms: h.ms };
 }
 
 /** Shate-M (М2) — доступность apikey-поиска (пустой каталог = ок, не поломка). */
-export async function probeShatem(): Promise<SupplierHealth> {
+export async function probeShatem(force = false): Promise<SupplierHealth> {
   if (!process.env.SHATEM_API_KEY) return { configured: false, ok: false, offers: 0 };
-  return withCache("shatem", async () => {
+  return withCache("shatem", force, async () => {
     const t0 = Date.now();
     const r = await probeReachable((a) => searchShatemOffers(a, { markupPct: 0 }));
     return { configured: true, ok: r.reachable, offers: r.offers, error: r.error, ms: Date.now() - t0 };
@@ -98,9 +99,9 @@ export async function probeShatem(): Promise<SupplierHealth> {
 }
 
 /** Autotrade (Т3-Т5) — доступность веб-сессии/поиска. */
-export async function probeAutotrade(): Promise<SupplierHealth> {
+export async function probeAutotrade(force = false): Promise<SupplierHealth> {
   if (!autotradeConfigured()) return { configured: false, ok: false, offers: 0 };
-  return withCache("autotrade", async () => {
+  return withCache("autotrade", force, async () => {
     const t0 = Date.now();
     const r = await probeReachable((a) => searchAutotradeOffers(a, { markupPct: 0 }));
     return { configured: true, ok: r.reachable, offers: r.offers, error: r.error, ms: Date.now() - t0 };
@@ -108,12 +109,12 @@ export async function probeAutotrade(): Promise<SupplierHealth> {
 }
 
 /** Interkom (И6) — доступность; пробуем только если включён тумблером. */
-export async function probeInterkom(): Promise<SupplierHealth> {
+export async function probeInterkom(force = false): Promise<SupplierHealth> {
   if (!interkomConfigured()) return { configured: false, ok: false, offers: 0 };
   const enabled =
     ((await getSetting("interkom_enabled").catch(() => "off")) ?? "off").trim() === "on";
   if (!enabled) return { configured: true, disabled: true, ok: false, offers: 0 };
-  return withCache("interkom", async () => {
+  return withCache("interkom", force, async () => {
     const t0 = Date.now();
     // allSegments=true — по всем сегментам (как «любое авто»), проба не зависит от марки.
     const r = await probeReachable((a) =>

@@ -199,3 +199,14 @@ export async function getContext(): Promise<{
   _ctx = { agreementCode, deliveryAddressCode, at: Date.now() };
   return _ctx;
 }
+
+/**
+ * Сбросить кэш авторизации/контекста Shate-M — «сторож» (крон proxy-check) зовёт
+ * это при статусе «не работает», чтобы следующий запрос переавторизовался с нуля
+ * (лечит протухший токен/контекст, который не отдал явную 401).
+ */
+export function resetShatemAuth(): void {
+  _token = null;
+  _loginInFlight = null;
+  _ctx = null;
+}
