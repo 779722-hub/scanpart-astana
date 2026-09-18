@@ -1,15 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkProxyHealth, proxyStatusTransition } from "@/lib/proxy-health";
-import { checkPhaetonSearchHealth } from "@/lib/phaeton/health";
+import {
+  probePhaeton,
+  probeShatem,
+  probeAutotrade,
+  probeInterkom,
+  type SupplierHealth,
+} from "@/lib/monitoring";
 import { getSetting, invalidateSettings } from "@/lib/sheets/settings";
 import { writeSetting } from "@/lib/sheets/client";
 import { sendTelegramHtml } from "@/lib/telegram/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Реальная проба Phaeton (searchBrands+searchPrices по сентинелам через прокси)
-// может занять несколько секунд на холодном инстансе — даём запас.
-export const maxDuration = 40;
+// Реальные пробы 4 поставщиков (поиск сентинелов через прокси) параллельно —
+// на холодном инстансе несколько секунд, даём запас.
+export const maxDuration = 60;
+
+// Читаемые ярлыки для телеграма (только внутренние — код+имя допустимы).
+const SUPPLIER_LABEL: Record<string, string> = {
+  phaeton: "Phaeton (Р1)",
+  shatem: "Shate-M (М2)",
+  autotrade: "Autotrade (Т3)",
+  interkom: "Interkom (И6)",
+};
 
 /**
  * ЧЕСТНЫЙ мониторинг поиска. Внешний планировщик (GitHub Actions, рядом с
@@ -62,38 +76,42 @@ export async function GET(req: NextRequest) {
     /* fail-safe: мониторинг не должен падать */
   }
 
-  // Phaeton (Р1) — честная проба выдачи. Если прокси лёг, Р1 всё равно не
-  // отдаёт: отражаем это в статусе, но БЕЗ отдельного телеграма (алерт прокси
-  // уже покрывает — не дублируем). Отдельный phaeton-алерт нужен для случая
-  // «прокси жив, а Р1 молчит».
-  let phaeton: string | undefined;
+  // Честные пробы всех поставщиков. Все ходят через тот же прокси: если он лёг —
+  // пробы НЕ запускаем (иначе поймаем «down» у всех и продублируем алерт прокси).
+  // Тогда статусы поставщиков остаются прежними, а дашборд (/api/health) сам
+  // покажет их как «не работает», пока прокси лежит (оверлей proxyDown). Когда
+  // прокси жив, каждый поставщик проверяется отдельно и алертит на СМЕНЕ статуса
+  // — так видно, ЧТО именно сломано (напр. прокси жив, а Р1 или И6 молчит).
+  const suppliers: Record<string, string> = {};
   try {
-    if (now === "down") {
-      const prevPh = (await getSetting("phaeton_status"))?.trim();
-      if (prevPh !== "down") {
-        await writeSetting("phaeton_status", "down");
-        invalidateSettings();
-      }
-      phaeton = "down";
-    } else {
-      const ph = await checkPhaetonSearchHealth();
-      if (ph.configured) {
-        const pnow = ph.ok ? "up" : "down";
-        phaeton = pnow;
-        const prevRaw = (await getSetting("phaeton_status"))?.trim();
+    if (now === "up") {
+      const probes: Array<[string, SupplierHealth]> = await Promise.all([
+        probePhaeton().then((h) => ["phaeton", h] as [string, SupplierHealth]),
+        probeShatem().then((h) => ["shatem", h] as [string, SupplierHealth]),
+        probeAutotrade().then((h) => ["autotrade", h] as [string, SupplierHealth]),
+        probeInterkom().then((h) => ["interkom", h] as [string, SupplierHealth]),
+      ]);
+      for (const [key, h] of probes) {
+        // Не настроен или выключен тумблером — не трогаем статус и не алертим.
+        if (!h.configured || h.disabled) continue;
+        const snow = h.ok ? "up" : "down";
+        suppliers[key] = snow;
+        const prevRaw = (await getSetting(`${key}_status`))?.trim();
         const prev = prevRaw === "up" || prevRaw === "down" ? prevRaw : undefined;
-        const t = proxyStatusTransition(prev, pnow);
+        const t = proxyStatusTransition(prev, snow);
         if (t.alert === "down") {
           await sendTelegramHtml(
-            `🔴 Phaeton (Р1) не отдаёт запчасти со склада Астаны${
-              ph.error ? ` (${ph.error})` : ""
-            } — проверьте whitelist IP на Phaeton и склад Астаны`
+            `🔴 ${SUPPLIER_LABEL[key]} не отдаёт запчасти со склада Астаны${
+              h.error ? ` (${h.error})` : ""
+            } — проверьте доступ поставщика и склад`
           );
         } else if (t.alert === "up") {
-          await sendTelegramHtml("🟢 Phaeton (Р1) снова отдаёт запчасти со склада Астаны");
+          await sendTelegramHtml(
+            `🟢 ${SUPPLIER_LABEL[key]} снова отдаёт запчасти со склада Астаны`
+          );
         }
-        if (prev !== pnow) {
-          await writeSetting("phaeton_status", pnow);
+        if (prev !== snow) {
+          await writeSetting(`${key}_status`, snow);
           invalidateSettings();
         }
       }
@@ -102,5 +120,5 @@ export async function GET(req: NextRequest) {
     /* fail-safe */
   }
 
-  return NextResponse.json({ ok: true, proxy: now, phaeton, changed });
+  return NextResponse.json({ ok: true, proxy: now, suppliers, changed });
 }

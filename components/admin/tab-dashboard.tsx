@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Activity, CheckCircle2, XCircle, MinusCircle, Loader2 } from "lucide-react";
 
 interface Health {
   ok: boolean;
@@ -29,22 +29,23 @@ const PROXY_VALUE_RU: Record<string, string> = {
   missing: "не настроен",
 };
 
-// Phaeton (Р1): честный статус из реальной пробы выдачи (крон proxy-check).
-// «нет данных» — крон ещё не проверял (первые ~5 мин после деплоя).
-const PHAETON_VALUE_RU: Record<string, string> = {
+// Поставщики (Р1/М2/Т3/И6): честный статус из реальной пробы выдачи (крон
+// proxy-check). «нет данных» — крон ещё не проверял; «выключен» — Interkom off.
+const SUPPLIER_VALUE_RU: Record<string, string> = {
   ok: "отдаёт запчасти",
   fail: "не отдаёт",
   unknown: "нет данных",
   missing: "не настроен",
-};
-
-// Interkom: подключён (креды + включён), выключен (креды есть, тумблер off),
-// не настроен (нет логина/пароля).
-const INTERKOM_VALUE_RU: Record<string, string> = {
-  ok: "подключён",
   off: "выключен",
-  missing: "не настроен",
 };
+const SUPPLIER_KEYS = new Set(["phaeton", "shatem", "autotrade", "interkom"]);
+
+// Тон строки: зелёный (ок), красный (сломано), серый (не активно/нет данных).
+function toneFor(v: string): "ok" | "bad" | "muted" {
+  if (v === "ok" || v === "configured") return "ok";
+  if (v === "off" || v === "missing" || v === "unknown" || v === "no-chat") return "muted";
+  return "bad";
+}
 
 export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
   const [health, setHealth] = useState<Health | null>(null);
@@ -104,15 +105,13 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
               <Row
                 key={k}
                 label={STATUS_LABELS[k] ?? k}
-                ok={v === "ok" || v === "configured"}
+                tone={toneFor(v)}
                 value={
                   k === "proxy"
                     ? PROXY_VALUE_RU[v] ?? v
-                    : k === "interkom"
-                      ? INTERKOM_VALUE_RU[v] ?? v
-                      : k === "phaeton"
-                        ? PHAETON_VALUE_RU[v] ?? v
-                        : v
+                    : SUPPLIER_KEYS.has(k)
+                      ? SUPPLIER_VALUE_RU[v] ?? v
+                      : v
                 }
               />
             ))
@@ -154,16 +153,27 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
   );
 }
 
-function Row({ label, ok, value }: { label: string; ok: boolean; value: string }) {
+function Row({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "ok" | "bad" | "muted";
+  value: string;
+}) {
+  const color =
+    tone === "ok"
+      ? "text-emerald-600"
+      : tone === "bad"
+        ? "text-brand"
+        : "text-ink-mute dark:text-paper-mute";
+  const Icon = tone === "ok" ? CheckCircle2 : tone === "bad" ? XCircle : MinusCircle;
   return (
     <div className="flex items-center justify-between gap-2 text-sm">
       <span className="capitalize">{label}</span>
-      <span
-        className={
-          ok ? "inline-flex items-center gap-1 text-emerald-600" : "inline-flex items-center gap-1 text-brand"
-        }
-      >
-        {ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+      <span className={`inline-flex items-center gap-1 ${color}`}>
+        <Icon className="h-4 w-4" />
         {value}
       </span>
     </div>

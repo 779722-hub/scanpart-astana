@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSetting } from "@/lib/sheets/settings";
-import { getLocations } from "@/lib/shatem/client";
 import { checkProxyHealth } from "@/lib/proxy-health";
 
 export const runtime = "nodejs";
@@ -50,22 +49,32 @@ export async function GET() {
   let tgTokenSetting: string | undefined;
   let tgChat = "";
   let interkomEnabled = false;
-  // Честный статус Phaeton пишет крон /api/cron/proxy-check раз в ~5 мин реальной
-  // пробой выдачи (см. lib/phaeton/health). Health лишь ЧИТАЕТ последний вердикт
-  // из настройки — быстро и без тяжёлого запроса на каждый опрос дашборда.
+  // Честные статусы поставщиков пишет крон /api/cron/proxy-check раз в ~5 мин
+  // реальными пробами выдачи (см. lib/monitoring). Health лишь ЧИТАЕТ последний
+  // вердикт из настроек — быстро и без тяжёлых запросов на каждый опрос дашборда.
   let phaetonStatus: string | undefined;
+  let shatemStatus: string | undefined;
+  let autotradeStatus: string | undefined;
+  let interkomStatus: string | undefined;
   if (sheetsConfigured) {
     try {
-      const [tok, chat, ikEnabled, phStatus] = await Promise.all([
-        getSetting("telegram_bot_token"),
-        getSetting("telegram_chat_id"),
-        getSetting("interkom_enabled"),
-        getSetting("phaeton_status"),
-      ]);
+      const [tok, chat, ikEnabled, phStatus, shStatus, atStatus, ikStatus] =
+        await Promise.all([
+          getSetting("telegram_bot_token"),
+          getSetting("telegram_chat_id"),
+          getSetting("interkom_enabled"),
+          getSetting("phaeton_status"),
+          getSetting("shatem_status"),
+          getSetting("autotrade_status"),
+          getSetting("interkom_status"),
+        ]);
       tgTokenSetting = tok;
       tgChat = (chat ?? "").trim();
       interkomEnabled = (ikEnabled ?? "").trim() === "on";
       phaetonStatus = (phStatus ?? "").trim();
+      shatemStatus = (shStatus ?? "").trim();
+      autotradeStatus = (atStatus ?? "").trim();
+      interkomStatus = (ikStatus ?? "").trim();
       sheetsOk = true;
     } catch {
       sheetsOk = false;
@@ -73,20 +82,28 @@ export async function GET() {
   }
   const tgToken = (tgTokenSetting || process.env.TELEGRAM_BOT_TOKEN || "").trim();
 
-  const [shatemReachable, tgTokenOk, proxy] = await Promise.all([
-    // Shate-M lives behind the KZ proxy (its root pinged directly from Vercel
-    // always fails — a false alarm). Probe the way search actually uses it:
-    // an authed call through the proxy. Fail-safe → never throws the endpoint.
-    shatemConfigured
-      ? getLocations()
-          .then((l) => l.length > 0)
-          .catch(() => false)
-      : Promise.resolve(false),
+  const [tgTokenOk, proxy] = await Promise.all([
     checkTelegramToken(tgToken),
     // Живость KZ-прокси (общий канал всех поставщиков). Кэш ~30с + свой таймаут,
     // fail-safe — латентность /api/health не растёт.
     checkProxyHealth(),
   ]);
+
+  // Все поставщики ходят через один прокси: если он лёг — показываем их «не
+  // работает», не дожидаясь крона (иначе дашборд врал бы «отдаёт» во время
+  // простоя прокси). Крон при этом статусы НЕ перезаписывает — без шторма
+  // алертов на восстановлении.
+  const proxyDown = proxy.configured && !proxy.ok;
+  const supplierCheck = (
+    configured: boolean,
+    status: string | undefined,
+    off = false
+  ): string => {
+    if (!configured) return "missing";
+    if (off) return "off";
+    if (proxyDown) return "fail";
+    return status === "up" ? "ok" : status === "down" ? "fail" : "unknown";
+  };
 
   // Заказ уходит в телеграм только если есть И рабочий токен, И чат
   // (см. app/api/order) — поэтому «ok» лишь когда есть оба.
@@ -108,20 +125,17 @@ export async function GET() {
       version: VERSION,
       timestamp: new Date().toISOString(),
       checks: {
-        // Честный сигнал: реальная проба выдачи Р1 из крона (proxy-check).
-        // "missing" без ключа; "unknown" пока крон ещё не проверил; иначе up/down.
-        phaeton: !phaetonConfigured
-          ? "missing"
-          : phaetonStatus === "up"
-            ? "ok"
-            : phaetonStatus === "down"
-              ? "fail"
-              : "unknown",
-        shatem: shatemConfigured ? (shatemReachable ? "ok" : "fail") : "missing",
-        autotrade: autotradeConfigured ? "configured" : "missing",
-        // Interkom: "missing" без кредов; "off" если креды есть, но выключатель
-        // interkom_enabled не «on»; "ok" (подключён) когда есть и то, и другое.
-        interkom: !interkomConfigured ? "missing" : interkomEnabled ? "ok" : "off",
+        // Честные сигналы: реальные пробы выдачи из крона (proxy-check).
+        // "missing" без ключа; "off" (Interkom) — выключен тумблером; "unknown" —
+        // крон ещё не проверил; "fail" — не отдаёт (или прокси лежит); "ok".
+        phaeton: supplierCheck(phaetonConfigured, phaetonStatus),
+        shatem: supplierCheck(shatemConfigured, shatemStatus),
+        autotrade: supplierCheck(autotradeConfigured, autotradeStatus),
+        interkom: supplierCheck(
+          interkomConfigured,
+          interkomStatus,
+          interkomConfigured && !interkomEnabled
+        ),
         proxy: !proxy.configured ? "missing" : proxy.ok ? "ok" : "fail",
         sheets: !sheetsConfigured ? "missing" : sheetsOk ? "ok" : "fail",
         cloudinary:
