@@ -29,6 +29,15 @@ const PROXY_VALUE_RU: Record<string, string> = {
   missing: "не настроен",
 };
 
+// Phaeton (Р1): честный статус из реальной пробы выдачи (крон proxy-check).
+// «нет данных» — крон ещё не проверял (первые ~5 мин после деплоя).
+const PHAETON_VALUE_RU: Record<string, string> = {
+  ok: "отдаёт запчасти",
+  fail: "не отдаёт",
+  unknown: "нет данных",
+  missing: "не настроен",
+};
+
 // Interkom: подключён (креды + включён), выключен (креды есть, тумблер off),
 // не настроен (нет логина/пароля).
 const INTERKOM_VALUE_RU: Record<string, string> = {
@@ -101,7 +110,9 @@ export function TabDashboard({ onOpenOrders }: { onOpenOrders: () => void }) {
                     ? PROXY_VALUE_RU[v] ?? v
                     : k === "interkom"
                       ? INTERKOM_VALUE_RU[v] ?? v
-                      : v
+                      : k === "phaeton"
+                        ? PHAETON_VALUE_RU[v] ?? v
+                        : v
                 }
               />
             ))

@@ -8,19 +8,6 @@ export const dynamic = "force-dynamic";
 
 const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.GITHUB_SHA?.slice(0, 7) ?? "dev";
 
-async function checkUrl(url: string, timeoutMs = 4000): Promise<boolean> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
-    return res.ok || res.status === 401 || res.status === 403; // any reachable answer counts
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 /** Does the bot token actually work? Presence of a value proves nothing. */
 async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<boolean> {
   if (!token) return false;
@@ -41,7 +28,7 @@ async function checkTelegramToken(token: string, timeoutMs = 4000): Promise<bool
 }
 
 export async function GET() {
-  const phaetonBase = process.env.PHAETON_BASE_URL || "https://api.phaeton.kz";
+  const phaetonConfigured = Boolean(process.env.PHAETON_API_KEY);
   const shatemConfigured = Boolean(process.env.SHATEM_API_KEY);
   const autotradeConfigured = Boolean(
     process.env.AUTOTRADE_API_KEY || process.env.AUTOTRADE_LOGIN
@@ -63,16 +50,22 @@ export async function GET() {
   let tgTokenSetting: string | undefined;
   let tgChat = "";
   let interkomEnabled = false;
+  // Честный статус Phaeton пишет крон /api/cron/proxy-check раз в ~5 мин реальной
+  // пробой выдачи (см. lib/phaeton/health). Health лишь ЧИТАЕТ последний вердикт
+  // из настройки — быстро и без тяжёлого запроса на каждый опрос дашборда.
+  let phaetonStatus: string | undefined;
   if (sheetsConfigured) {
     try {
-      const [tok, chat, ikEnabled] = await Promise.all([
+      const [tok, chat, ikEnabled, phStatus] = await Promise.all([
         getSetting("telegram_bot_token"),
         getSetting("telegram_chat_id"),
         getSetting("interkom_enabled"),
+        getSetting("phaeton_status"),
       ]);
       tgTokenSetting = tok;
       tgChat = (chat ?? "").trim();
       interkomEnabled = (ikEnabled ?? "").trim() === "on";
+      phaetonStatus = (phStatus ?? "").trim();
       sheetsOk = true;
     } catch {
       sheetsOk = false;
@@ -80,8 +73,7 @@ export async function GET() {
   }
   const tgToken = (tgTokenSetting || process.env.TELEGRAM_BOT_TOKEN || "").trim();
 
-  const [phaetonOk, shatemReachable, tgTokenOk, proxy] = await Promise.all([
-    checkUrl(`${phaetonBase}/`),
+  const [shatemReachable, tgTokenOk, proxy] = await Promise.all([
     // Shate-M lives behind the KZ proxy (its root pinged directly from Vercel
     // always fails — a false alarm). Probe the way search actually uses it:
     // an authed call through the proxy. Fail-safe → never throws the endpoint.
@@ -116,7 +108,15 @@ export async function GET() {
       version: VERSION,
       timestamp: new Date().toISOString(),
       checks: {
-        phaeton: phaetonOk ? "ok" : "fail",
+        // Честный сигнал: реальная проба выдачи Р1 из крона (proxy-check).
+        // "missing" без ключа; "unknown" пока крон ещё не проверил; иначе up/down.
+        phaeton: !phaetonConfigured
+          ? "missing"
+          : phaetonStatus === "up"
+            ? "ok"
+            : phaetonStatus === "down"
+              ? "fail"
+              : "unknown",
         shatem: shatemConfigured ? (shatemReachable ? "ok" : "fail") : "missing",
         autotrade: autotradeConfigured ? "configured" : "missing",
         // Interkom: "missing" без кредов; "off" если креды есть, но выключатель
